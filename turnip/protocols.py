@@ -35,7 +35,7 @@ class GitProcessProtocol(protocol.ProcessProtocol):
             self.peer.transport.loseConnection()
 
 
-class GitServerProtocol(protocol.Protocol):
+class PackServerProtocol(protocol.Protocol):
 
     got_request = False
     _buffer = b''
@@ -91,7 +91,7 @@ class GitServerProtocol(protocol.Protocol):
         self.transport.write(data)
 
 
-class GitBackendProtocol(GitServerProtocol):
+class PackBackendProtocol(PackServerProtocol):
 
     def requestReceived(self, command, raw_pathname, host):
         path = helpers.compose_path(self.factory.root, raw_pathname)
@@ -109,15 +109,15 @@ class GitBackendProtocol(GitServerProtocol):
         reactor.spawnProcess(self.peer, cmd, args)
 
 
-class GitBackendFactory(protocol.Factory):
+class PackBackendFactory(protocol.Factory):
 
-    protocol = GitBackendProtocol
+    protocol = PackBackendProtocol
 
     def __init__(self, root):
         self.root = root
 
 
-class GitClientProtocol(protocol.Protocol):
+class PackClientProtocol(protocol.Protocol):
 
     def setPeer(self, peer):
         self.peer = peer
@@ -134,9 +134,9 @@ class GitClientProtocol(protocol.Protocol):
             self.peer.transport.loseConnection()
 
 
-class GitClientFactory(protocol.ClientFactory):
+class PackClientFactory(protocol.ClientFactory):
 
-    protocol = GitClientProtocol
+    protocol = PackClientProtocol
 
     def setServer(self, server):
         self.server = server
@@ -150,7 +150,7 @@ class GitClientFactory(protocol.ClientFactory):
         self.server.transport.loseConnection()
 
 
-class GitFrontendProtocol(GitServerProtocol):
+class PackFrontendProtocol(PackServerProtocol):
 
     command = pathname = host = write = None
 
@@ -172,7 +172,7 @@ class GitFrontendProtocol(GitServerProtocol):
             self.die(b'Repository is read-only')
             return
 
-        client = GitClientFactory()
+        client = PackClientFactory()
         client.setServer(self)
         reactor.connectTCP(
             self.factory.backend_host, self.factory.backend_port, client)
@@ -185,9 +185,9 @@ class GitFrontendProtocol(GitServerProtocol):
                     self.command, self.pathname, self.host)))
 
 
-class GitFrontendFactory(protocol.Factory):
+class PackFrontendFactory(protocol.Factory):
 
-    protocol = GitFrontendProtocol
+    protocol = PackFrontendProtocol
 
     def __init__(self, backend_host, backend_port, virt_endpoint):
         self.backend_host = backend_host

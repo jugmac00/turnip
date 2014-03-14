@@ -21,9 +21,9 @@ from twisted.web import (
     xmlrpc,
     )
 
-from turnip.git import (
-    GitBackendFactory,
-    GitFrontendFactory,
+from turnip.protocols import (
+    PackBackendFactory,
+    PackFrontendFactory,
     )
 
 
@@ -115,9 +115,9 @@ class TestBackendFunctional(FunctionalTestMixin, TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         super(TestBackendFunctional, self).setUp()
-        # Set up a GitBackendFactory on a free port in a clean repo root.
+        # Set up a PackBackendFactory on a free port in a clean repo root.
         self.root = self.useFixture(TempDir()).path
-        self.listener = reactor.listenTCP(0, GitBackendFactory(self.root))
+        self.listener = reactor.listenTCP(0, PackBackendFactory(self.root))
         self.port = self.listener.getHost().port
 
         yield self.assertCommandSuccess(
@@ -149,14 +149,14 @@ class TestFrontendFunctional(FunctionalTestMixin, TestCase):
         yield self.assertCommandSuccess(
             (b'git', b'init', b'--bare', internal_name), path=self.root)
         self.backend_listener = reactor.listenTCP(
-            0, GitBackendFactory(self.root))
+            0, PackBackendFactory(self.root))
         self.backend_port = self.backend_listener.getHost().port
 
         # And finally run a frontend server connecting to the backend
         # and virt info servers.
         self.frontend_listener = reactor.listenTCP(
             0,
-            GitFrontendFactory(
+            PackFrontendFactory(
                 b'localhost', self.backend_port,
                 b'http://localhost:%d/' % self.virt_port))
         self.port = self.frontend_listener.getHost().port

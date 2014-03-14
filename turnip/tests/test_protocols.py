@@ -8,12 +8,12 @@ from testtools import TestCase
 from twisted.test import proto_helpers
 
 from turnip import (
-    git,
     helpers,
+    protocols,
     )
 
 
-class DummyGitServerProtocol(git.GitServerProtocol):
+class DummyPackServerProtocol(protocols.PackServerProtocol):
 
     test_request = None
 
@@ -23,12 +23,12 @@ class DummyGitServerProtocol(git.GitServerProtocol):
         self.test_request = (command, pathname, host)
 
 
-class TestGitServerProtocol(TestCase):
+class TestPackServerProtocol(TestCase):
     """Test the base implementation of the git pack network protocol."""
 
     def setUp(self):
-        super(TestGitServerProtocol, self).setUp()
-        self.proto = DummyGitServerProtocol()
+        super(TestPackServerProtocol, self).setUp()
+        self.proto = DummyPackServerProtocol()
         self.transport = proto_helpers.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
