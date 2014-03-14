@@ -45,7 +45,7 @@ class TestPackServerProtocol(TestCase):
         self.proto.dataReceived(
             b'002egit-upload-pack /foo.git\0host=example.com\0')
         self.assertEqual(
-            (b'git-upload-pack', b'/foo.git', b'example.com'),
+            (b'git-upload-pack', b'/foo.git', {b'host': b'example.com'}),
             self.proto.test_request)
 
     def test_handles_fragmentation(self):
@@ -54,7 +54,7 @@ class TestPackServerProtocol(TestCase):
         self.proto.dataReceived(b'egit-upload-pack /foo.git\0hos')
         self.proto.dataReceived(b't=example.com\0')
         self.assertEqual(
-            (b'git-upload-pack', b'/foo.git', b'example.com'),
+            (b'git-upload-pack', b'/foo.git', {b'host': b'example.com'}),
             self.proto.test_request)
         self.assertTrue(self.transport.connected)
 
@@ -66,7 +66,7 @@ class TestPackServerProtocol(TestCase):
         self.proto.dataReceived(
             b'002egit-upload-pack /foo.git\0host=example.com\0lol')
         self.assertEqual(
-            (b'git-upload-pack', b'/foo.git', b'example.com'),
+            (b'git-upload-pack', b'/foo.git', {b'host': b'example.com'}),
             self.proto.test_request)
         self.assertKilledWith(b'Garbage after request packet')
 

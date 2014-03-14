@@ -62,11 +62,11 @@ class PackServerProtocol(protocol.Protocol):
             if data is None:
                 return
             try:
-                command, pathname, host = helpers.decode_request(data)
+                command, pathname, params = helpers.decode_request(data)
             except ValueError as e:
                 self.die(str(e).encode('utf-8'))
                 return
-            self.requestReceived(command, pathname, host)
+            self.requestReceived(command, pathname, params)
             self.got_request = True
             # There should be no further traffic from the client until
             # the server is up and has sent its refs.
@@ -93,7 +93,7 @@ class PackServerProtocol(protocol.Protocol):
 
 class PackBackendProtocol(PackServerProtocol):
 
-    def requestReceived(self, command, raw_pathname, host):
+    def requestReceived(self, command, raw_pathname, params):
         path = helpers.compose_path(self.factory.root, raw_pathname)
         if command == b'git-upload-pack':
             cmd = b'git'
@@ -152,10 +152,10 @@ class PackClientFactory(protocol.ClientFactory):
 
 class PackFrontendProtocol(PackServerProtocol):
 
-    command = pathname = host = write = None
+    command = pathname = params = write = None
 
     @defer.inlineCallbacks
-    def requestReceived(self, command, pathname, host):
+    def requestReceived(self, command, pathname, params):
 
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint)
         try:
@@ -166,7 +166,7 @@ class PackFrontendProtocol(PackServerProtocol):
             self.die(b"Boom: %r" % e)
             return
         self.command = command
-        self.host = host
+        self.params = params
 
         if command != b'git-upload-pack' and not self.writable:
             self.die(b'Repository is read-only')
@@ -182,7 +182,8 @@ class PackFrontendProtocol(PackServerProtocol):
         if self.peer is not None:
             self.peer.transport.write(
                 helpers.encode_packet(helpers.encode_request(
-                    self.command, self.pathname, self.host)))
+                    self.command, self.pathname,
+                    {b'host': self.params[b'host']})))
 
 
 class PackFrontendFactory(protocol.Factory):
