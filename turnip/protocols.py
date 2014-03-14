@@ -157,7 +157,7 @@ class PackFrontendProtocol(PackServerProtocol):
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, host):
 
-        proxy = xmlrpc.Proxy(self.factory.virt_endpoint)
+        proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint)
         try:
             translated = yield proxy.callRemote(b'translatePath', pathname)
             self.pathname = translated['path']
@@ -189,7 +189,7 @@ class PackFrontendFactory(protocol.Factory):
 
     protocol = PackFrontendProtocol
 
-    def __init__(self, backend_host, backend_port, virt_endpoint):
+    def __init__(self, backend_host, backend_port, virtinfo_endpoint):
         self.backend_host = backend_host
         self.backend_port = backend_port
-        self.virt_endpoint = virt_endpoint
+        self.virtinfo_endpoint = virtinfo_endpoint

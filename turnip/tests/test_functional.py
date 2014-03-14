@@ -27,7 +27,7 @@ from turnip.protocols import (
     )
 
 
-class FakeVirtService(xmlrpc.XMLRPC):
+class FakeVirtInfoService(xmlrpc.XMLRPC):
     """A trivial virt information XML-RPC service.
 
     Translates a path to its SHA-256 hash. The repo is writable if the
@@ -138,9 +138,9 @@ class TestFrontendFunctional(FunctionalTestMixin, TestCase):
 
         # Set up a fake virt information XML-RPC server which just
         # maps paths to their SHA-256 hash.
-        self.virt_listener = reactor.listenTCP(
-            0, server.Site(FakeVirtService()))
-        self.virt_port = self.virt_listener.getHost().port
+        self.virtinfo_listener = reactor.listenTCP(
+            0, server.Site(FakeVirtInfoService()))
+        self.virtinfo_port = self.virtinfo_listener.getHost().port
 
         # Run a backend server in a repo root containing an empty repo
         # for the path '/test'.
@@ -153,12 +153,12 @@ class TestFrontendFunctional(FunctionalTestMixin, TestCase):
         self.backend_port = self.backend_listener.getHost().port
 
         # And finally run a frontend server connecting to the backend
-        # and virt info servers.
+        # and virtinfo servers.
         self.frontend_listener = reactor.listenTCP(
             0,
             PackFrontendFactory(
                 b'localhost', self.backend_port,
-                b'http://localhost:%d/' % self.virt_port))
+                b'http://localhost:%d/' % self.virtinfo_port))
         self.port = self.frontend_listener.getHost().port
 
         # Always use a writable URL for now.
@@ -170,7 +170,7 @@ class TestFrontendFunctional(FunctionalTestMixin, TestCase):
         super(TestFrontendFunctional, self).tearDown()
         yield self.frontend_listener.stopListening()
         yield self.backend_listener.stopListening()
-        yield self.virt_listener.stopListening()
+        yield self.virtinfo_listener.stopListening()
 
     @defer.inlineCallbacks
     def test_read_only(self):
