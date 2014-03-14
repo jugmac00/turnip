@@ -8,7 +8,9 @@ import os.path
 
 
 def compose_path(root, path):
-    full_path = os.path.join(root, path)
-    if not os.path.realpath(full_path).startswith(root):
-        raise ValueError(path)
+    # Construct the full path, stripping any leading slashes so we
+    # resolve absolute paths within the root.
+    full_path = os.path.abspath(os.path.join(root, path.lstrip(os.path.sep)))
+    if not full_path.startswith(os.path.abspath(root)):
+        raise ValueError('Path not contained within root')
     return full_path
