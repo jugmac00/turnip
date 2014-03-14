@@ -36,7 +36,7 @@ class TestGitServerProtocol(TestCase):
     def assertKilledWith(self, message):
         self.assertFalse(self.transport.connected)
         self.assertEqual(
-            (b'ERR ' + message, b''),
+            (b'ERR ' + message + b'\n', b''),
             helpers.decode_packet(self.transport.value()))
 
     def test_calls_requestReceived(self):

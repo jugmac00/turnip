@@ -84,7 +84,7 @@ class GitServerProtocol(protocol.Protocol):
 
     def die(self, message):
         self.transport.write(
-            helpers.encode_packet(b'ERR ' + message))
+            helpers.encode_packet(b'ERR ' + message + b'\n'))
         self.transport.loseConnection()
 
     def sendData(self, data):
