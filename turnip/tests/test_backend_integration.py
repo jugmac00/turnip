@@ -35,7 +35,7 @@ class TestBackendIntegration(TestCase):
         yield self.listener.stopListening()
 
     @defer.inlineCallbacks
-    def assertCommandSuccess(self, command, path):
+    def assertCommandSuccess(self, command, path='.'):
         out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], path=path)
         self.assertEqual(0, code)
@@ -43,35 +43,45 @@ class TestBackendIntegration(TestCase):
 
     @defer.inlineCallbacks
     def test_clone_and_push(self):
-        # Test a full clone, commit, push, clone cycle using the backend
-        # server.
+        # Test a full clone, commit, push, clone, commit, push, pull
+        # cycle using the backend server.
         yield self.assertCommandSuccess(
             (b'git', b'init', b'--bare', b'test'), path=self.root)
         url = b'git://localhost:%d/test' % self.port
         test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+        clone2 = os.path.join(test_root, 'clone2')
 
         # Clone the empty repo from the backend and commit to it.
-        yield self.assertCommandSuccess(
-            (b'git', b'clone', url), path=test_root)
+        yield self.assertCommandSuccess((b'git', b'clone', url, clone1))
         yield self.assertCommandSuccess(
             (b'git', b'config', b'user.email', b'test@example.com'),
-            path=os.path.join(test_root, b'test'))
+            path=clone1)
         yield self.assertCommandSuccess(
             (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
-            path=os.path.join(test_root, b'test'))
+            path=clone1)
 
         # Push it back up to the backend.
         yield self.assertCommandSuccess(
-            (b'git', b'push', b'origin', b'master'),
-            path=os.path.join(test_root, b'test'))
+            (b'git', b'push', b'origin', b'master'), path=clone1)
 
         # Re-clone and check that we got the fresh commit.
-        yield self.assertCommandSuccess(
-            (b'git', b'clone', url, b'test2'), path=test_root)
+        yield self.assertCommandSuccess((b'git', b'clone', url, clone2))
         out = yield self.assertCommandSuccess(
-            (b'git', b'log', b'--oneline', b'-n', b'1'),
-            path=os.path.join(test_root, b'test2'))
+            (b'git', b'log', b'--oneline', b'-n', b'1'), path=clone2)
         self.assertIn(b'Committed test', out)
+
+        # Commit and push from the second clone.
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Another test'),
+            path=clone2)
+        yield self.assertCommandSuccess((b'git', b'push'), path=clone2)
+
+        # Pull into the first clone and check for the second commit.
+        yield self.assertCommandSuccess((b'git', b'pull'), path=clone1)
+        out = yield self.assertCommandSuccess(
+            (b'git', b'log', b'--oneline', b'-n', b'1'), path=clone1)
+        self.assertIn(b'Another test', out)
 
     @defer.inlineCallbacks
     def test_no_repo(self):
