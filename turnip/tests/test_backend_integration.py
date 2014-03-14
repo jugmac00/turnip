@@ -4,6 +4,7 @@ from __future__ import (
     unicode_literals,
     )
 
+import hashlib
 import os.path
 
 from fixtures import TempDir
@@ -14,8 +15,33 @@ from twisted.internet import (
     reactor,
     utils,
     )
+from twisted.web import (
+    server,
+    xmlrpc,
+    )
 
-from turnip.git import GitBackendFactory
+from turnip.git import (
+    GitBackendFactory,
+    GitFrontendFactory,
+    )
+
+
+class FakeVirtService(xmlrpc.XMLRPC):
+    """A trivial virt information XML-RPC service.
+
+    Translates a path to its SHA-256 hash. The repo is writable if the
+    path is prefixed with '/+rw'
+    """
+
+    def xmlrpc_translatePath(self, pathname):
+        writable = False
+        if pathname.startswith('/+rw'):
+            writable = True
+            pathname = pathname[4:]
+        return {
+            'path': hashlib.sha256(pathname).hexdigest(),
+            'writable': writable,
+            }
 
 
 class IntegrationTestMixin(object):
@@ -95,3 +121,45 @@ class TestBackendIntegration(IntegrationTestMixin, TestCase):
     def tearDown(self):
         super(TestBackendIntegration, self).tearDown()
         yield self.listener.stopListening()
+
+
+class TestFrontendIntegration(IntegrationTestMixin, TestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        super(TestFrontendIntegration, self).setUp()
+
+        # Set up a fake virt information XML-RPC server which just
+        # maps paths to their SHA-256 hash.
+        self.virt_listener = reactor.listenTCP(
+            0, server.Site(FakeVirtService()))
+        self.virt_port = self.virt_listener.getHost().port
+
+        # Run a backend server in a repo root containing an empty repo
+        # for the path '/test'.
+        self.root = self.useFixture(TempDir()).path
+        internal_name = hashlib.sha256(b'/test').hexdigest()
+        yield self.assertCommandSuccess(
+            (b'git', b'init', b'--bare', internal_name), path=self.root)
+        self.backend_listener = reactor.listenTCP(
+            0, GitBackendFactory(self.root))
+        self.backend_port = self.backend_listener.getHost().port
+
+        # And finally run a frontend server connecting to the backend
+        # and virt info servers.
+        self.frontend_listener = reactor.listenTCP(
+            0,
+            GitFrontendFactory(
+                b'localhost', self.backend_port,
+                b'http://localhost:%d/' % self.virt_port))
+        self.port = self.frontend_listener.getHost().port
+
+        # Always use a writable URL for now.
+        self.url = b'git://localhost:%d/+rw/test' % self.port
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        super(TestFrontendIntegration, self).tearDown()
+        yield self.frontend_listener.stopListening()
+        yield self.backend_listener.stopListening()
+        yield self.virt_listener.stopListening()
