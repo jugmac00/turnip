@@ -5,6 +5,7 @@ from __future__ import (
     )
 
 from testtools import TestCase
+from twisted.test import proto_helpers
 
 from turnip import git
 
@@ -97,3 +98,77 @@ class TestEncodeRequest(TestCase):
         self.assertInvalid(
             b'git-do-stuff', b'/some/path', b'exam\0le.com',
             b'Metacharacter in arguments')
+
+
+class DummyGitServerProtocol(git.GitServerProtocol):
+
+    test_request = None
+
+    def requestReceived(self, command, pathname, host):
+        if self.test_request is not None:
+            raise AssertionError('Request already received')
+        self.test_request = (command, pathname, host)
+
+
+class TestGitServerProtocol(TestCase):
+    """Test the base implementation of the git pack network protocol."""
+
+    def setUp(self):
+        super(TestGitServerProtocol, self).setUp()
+        self.proto = DummyGitServerProtocol()
+        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport.protocol = self.proto
+        self.proto.makeConnection(self.transport)
+
+    def assertKilledWith(self, message):
+        self.assertFalse(self.transport.connected)
+        self.assertEqual(
+            (b'ERR ' + message, b''),
+            git.decode_packet(self.transport.value()))
+
+    def test_calls_requestReceived(self):
+        # dataReceived waits for a complete request packet and calls
+        # requestReceived.
+        self.proto.dataReceived(
+            b'002egit-upload-pack /foo.git\0host=example.com\0')
+        self.assertEqual(
+            (b'git-upload-pack', b'/foo.git', b'example.com'),
+            self.proto.test_request)
+
+    def test_handles_fragmentation(self):
+        # dataReceived handles fragmented request packets.
+        self.proto.dataReceived(b'002')
+        self.proto.dataReceived(b'egit-upload-pack /foo.git\0hos')
+        self.proto.dataReceived(b't=example.com\0')
+        self.assertEqual(
+            (b'git-upload-pack', b'/foo.git', b'example.com'),
+            self.proto.test_request)
+        self.assertTrue(self.transport.connected)
+
+    def test_rejects_trailing_garbage(self):
+        # Any input after the request packet but before the server's
+        # greeting is invalid. (This will change once we're handling
+        # HTTP too, but by then we'll be able to forward the trailing
+        # bits through).
+        self.proto.dataReceived(
+            b'002egit-upload-pack /foo.git\0host=example.com\0lol')
+        self.assertEqual(
+            (b'git-upload-pack', b'/foo.git', b'example.com'),
+            self.proto.test_request)
+        self.assertKilledWith(b'Garbage after request packet')
+
+    def test_drops_bad_packet(self):
+        # An invalid packet causes the connection to be dropped.
+        self.proto.dataReceived('abcg')
+        self.assertKilledWith(b'Invalid pkt-len in request')
+
+    def test_drops_bad_request(self):
+        # An invalid request causes the connection to be dropped.
+        self.proto.dataReceived('0007lol')
+        self.assertKilledWith(b'Invalid git-proto-request')
+
+    def test_drops_flush_request(self):
+        # A flush packet is not a valid request, so the connection is
+        # dropped.
+        self.proto.dataReceived('0000')
+        self.assertKilledWith(b'Invalid pkt-len in request')

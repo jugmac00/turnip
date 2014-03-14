@@ -28,6 +28,24 @@ def encode_packet(data):
         return (b'%04x' % (len(data) + PKT_LEN_SIZE)).encode('ascii') + data
 
 
+def decode_packet(input):
+    """Consume a packet, returning the payload and any unconsumed tail."""
+    if input.startswith(b'0000'):
+        return (None, input[PKT_LEN_SIZE:])
+    else:
+        try:
+            pkt_len = int(input[:PKT_LEN_SIZE], 16)
+            if not (4 <= pkt_len <= 65524):
+                raise ValueError()
+        except ValueError:
+            raise ValueError("Invalid pkt-len")
+        if len(input) < pkt_len:
+            # Some of the packet is yet to be received.
+            # XXX: None is ambiguous with flush-pkt!
+            return (None, input)
+        return (input[PKT_LEN_SIZE:pkt_len], input[pkt_len:])
+
+
 def decode_request(data):
     """Decode a git-proto-request.
 
@@ -88,11 +106,11 @@ class GitServerProtocol(protocol.Protocol):
             return
         try:
             pkt_len = int(self._buffer[:PKT_LEN_SIZE], 16)
+            if not (4 <= pkt_len <= 65524):
+                raise ValueError()
         except ValueError:
-            self.transport.loseConnection()
+            self.die(b'Invalid pkt-len in request')
             return
-
-        assert 4 <= pkt_len <= 65524
         if len(self._buffer) < pkt_len:
             # Some of the packet is yet to be received.
             return
@@ -106,15 +124,19 @@ class GitServerProtocol(protocol.Protocol):
             data = self.readPacket()
             if data is None:
                 return
-            command, pathname, host = decode_request(data)
+            try:
+                command, pathname, host = decode_request(data)
+            except ValueError as e:
+                self.die(e.message.encode('utf-8'))
+                return
             self.requestReceived(command, pathname, host)
             self.got_request = True
             # There should be no further traffic from the client until
             # the server is up and has sent its refs.
             if len(self._buffer) > 0:
-                self.die(b'Garbage after request line.')
+                self.die(b'Garbage after request packet')
         elif self.peer is None:
-            self.die(b'Garbage after request line.')
+            self.die(b'Garbage after request packet')
         else:
             self.peer.transport.write(data)
 
@@ -143,7 +165,7 @@ class GitBackendProtocol(GitServerProtocol):
             cmd = b'git'
             args = [b'git', b'receive-pack', path]
         else:
-            self.die(b'Unsupport command in request.')
+            self.die(b'Unsupport command in request')
             return
         self.peer = GitProcessProtocol()
         self.peer.setPeer(self)
@@ -210,7 +232,7 @@ class GitFrontendProtocol(GitServerProtocol):
         self.host = host
 
         if command != b'git-upload-pack' and not self.writable:
-            self.die(b'Repository is read-only.')
+            self.die(b'Repository is read-only')
             return
 
         client = GitClientFactory()
