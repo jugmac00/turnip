@@ -9,6 +9,7 @@ import os.path
 
 from fixtures import TempDir
 from testtools import TestCase
+from testtools.content import text_content
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (
     defer,
@@ -52,7 +53,10 @@ class FunctionalTestMixin(object):
     def assertCommandSuccess(self, command, path='.'):
         out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], path=path)
-        self.assertEqual(0, code)
+        if code != 0:
+            self.addDetail('stdout', text_content(out))
+            self.addDetail('stderr', text_content(err))
+            self.assertEqual(0, code)
         defer.returnValue(out)
 
     @defer.inlineCallbacks
@@ -83,6 +87,9 @@ class FunctionalTestMixin(object):
         self.assertIn(b'Committed test', out)
 
         # Commit and push from the second clone.
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone2)
         yield self.assertCommandSuccess(
             (b'git', b'commit', b'--allow-empty', b'-m', b'Another test'),
             path=clone2)
@@ -174,6 +181,9 @@ class TestFrontendFunctional(FunctionalTestMixin, TestCase):
         # Create a read-only clone.
         yield self.assertCommandSuccess(
             (b'git', b'clone', self.ro_url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
         yield self.assertCommandSuccess(
             (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
             path=clone1)
