@@ -4,12 +4,17 @@ from __future__ import (
     unicode_literals,
     )
 
+import sys
+
 from twisted.internet import (
     defer,
     protocol,
     reactor,
     )
-from twisted.web import xmlrpc
+# twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
+# bits of this module work.
+if sys.version_info.major < 3:
+    from twisted.web import xmlrpc
 
 from turnip import helpers
 
@@ -40,7 +45,7 @@ class GitServerProtocol(protocol.Protocol):
         try:
             packet, tail = helpers.decode_packet(self._buffer)
         except ValueError as e:
-            self.die(b'Bad request: ' + e.message.encode('utf-8'))
+            self.die(b'Bad request: ' + str(e).encode('utf-8'))
             return None
         if packet is None:
             self.die(b'Bad request: flush-pkt instead')
@@ -59,7 +64,7 @@ class GitServerProtocol(protocol.Protocol):
             try:
                 command, pathname, host = helpers.decode_request(data)
             except ValueError as e:
-                self.die(e.message.encode('utf-8'))
+                self.die(str(e).encode('utf-8'))
                 return
             self.requestReceived(command, pathname, host)
             self.got_request = True
