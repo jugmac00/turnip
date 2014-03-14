@@ -44,7 +44,7 @@ class FakeVirtService(xmlrpc.XMLRPC):
             }
 
 
-class IntegrationTestMixin(object):
+class FunctionalTestMixin(object):
 
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=30)
 
@@ -103,11 +103,11 @@ class IntegrationTestMixin(object):
         self.assertIn(b'fatal:', output)
 
 
-class TestBackendIntegration(IntegrationTestMixin, TestCase):
+class TestBackendFunctional(FunctionalTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        super(TestBackendIntegration, self).setUp()
+        super(TestBackendFunctional, self).setUp()
         # Set up a GitBackendFactory on a free port in a clean repo root.
         self.root = self.useFixture(TempDir()).path
         self.listener = reactor.listenTCP(0, GitBackendFactory(self.root))
@@ -119,15 +119,15 @@ class TestBackendIntegration(IntegrationTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        super(TestBackendIntegration, self).tearDown()
+        super(TestBackendFunctional, self).tearDown()
         yield self.listener.stopListening()
 
 
-class TestFrontendIntegration(IntegrationTestMixin, TestCase):
+class TestFrontendFunctional(FunctionalTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        super(TestFrontendIntegration, self).setUp()
+        super(TestFrontendFunctional, self).setUp()
 
         # Set up a fake virt information XML-RPC server which just
         # maps paths to their SHA-256 hash.
@@ -160,7 +160,7 @@ class TestFrontendIntegration(IntegrationTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        super(TestFrontendIntegration, self).tearDown()
+        super(TestFrontendFunctional, self).tearDown()
         yield self.frontend_listener.stopListening()
         yield self.backend_listener.stopListening()
         yield self.virt_listener.stopListening()
