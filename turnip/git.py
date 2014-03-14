@@ -19,9 +19,13 @@ PKT_LEN_SIZE = 4
 
 def encode_packet(data):
     if data is None:
+        # flush-pkt.
         return b'0000'
     else:
-        return ('%04x' % (len(data) + PKT_LEN_SIZE)).encode('ascii') + data
+        # data-pkt
+        if len(data) > 65520:
+            raise ValueError("data-pkt payload must not exceed 65520 bytes")
+        return (b'%04x' % (len(data) + PKT_LEN_SIZE)).encode('ascii') + data
 
 
 def decode_request(data):
@@ -30,6 +34,8 @@ def decode_request(data):
     Returns a tuple of (command, pathname, host). host may be None if
     there was no host-parameter.
     """
+    if b' ' not in data:
+        raise ValueError('Invalid git-proto-request')
     command, rest = data.split(b' ', 1)
     args = rest.split(b'\0')
     if len(args) not in (2, 3) or args[-1] != b'':
@@ -48,7 +54,7 @@ def encode_request(command, pathname, host=None):
     """Encode a command, pathname and optional host into a git-proto-request.
     """
     if b' ' in command or b'\0' in pathname or (host and b'\0' in host):
-        raise ValueError()
+        raise ValueError('Metacharacter in arguments')
     bits = [pathname]
     if host is not None:
         bits.append(b'host=' + host)
