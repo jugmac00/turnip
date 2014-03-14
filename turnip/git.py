@@ -104,21 +104,18 @@ class GitServerProtocol(protocol.Protocol):
     peer = None
 
     def readPacket(self):
-        if len(self._buffer) < PKT_LEN_SIZE:
-            return
         try:
-            pkt_len = int(self._buffer[:PKT_LEN_SIZE], 16)
-            if not (4 <= pkt_len <= 65524):
-                raise ValueError()
-        except ValueError:
-            self.die(b'Invalid pkt-len in request')
-            return
-        if len(self._buffer) < pkt_len:
-            # Some of the packet is yet to be received.
-            return
-        data = self._buffer[PKT_LEN_SIZE:pkt_len]
-        self._buffer = self._buffer[pkt_len:]
-        return data
+            packet, tail = decode_packet(self._buffer)
+        except ValueError as e:
+            self.die(b'Bad request: ' + e.message.encode('utf-8'))
+            return None
+        if packet is None:
+            self.die(b'Bad request: flush-pkt instead')
+            return None
+        if packet is INCOMPLETE_PKT:
+            return None
+        self._buffer = tail
+        return packet
 
     def dataReceived(self, data):
         if not self.got_request:

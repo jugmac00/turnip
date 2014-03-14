@@ -187,7 +187,7 @@ class TestGitServerProtocol(TestCase):
     def test_drops_bad_packet(self):
         # An invalid packet causes the connection to be dropped.
         self.proto.dataReceived('abcg')
-        self.assertKilledWith(b'Invalid pkt-len in request')
+        self.assertKilledWith(b'Bad request: Invalid pkt-len')
 
     def test_drops_bad_request(self):
         # An invalid request causes the connection to be dropped.
@@ -198,4 +198,4 @@ class TestGitServerProtocol(TestCase):
         # A flush packet is not a valid request, so the connection is
         # dropped.
         self.proto.dataReceived('0000')
-        self.assertKilledWith(b'Invalid pkt-len in request')
+        self.assertKilledWith(b'Bad request: flush-pkt instead')
