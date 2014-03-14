@@ -12,7 +12,7 @@ from twisted.web import (
     static,
     )
 
-from turnip.utils import compose_path
+from turnip.helpers import compose_path
 
 
 class TurnipAPIResource(resource.Resource):
