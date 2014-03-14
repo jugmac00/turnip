@@ -9,8 +9,8 @@ from testtools import TestCase
 from turnip import helpers
 
 
-TEST_DATA = '0123456789abcdef'
-TEST_PKT = '00140123456789abcdef'
+TEST_DATA = b'0123456789abcdef'
+TEST_PKT = b'00140123456789abcdef'
 
 
 class TestComposePath(TestCase):
@@ -37,9 +37,9 @@ class TestComposePath(TestCase):
     def test_no_escape(self):
         # You can't get out.
         self.assertRaises(
-            ValueError, helpers.compose_path, '/foo', '../bar')
+            ValueError, helpers.compose_path, b'/foo', b'../bar')
         self.assertRaises(
-            ValueError, helpers.compose_path, '/foo', '/foo/../../bar')
+            ValueError, helpers.compose_path, b'/foo', b'/foo/../../bar')
 
 
 class TestEncodePacket(TestCase):
@@ -57,9 +57,9 @@ class TestEncodePacket(TestCase):
     def test_rejects_oversized_payload(self):
         # pkt-lines are limited to 65524 bytes, so the data must not
         # exceed 65520 bytes.
-        data = 'a' * 65520
+        data = b'a' * 65520
         self.assertEqual(b'fff4', helpers.encode_packet(data)[:4])
-        data += 'a'
+        data += b'a'
         self.assertRaises(ValueError, helpers.encode_packet, data)
 
 
@@ -94,7 +94,7 @@ class TestDecodeRequest(TestCase):
 
     def assertInvalid(self, req, message):
         e = self.assertRaises(ValueError, helpers.decode_request, req)
-        self.assertEqual(message, e.message)
+        self.assertEqual(message, str(e).encode('utf-8'))
 
     def test_without_host(self):
         self.assertEqual(
@@ -133,7 +133,7 @@ class TestEncodeRequest(TestCase):
     def assertInvalid(self, command, pathname, host, message):
         e = self.assertRaises(
             ValueError, helpers.encode_request, command, pathname, host)
-        self.assertEqual(message, e.message)
+        self.assertEqual(message, str(e).encode('utf-8'))
 
     def test_without_host(self):
         self.assertEqual(

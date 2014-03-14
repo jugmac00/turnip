@@ -14,7 +14,8 @@ INCOMPLETE_PKT = object()
 def compose_path(root, path):
     # Construct the full path, stripping any leading slashes so we
     # resolve absolute paths within the root.
-    full_path = os.path.abspath(os.path.join(root, path.lstrip(os.path.sep)))
+    full_path = os.path.abspath(os.path.join(
+        root, path.lstrip(os.path.sep.encode('utf-8'))))
     if not full_path.startswith(os.path.abspath(root)):
         raise ValueError('Path not contained within root')
     return full_path
@@ -28,7 +29,7 @@ def encode_packet(data):
         # data-pkt
         if len(data) > 65520:
             raise ValueError("data-pkt payload must not exceed 65520 bytes")
-        return (b'%04x' % (len(data) + PKT_LEN_SIZE)).encode('ascii') + data
+        return ('%04x' % (len(data) + PKT_LEN_SIZE)).encode('ascii') + data
 
 
 def decode_packet(input):
