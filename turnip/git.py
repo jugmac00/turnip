@@ -15,6 +15,7 @@ from turnip.utils import compose_path
 
 
 PKT_LEN_SIZE = 4
+INCOMPLETE_PKT = object()
 
 
 def encode_packet(data):
@@ -30,19 +31,20 @@ def encode_packet(data):
 
 def decode_packet(input):
     """Consume a packet, returning the payload and any unconsumed tail."""
+    if len(input) < PKT_LEN_SIZE:
+        return (INCOMPLETE_PKT, input)
     if input.startswith(b'0000'):
         return (None, input[PKT_LEN_SIZE:])
     else:
         try:
             pkt_len = int(input[:PKT_LEN_SIZE], 16)
             if not (4 <= pkt_len <= 65524):
-                raise ValueError()
+                raise ValueError("Invalid pkt-len")
         except ValueError:
             raise ValueError("Invalid pkt-len")
         if len(input) < pkt_len:
             # Some of the packet is yet to be received.
-            # XXX: None is ambiguous with flush-pkt!
-            return (None, input)
+            return (INCOMPLETE_PKT, input)
         return (input[PKT_LEN_SIZE:pkt_len], input[pkt_len:])
 
 

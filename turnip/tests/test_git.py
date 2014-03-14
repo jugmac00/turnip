@@ -9,6 +9,8 @@ from twisted.test import proto_helpers
 
 from turnip import git
 
+TEST_DATA = '0123456789abcdef'
+TEST_PKT = '00140123456789abcdef'
 
 class TestEncodePacket(TestCase):
     """Test git pkt-line encoding."""
@@ -16,8 +18,7 @@ class TestEncodePacket(TestCase):
     def test_data(self):
         # Encoding a string creates a data-pkt, prefixing it with a
         # four-byte length of the entire packet.
-        data = b'0123456789abcdef'
-        self.assertEqual(b'0014' + data, git.encode_packet(data))
+        self.assertEqual(TEST_PKT, git.encode_packet(TEST_DATA))
 
     def test_flush(self):
         # None represents the special flush-pkt, a zero-length packet.
@@ -30,6 +31,32 @@ class TestEncodePacket(TestCase):
         self.assertEqual(b'fff4', git.encode_packet(data)[:4])
         data += 'a'
         self.assertRaises(ValueError, git.encode_packet, data)
+
+
+class TestDecodePacket(TestCase):
+    """Test git pkt-line decoding."""
+
+    def test_data(self):
+        self.assertEqual((TEST_DATA, b''), git.decode_packet(TEST_PKT))
+
+    def test_flush(self):
+        self.assertEqual((None, b''), git.decode_packet(b'0000'))
+
+    def test_data_with_tail(self):
+        self.assertEqual(
+            (TEST_DATA, b'foo'), git.decode_packet(TEST_PKT + b'foo'))
+
+    def test_flush_with_tail(self):
+        self.assertEqual((None, b'foo'), git.decode_packet(b'0000foo'))
+
+    def test_incomplete_len(self):
+        self.assertEqual(
+            (git.INCOMPLETE_PKT, b'001'), git.decode_packet(b'001'))
+
+    def test_incomplete_data(self):
+        self.assertEqual(
+            (git.INCOMPLETE_PKT, TEST_PKT[:-1]),
+            git.decode_packet(TEST_PKT[:-1]))
 
 
 class TestDecodeRequest(TestCase):
