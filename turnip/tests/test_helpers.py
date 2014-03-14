@@ -90,41 +90,60 @@ class TestDecodePacket(TestCase):
 
 
 class TestDecodeRequest(TestCase):
-    """Test git-proto-request decoding."""
+    """Test turnip-proto-request decoding.
+
+    It's a superset of git-proto-request, supporting multiple named
+    parameters rather than just host-parameter.
+    """
 
     def assertInvalid(self, req, message):
         e = self.assertRaises(ValueError, helpers.decode_request, req)
         self.assertEqual(message, str(e).encode('utf-8'))
 
-    def test_without_host(self):
+    def test_without_parameters(self):
         self.assertEqual(
-            (b'git-do-stuff', b'/some/path', None),
+            (b'git-do-stuff', b'/some/path', {}),
             helpers.decode_request(b'git-do-stuff /some/path\0'))
 
-    def test_with_host(self):
+    def test_with_host_parameter(self):
         self.assertEqual(
-            (b'git-do-stuff', b'/some/path', b'example.com'),
+            (b'git-do-stuff', b'/some/path', {b'host': b'example.com'}),
             helpers.decode_request(
                 b'git-do-stuff /some/path\0host=example.com\0'))
 
+    def test_with_host_and_user_parameters(self):
+        self.assertEqual(
+            (b'git-do-stuff', b'/some/path',
+             {b'host': b'example.com', b'user': b'foo=bar'}),
+            helpers.decode_request(
+                b'git-do-stuff /some/path\0host=example.com\0user=foo=bar\0'))
+
     def test_rejects_totally_invalid(self):
-        # There must be a space preceding an argument list.
+        # There must be a space preceding the pathname.
         self.assertInvalid(b'git-do-stuff', b'Invalid git-proto-request')
 
-    def test_rejects_no_args(self):
-        # There must be at least one NUL-terminated argument, the path.
+    def test_rejects_no_pathname(self):
+        # There must be a NUL-terminated pathname following the command
+        # and space.
         self.assertInvalid(b'git-do-stuff ', b'Invalid git-proto-request')
 
-    def test_rejects_too_many_args(self):
-        # A maximum of two arguments are supported.
+    def test_rejects_parameter_without_value(self):
+        # Each named parameter must have a value.
         self.assertInvalid(
             b'git-do-stuff /foo\0host=bar\0lol\0',
+            b'Parameters must have values')
+
+    def test_rejects_unterminated_parameters(self):
+        # Each parameter must be NUL-terminated.
+        self.assertInvalid(
+            b'git-do-stuff /foo\0boo=bar',
             b'Invalid git-proto-request')
 
-    def test_rejects_bad_host(self):
-        # The host-parameter must start with host=.
+    def test_rejects_duplicate_parameters(self):
+        # Each parameter must be NUL-terminated.
         self.assertInvalid(
-            b'git-do-stuff /foo\0ghost\0', b'Invalid host-parameter')
+            b'git-do-stuff /foo\0host=foo\0host=bar\0',
+            b'Parameters must not be repeated')
 
 
 class TestEncodeRequest(TestCase):

@@ -57,27 +57,30 @@ def decode_packet(input):
 
 
 def decode_request(data):
-    """Decode a git-proto-request.
+    """Decode a turnip-proto-request.
 
-    Returns a tuple of (command, pathname, host). host may be None if
-    there was no host-parameter.
+    turnip-proto-request is a superset of git-proto-request, supporting
+    multiple named parameters. A turnip-proto-request with no parameters
+    other than 'host' is also a git-proto-request.
     """
     if b' ' not in data:
         raise ValueError('Invalid git-proto-request')
     command, rest = data.split(b' ', 1)
-    args = rest.split(b'\0')
-    # Arguments consist of a pathname optionally followed by a
-    # host-parameter. Each argument is NUL-terminated.
-    if len(args) not in (2, 3) or args[-1] != b'':
+    bits = rest.split(b'\0')
+    # Following the command is a pathname, then any number of named
+    # parameters. Each of these is NUL-terminated.
+    if len(bits) < 2 or bits[-1] != b'':
         raise ValueError('Invalid git-proto-request')
-    pathname = args[0]
-    if len(args) == 3:
-        if not args[1].startswith(b'host='):
-            raise ValueError('Invalid host-parameter')
-        host = args[1][len(b'host='):]
-    else:
-        host = None
-    return (command, pathname, host)
+    pathname = bits[0]
+    params = {}
+    for param in bits[1:-1]:
+        if b'=' not in param:
+            raise ValueError('Parameters must have values')
+        name, value = param.split(b'=', 1)
+        if name in params:
+            raise ValueError('Parameters must not be repeated')
+        params[name] = value
+    return (command, pathname, params)
 
 
 def encode_request(command, pathname, host=None):
