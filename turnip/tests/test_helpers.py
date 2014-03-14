@@ -6,7 +6,7 @@ from __future__ import (
 
 from testtools import TestCase
 
-from turnip import utils
+from turnip import helpers
 
 
 class TestComposePath(TestCase):
@@ -16,23 +16,23 @@ class TestComposePath(TestCase):
         # The path is resolved within the given root tree.
         self.assertEqual(
             b'/foo/bar/baz/quux',
-            utils.compose_path(b'/foo/bar', b'baz/quux'))
+            helpers.compose_path(b'/foo/bar', b'baz/quux'))
 
     def test_absolute(self):
         # Even absolute paths are contained.
         self.assertEqual(
             b'/foo/bar/baz/quux',
-            utils.compose_path(b'/foo/bar', b'/baz/quux'))
+            helpers.compose_path(b'/foo/bar', b'/baz/quux'))
 
     def test_normalises(self):
         # Paths are normalised.
         self.assertEqual(
             b'/foo/bar/baz/quux',
-            utils.compose_path(b'///foo/.//bar', b'//baz/..//baz/./quux'))
+            helpers.compose_path(b'///foo/.//bar', b'//baz/..//baz/./quux'))
 
     def test_no_escape(self):
         # You can't get out.
         self.assertRaises(
-            ValueError, utils.compose_path, '/foo', '../bar')
+            ValueError, helpers.compose_path, '/foo', '../bar')
         self.assertRaises(
-            ValueError, utils.compose_path, '/foo', '/foo/../../bar')
+            ValueError, helpers.compose_path, '/foo', '/foo/../../bar')

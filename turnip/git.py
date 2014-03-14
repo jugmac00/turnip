@@ -11,7 +11,7 @@ from twisted.internet import (
     )
 from twisted.web import xmlrpc
 
-from turnip.utils import compose_path
+from turnip.helpers import compose_path
 
 
 PKT_LEN_SIZE = 4

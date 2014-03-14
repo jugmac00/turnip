@@ -12,6 +12,7 @@ from turnip import git
 TEST_DATA = '0123456789abcdef'
 TEST_PKT = '00140123456789abcdef'
 
+
 class TestEncodePacket(TestCase):
     """Test git pkt-line encoding."""
 
