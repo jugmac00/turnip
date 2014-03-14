@@ -129,7 +129,7 @@ class GitServerProtocol(protocol.Protocol):
 class GitBackendProtocol(GitServerProtocol):
 
     def requestReceived(self, command, raw_pathname, host):
-        path = compose_path(self.factory.root, raw_pathname)
+        path = compose_path(self.factory.root, raw_pathname.lstrip('/'))
         if command == b'git-upload-pack':
             cmd = b'git'
             args = [b'git', b'upload-pack', path]
