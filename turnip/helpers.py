@@ -8,6 +8,7 @@ import os.path
 
 
 PKT_LEN_SIZE = 4
+PKT_PAYLOAD_MAX = 65520
 INCOMPLETE_PKT = object()
 
 
@@ -21,15 +22,17 @@ def compose_path(root, path):
     return full_path
 
 
-def encode_packet(data):
-    if data is None:
+def encode_packet(payload):
+    if payload is None:
         # flush-pkt.
         return b'0000'
     else:
         # data-pkt
-        if len(data) > 65520:
-            raise ValueError("data-pkt payload must not exceed 65520 bytes")
-        return ('%04x' % (len(data) + PKT_LEN_SIZE)).encode('ascii') + data
+        if len(payload) > PKT_PAYLOAD_MAX:
+            raise ValueError(
+                "data-pkt payload must not exceed %d bytes" % PKT_PAYLOAD_MAX)
+        pkt_len = ('%04x' % (len(payload) + PKT_LEN_SIZE)).encode('ascii')
+        return pkt_len + payload
 
 
 def decode_packet(input):
@@ -37,13 +40,15 @@ def decode_packet(input):
     if len(input) < PKT_LEN_SIZE:
         return (INCOMPLETE_PKT, input)
     if input.startswith(b'0000'):
+        # flush-pkt
         return (None, input[PKT_LEN_SIZE:])
     else:
+        # data-pkt
         try:
             pkt_len = int(input[:PKT_LEN_SIZE], 16)
-            if not (4 <= pkt_len <= 65524):
-                raise ValueError("Invalid pkt-len")
         except ValueError:
+            pkt_len = 0
+        if not (PKT_LEN_SIZE <= pkt_len <= (PKT_LEN_SIZE + PKT_PAYLOAD_MAX)):
             raise ValueError("Invalid pkt-len")
         if len(input) < pkt_len:
             # Some of the packet is yet to be received.
@@ -61,6 +66,8 @@ def decode_request(data):
         raise ValueError('Invalid git-proto-request')
     command, rest = data.split(b' ', 1)
     args = rest.split(b'\0')
+    # Arguments consist of a pathname optionally followed by a
+    # host-parameter. Each argument is NUL-terminated.
     if len(args) not in (2, 3) or args[-1] != b'':
         raise ValueError('Invalid git-proto-request')
     pathname = args[0]
