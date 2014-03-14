@@ -156,6 +156,7 @@ class TestFrontendIntegration(IntegrationTestMixin, TestCase):
 
         # Always use a writable URL for now.
         self.url = b'git://localhost:%d/+rw/test' % self.port
+        self.ro_url = b'git://localhost:%d/test' % self.port
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -163,3 +164,33 @@ class TestFrontendIntegration(IntegrationTestMixin, TestCase):
         yield self.frontend_listener.stopListening()
         yield self.backend_listener.stopListening()
         yield self.virt_listener.stopListening()
+
+    @defer.inlineCallbacks
+    def test_read_only(self):
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+        clone2 = os.path.join(test_root, 'clone2')
+
+        # Create a read-only clone.
+        yield self.assertCommandSuccess(
+            (b'git', b'clone', self.ro_url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+
+        # A push attempt is rejected.
+        out = yield utils.getProcessOutput(
+            b'git', (b'push', b'origin', b'master'), path=clone1,
+            errortoo=True)
+        self.assertIn(b'fatal: remote error: Repository is read-only', out)
+
+        # The remote repository is still empty.
+        out = yield utils.getProcessOutput(
+            b'git', (b'clone', self.ro_url, clone2), errortoo=True)
+        self.assertIn(b'You appear to have cloned an empty repository.', out)
+
+        # But the push succeeds if we switch the remote to the writable URL.
+        yield self.assertCommandSuccess(
+            (b'git', b'remote', b'set-url', b'origin', self.url), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
