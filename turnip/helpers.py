@@ -83,12 +83,15 @@ def decode_request(data):
     return (command, pathname, params)
 
 
-def encode_request(command, pathname, host=None):
-    """Encode a command, pathname and optional host into a git-proto-request.
+def encode_request(command, pathname, params):
+    """Encode a command, pathname and parameters into a turnip-proto-request.
     """
-    if b' ' in command or b'\0' in pathname or (host and b'\0' in host):
+    if b' ' in command or b'\0' in pathname:
         raise ValueError('Metacharacter in arguments')
     bits = [pathname]
-    if host is not None:
-        bits.append(b'host=' + host)
+    for name in sorted(params):
+        value = params[name]
+        if b'=' in name or b'\0' in name + value:
+            raise ValueError('Metacharacter in arguments')
+        bits.append(name + b'=' + value)
     return command + b' ' + b'\0'.join(bits) + b'\0'

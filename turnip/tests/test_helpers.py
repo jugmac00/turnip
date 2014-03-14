@@ -149,29 +149,36 @@ class TestDecodeRequest(TestCase):
 class TestEncodeRequest(TestCase):
     """Test git-proto-request encoding."""
 
-    def assertInvalid(self, command, pathname, host, message):
+    def assertInvalid(self, command, pathname, params, message):
         e = self.assertRaises(
-            ValueError, helpers.encode_request, command, pathname, host)
+            ValueError, helpers.encode_request, command, pathname, params)
         self.assertEqual(message, str(e).encode('utf-8'))
 
-    def test_without_host(self):
+    def test_without_parameters(self):
         self.assertEqual(
             b'git-do-stuff /some/path\0',
-            helpers.encode_request(b'git-do-stuff', b'/some/path'))
+            helpers.encode_request(b'git-do-stuff', b'/some/path', {}))
 
-    def test_with_host(self):
+    def test_with_parameters(self):
         self.assertEqual(
-            b'git-do-stuff /some/path\0host=example.com\0',
+            b'git-do-stuff /some/path\0host=example.com\0user=foo=bar\0',
             helpers.encode_request(
-                b'git-do-stuff', b'/some/path', b'example.com'))
+                b'git-do-stuff', b'/some/path',
+                {b'host': b'example.com', b'user': b'foo=bar'}))
 
     def test_rejects_meta_in_args(self):
         self.assertInvalid(
-            b'git do-stuff', b'/some/path', b'example.com',
+            b'git do-stuff', b'/some/path', {b'host': b'example.com'},
             b'Metacharacter in arguments')
         self.assertInvalid(
-            b'git-do-stuff', b'/some/\0path', b'example.com',
+            b'git-do-stuff', b'/some/\0path', {b'host': b'example.com'},
             b'Metacharacter in arguments')
         self.assertInvalid(
-            b'git-do-stuff', b'/some/path', b'exam\0le.com',
+            b'git-do-stuff', b'/some/path', {b'host\0': b'example.com'},
+            b'Metacharacter in arguments')
+        self.assertInvalid(
+            b'git-do-stuff', b'/some/path', {b'host=': b'example.com'},
+            b'Metacharacter in arguments')
+        self.assertInvalid(
+            b'git-do-stuff', b'/some/path', {b'host': b'exam\0le.com'},
             b'Metacharacter in arguments')
