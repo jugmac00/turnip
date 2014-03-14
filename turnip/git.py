@@ -11,74 +11,7 @@ from twisted.internet import (
     )
 from twisted.web import xmlrpc
 
-from turnip.helpers import compose_path
-
-
-PKT_LEN_SIZE = 4
-INCOMPLETE_PKT = object()
-
-
-def encode_packet(data):
-    if data is None:
-        # flush-pkt.
-        return b'0000'
-    else:
-        # data-pkt
-        if len(data) > 65520:
-            raise ValueError("data-pkt payload must not exceed 65520 bytes")
-        return (b'%04x' % (len(data) + PKT_LEN_SIZE)).encode('ascii') + data
-
-
-def decode_packet(input):
-    """Consume a packet, returning the payload and any unconsumed tail."""
-    if len(input) < PKT_LEN_SIZE:
-        return (INCOMPLETE_PKT, input)
-    if input.startswith(b'0000'):
-        return (None, input[PKT_LEN_SIZE:])
-    else:
-        try:
-            pkt_len = int(input[:PKT_LEN_SIZE], 16)
-            if not (4 <= pkt_len <= 65524):
-                raise ValueError("Invalid pkt-len")
-        except ValueError:
-            raise ValueError("Invalid pkt-len")
-        if len(input) < pkt_len:
-            # Some of the packet is yet to be received.
-            return (INCOMPLETE_PKT, input)
-        return (input[PKT_LEN_SIZE:pkt_len], input[pkt_len:])
-
-
-def decode_request(data):
-    """Decode a git-proto-request.
-
-    Returns a tuple of (command, pathname, host). host may be None if
-    there was no host-parameter.
-    """
-    if b' ' not in data:
-        raise ValueError('Invalid git-proto-request')
-    command, rest = data.split(b' ', 1)
-    args = rest.split(b'\0')
-    if len(args) not in (2, 3) or args[-1] != b'':
-        raise ValueError('Invalid git-proto-request')
-    pathname = args[0]
-    if len(args) == 3:
-        if not args[1].startswith(b'host='):
-            raise ValueError('Invalid host-parameter')
-        host = args[1][len(b'host='):]
-    else:
-        host = None
-    return (command, pathname, host)
-
-
-def encode_request(command, pathname, host=None):
-    """Encode a command, pathname and optional host into a git-proto-request.
-    """
-    if b' ' in command or b'\0' in pathname or (host and b'\0' in host):
-        raise ValueError('Metacharacter in arguments')
-    bits = [pathname]
-    if host is not None:
-        bits.append(b'host=' + host)
-    return command + b' ' + b'\0'.join(bits) + b'\0'
+from turnip import helpers
 
 
 class GitProcessProtocol(protocol.ProcessProtocol):
@@ -105,14 +38,14 @@ class GitServerProtocol(protocol.Protocol):
 
     def readPacket(self):
         try:
-            packet, tail = decode_packet(self._buffer)
+            packet, tail = helpers.decode_packet(self._buffer)
         except ValueError as e:
             self.die(b'Bad request: ' + e.message.encode('utf-8'))
             return None
         if packet is None:
             self.die(b'Bad request: flush-pkt instead')
             return None
-        if packet is INCOMPLETE_PKT:
+        if packet is helpers.INCOMPLETE_PKT:
             return None
         self._buffer = tail
         return packet
@@ -124,7 +57,7 @@ class GitServerProtocol(protocol.Protocol):
             if data is None:
                 return
             try:
-                command, pathname, host = decode_request(data)
+                command, pathname, host = helpers.decode_request(data)
             except ValueError as e:
                 self.die(e.message.encode('utf-8'))
                 return
@@ -146,7 +79,7 @@ class GitServerProtocol(protocol.Protocol):
 
     def die(self, message):
         self.transport.write(
-            encode_packet(b'ERR ' + message))
+            helpers.encode_packet(b'ERR ' + message))
         self.transport.loseConnection()
 
     def sendData(self, data):
@@ -156,7 +89,7 @@ class GitServerProtocol(protocol.Protocol):
 class GitBackendProtocol(GitServerProtocol):
 
     def requestReceived(self, command, raw_pathname, host):
-        path = compose_path(self.factory.root, raw_pathname)
+        path = helpers.compose_path(self.factory.root, raw_pathname)
         if command == b'git-upload-pack':
             cmd = b'git'
             args = [b'git', b'upload-pack', path]
@@ -243,8 +176,8 @@ class GitFrontendProtocol(GitServerProtocol):
         self.peer = peer
         if self.peer is not None:
             self.peer.transport.write(
-                encode_packet(
-                    encode_request(self.command, self.pathname, self.host)))
+                helpers.encode_packet(helpers.encode_request(
+                    self.command, self.pathname, self.host)))
 
 
 class GitFrontendFactory(protocol.Factory):
