@@ -130,11 +130,11 @@ class TestBackendFunctional(FunctionalTestMixin, TestCase):
         yield self.listener.stopListening()
 
 
-class TestFrontendFunctional(FunctionalTestMixin, TestCase):
+class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
     @defer.inlineCallbacks
     def setUp(self):
-        super(TestFrontendFunctional, self).setUp()
+        super(FrontendFunctionalTestMixin, self).setUp()
 
         # Set up a fake virt information XML-RPC server which just
         # maps paths to their SHA-256 hash.
@@ -152,23 +152,9 @@ class TestFrontendFunctional(FunctionalTestMixin, TestCase):
             0, PackBackendFactory(self.root))
         self.backend_port = self.backend_listener.getHost().port
 
-        # And finally run a frontend server connecting to the backend
-        # and virtinfo servers.
-        self.frontend_listener = reactor.listenTCP(
-            0,
-            PackFrontendFactory(
-                b'localhost', self.backend_port,
-                b'http://localhost:%d/' % self.virtinfo_port))
-        self.port = self.frontend_listener.getHost().port
-
-        # Always use a writable URL for now.
-        self.url = b'git://localhost:%d/+rw/test' % self.port
-        self.ro_url = b'git://localhost:%d/test' % self.port
-
     @defer.inlineCallbacks
     def tearDown(self):
-        super(TestFrontendFunctional, self).tearDown()
-        yield self.frontend_listener.stopListening()
+        super(FrontendFunctionalTestMixin, self).tearDown()
         yield self.backend_listener.stopListening()
         yield self.virtinfo_listener.stopListening()
 
@@ -204,3 +190,28 @@ class TestFrontendFunctional(FunctionalTestMixin, TestCase):
             (b'git', b'remote', b'set-url', b'origin', self.url), path=clone1)
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'master'), path=clone1)
+
+
+class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield super(TestGitFrontendFunctional, self).setUp()
+
+        # We run a frontend server connecting to the backend and
+        # virtinfo servers started by the mixin.
+        self.frontend_listener = reactor.listenTCP(
+            0,
+            PackFrontendFactory(
+                b'localhost', self.backend_port,
+                b'http://localhost:%d/' % self.virtinfo_port))
+        self.port = self.frontend_listener.getHost().port
+
+        # Always use a writable URL for now.
+        self.url = b'git://localhost:%d/+rw/test' % self.port
+        self.ro_url = b'git://localhost:%d/test' % self.port
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield super(TestGitFrontendFunctional, self).tearDown()
+        yield self.frontend_listener.stopListening()
