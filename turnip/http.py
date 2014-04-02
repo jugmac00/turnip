@@ -17,6 +17,7 @@ from twisted.web import (
     resource,
     server,
     static,
+    xmlrpc,
     )
 
 from turnip.helpers import (
@@ -109,18 +110,39 @@ class SmartHTTPRefsResource(resource.Resource):
             return resource.NoResource(
                 b'Only git smart HTTP clients are supported.')
 
+        d = self.doIt(request, service)
+        d.addErrback(request.processingFailed)
+        return server.NOT_DONE_YET
+
+    @defer.inlineCallbacks
+    def doIt(self, request, service):
         request.setHeader(
             b'Content-Type', b'application/x-%s-advertisement' % service)
         request.write(encode_packet(b'# service=%s\n' % service))
         request.write(encode_packet(None))
 
+        proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint)
+        try:
+            translated = yield proxy.callRemote(b'translatePath', self.path)
+            self.pathname = translated['path']
+            self.writable = translated['writable']
+        except Exception as e:
+            self.die(request, b"Boom: %r" % e)
+            return
+
+        if service != b'git-upload-pack' and not self.writable:
+            self.die(request, b'Repository is read-only')
+            return
+
         client_factory = HTTPPackClientFactory(
-            b'git-upload-pack', self.path,
+            service, self.pathname,
             {b'turnip-advertise-refs': b'yes'}, request.content, request)
         reactor.connectTCP(
             self.root.backend_host, self.root.backend_port, client_factory)
 
-        return server.NOT_DONE_YET
+    def die(self, request, message):
+        request.write(encode_packet(b'ERR ' + message + b'\n'))
+        request.finish()
 
 
 class SmartHTTPCommandResource(resource.Resource):
@@ -133,8 +155,6 @@ class SmartHTTPCommandResource(resource.Resource):
         self.path = path
 
     def render_POST(self, request):
-        request.setHeader(
-            b'Content-Type', b'application/x-%s-result' % self.service)
         content = request.content
         # XXX: We really need to hack twisted.web to stream the request
         # body, and decode it in a less hacky manner (git always uses
@@ -144,13 +164,37 @@ class SmartHTTPCommandResource(resource.Resource):
         if content_encoding == b'gzip':
             content = StringIO(
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
+
+        d = self.doIt(request, content, self.service)
+        d.addErrback(request.processingFailed)
+        return server.NOT_DONE_YET
+
+    @defer.inlineCallbacks
+    def doIt(self, request, content, service):
+        request.setHeader(
+            b'Content-Type', b'application/x-%s-result' % self.service)
+        proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint)
+        try:
+            translated = yield proxy.callRemote(b'translatePath', self.path)
+            self.pathname = translated['path']
+            self.writable = translated['writable']
+        except Exception as e:
+            self.die(request, b"Boom: %r" % e)
+            return
+
+        if service != b'git-upload-pack' and not self.writable:
+            self.die(request, b'Repository is read-only')
+            return
+
         client_factory = HTTPPackClientFactory(
-            self.service, self.path,
+            self.service, self.pathname,
             {b'turnip-stateless-rpc': b'yes'}, content, request)
         reactor.connectTCP(
             self.root.backend_host, self.root.backend_port, client_factory)
 
-        return server.NOT_DONE_YET
+    def die(self, request, message):
+        request.write(encode_packet(b'ERR ' + message + b'\n'))
+        request.finish()
 
 
 class SmartHTTPFrontendResource(resource.Resource):

@@ -234,8 +234,8 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         self.port = self.frontend_listener.getHost().port
 
         # Always use a writable URL for now.
-        self.url = b'git://localhost:%d/+rw/test' % self.port
-        self.ro_url = b'git://localhost:%d/test' % self.port
+        self.url = b'http://localhost:%d/+rw/test' % self.port
+        self.ro_url = b'http://localhost:%d/test' % self.port
 
     @defer.inlineCallbacks
     def tearDown(self):
