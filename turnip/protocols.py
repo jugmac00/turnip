@@ -33,7 +33,9 @@ class GitProcessProtocol(protocol.ProcessProtocol):
     def errReceived(self, data):
         self.peer.sendData(data)
 
-    def processEnded(self, status):
+    def processExited(self, status):
+        # XXX: This should be processEnded, but an FD gets left open
+        # somehow when behind the HTTP client.
         self.peer.transport.loseConnection()
 
 
@@ -82,8 +84,8 @@ class PackServerProtocol(protocol.Protocol):
                 self.die(str(e).encode('utf-8'))
                 return
             self.pauseProducing()
-            self.requestReceived(command, pathname, params)
             self.got_request = True
+            self.requestReceived(command, pathname, params)
         elif self.peer is None:
             self.die(b'Garbage after request packet')
         else:
@@ -178,7 +180,6 @@ class PackFrontendProtocol(PackServerProtocol):
 
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, params):
-
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint)
         try:
             translated = yield proxy.callRemote(b'translatePath', pathname)

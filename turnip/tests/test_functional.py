@@ -21,6 +21,7 @@ from twisted.web import (
     xmlrpc,
     )
 
+from turnip.http import SmartHTTPFrontendResource
 from turnip.protocols import (
     PackBackendFactory,
     PackFrontendFactory,
@@ -47,7 +48,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
 
 class FunctionalTestMixin(object):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=30)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
@@ -214,4 +215,29 @@ class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         yield super(TestGitFrontendFunctional, self).tearDown()
+        yield self.frontend_listener.stopListening()
+
+
+class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield super(TestSmartHTTPFrontendFunctional, self).setUp()
+
+        # We run a frontend server connecting to the backend and
+        # virtinfo servers started by the mixin.
+        frontend_site = server.Site(
+            SmartHTTPFrontendResource(
+                b'localhost', self.backend_port,
+                b'http://localhost:%d/' % self.virtinfo_port))
+        self.frontend_listener = reactor.listenTCP(0, frontend_site)
+        self.port = self.frontend_listener.getHost().port
+
+        # Always use a writable URL for now.
+        self.url = b'git://localhost:%d/+rw/test' % self.port
+        self.ro_url = b'git://localhost:%d/test' % self.port
+
+    @defer.inlineCallbacks
+    def tearDown(self):
+        yield super(TestSmartHTTPFrontendFunctional, self).tearDown()
         yield self.frontend_listener.stopListening()
