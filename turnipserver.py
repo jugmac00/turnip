@@ -7,13 +7,13 @@ from __future__ import (
 from twisted.internet import reactor
 from twisted.web import server
 
-from turnip.http import (
-    SmartHTTPFrontendResource,
-    TurnipAPIResource,
-    )
-from turnip.protocols import (
+from turnip.api import TurnipAPIResource
+from turnip.packproto import (
     PackBackendFactory,
     PackFrontendFactory,
+    )
+from turnip.smarthttp import (
+    SmartHTTPFrontendResource,
     )
 
 REPO_STORE = '/var/tmp/git.launchpad.dev'

@@ -9,11 +9,11 @@ from twisted.test import proto_helpers
 
 from turnip import (
     helpers,
-    protocols,
+    packproto,
     )
 
 
-class DummyPackServerProtocol(protocols.PackServerProtocol):
+class DummyPackServerProtocol(packproto.PackServerProtocol):
 
     test_request = None
 

@@ -21,11 +21,11 @@ from twisted.web import (
     xmlrpc,
     )
 
-from turnip.http import SmartHTTPFrontendResource
-from turnip.protocols import (
+from turnip.packproto import (
     PackBackendFactory,
     PackFrontendFactory,
     )
+from turnip.smarthttp import SmartHTTPFrontendResource
 
 
 class FakeVirtInfoService(xmlrpc.XMLRPC):
