@@ -58,17 +58,16 @@ class TestPackServerProtocol(TestCase):
             self.proto.test_request)
         self.assertTrue(self.transport.connected)
 
-    def test_rejects_trailing_garbage(self):
-        # Any input after the request packet but before the server's
-        # greeting is invalid. (This will change once we're handling
-        # HTTP too, but by then we'll be able to forward the trailing
-        # bits through).
+    def test_buffers_trailing_data(self):
+        # Any input after the request packet is buffered until the
+        # implementation handles requestReceived() and calls
+        # resumeProducing().
         self.proto.dataReceived(
             b'002egit-upload-pack /foo.git\0host=example.com\0lol')
         self.assertEqual(
             (b'git-upload-pack', b'/foo.git', {b'host': b'example.com'}),
             self.proto.test_request)
-        self.assertKilledWith(b'Garbage after request packet')
+        self.assertEqual(b'lol', self.proto._buffer)
 
     def test_drops_bad_packet(self):
         # An invalid packet causes the connection to be dropped.

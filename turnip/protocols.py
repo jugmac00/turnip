@@ -21,8 +21,11 @@ from turnip import helpers
 
 class GitProcessProtocol(protocol.ProcessProtocol):
 
-    def setPeer(self, peer):
+    def __init__(self, peer):
         self.peer = peer
+
+    def connectionMade(self):
+        self.peer.resumeProducing()
 
     def outReceived(self, data):
         self.peer.sendData(data)
@@ -31,15 +34,25 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.peer.sendData(data)
 
     def processEnded(self, status):
-        if self.peer is not None:
-            self.peer.transport.loseConnection()
+        self.peer.transport.loseConnection()
 
 
 class PackServerProtocol(protocol.Protocol):
 
+    paused = False
     got_request = False
     _buffer = b''
     peer = None
+
+    def requestReceived(self, command, pathname, params):
+        """Begin handling of a git pack protocol request.
+
+        Implementations must set peer to an IProtocol connected to the
+        backend transport, and perform any connection setup there (eg.
+        sending a modified request line). Calling resumeProducing()
+        will begin passing data through to the backend.
+        """
+        raise NotImplementedError()
 
     def readPacket(self):
         try:
@@ -56,7 +69,9 @@ class PackServerProtocol(protocol.Protocol):
         return packet
 
     def dataReceived(self, data):
-        if not self.got_request:
+        if self.paused:
+            self._buffer += data
+        elif not self.got_request:
             self._buffer += data
             data = self.readPacket()
             if data is None:
@@ -66,20 +81,18 @@ class PackServerProtocol(protocol.Protocol):
             except ValueError as e:
                 self.die(str(e).encode('utf-8'))
                 return
+            self.pauseProducing()
             self.requestReceived(command, pathname, params)
             self.got_request = True
-            # There should be no further traffic from the client until
-            # the server is up and has sent its refs.
-            if len(self._buffer) > 0:
-                self.die(b'Garbage after request packet')
         elif self.peer is None:
             self.die(b'Garbage after request packet')
         else:
+            self.peer.transport.write(self._buffer)
+            self._buffer = b''
             self.peer.transport.write(data)
 
     def connectionLost(self, reason):
-        if self.peer:
-            self.peer.setPeer(None)
+        if self.peer is not None:
             self.peer.transport.loseConnection()
 
     def die(self, message):
@@ -89,6 +102,18 @@ class PackServerProtocol(protocol.Protocol):
 
     def sendData(self, data):
         self.transport.write(data)
+
+    def pauseProducing(self):
+        self.paused = True
+        self.transport.pauseProducing()
+
+    def resumeProducing(self):
+        self.paused = False
+        self.dataReceived(b'')
+        self.transport.resumeProducing()
+
+    def stopProducing(self):
+        self.pauseProducing()
 
 
 class PackBackendProtocol(PackServerProtocol):
@@ -111,8 +136,7 @@ class PackBackendProtocol(PackServerProtocol):
             args.append(b'--advertise-refs')
         args.append(path)
 
-        self.peer = GitProcessProtocol()
-        self.peer.setPeer(self)
+        self.peer = GitProcessProtocol(self)
         reactor.spawnProcess(self.peer, cmd, args)
 
 
@@ -126,35 +150,26 @@ class PackBackendFactory(protocol.Factory):
 
 class PackClientProtocol(protocol.Protocol):
 
-    def setPeer(self, peer):
-        self.peer = peer
-
     def connectionMade(self):
-        self.peer.setPeer(self)
+        self.factory.peer.peer = self
+        self.factory.peer.resumeProducing()
 
     def dataReceived(self, data):
-        self.peer.transport.write(data)
+        self.factory.peer.transport.write(data)
 
     def connectionLost(self, status):
-        if self.peer is not None:
-            self.peer.setPeer(None)
-            self.peer.transport.loseConnection()
+        self.factory.peer.transport.loseConnection()
 
 
 class PackClientFactory(protocol.ClientFactory):
 
     protocol = PackClientProtocol
 
-    def setServer(self, server):
-        self.server = server
-
-    def buildProtocol(self, *args, **kw):
-        proto = protocol.ClientFactory.buildProtocol(self, *args, **kw)
-        proto.setPeer(self.server)
-        return proto
+    def __init__(self, peer):
+        self.peer = peer
 
     def clientConnectionFailed(self, connector, reason):
-        self.server.transport.loseConnection()
+        self.peer.transport.loseConnection()
 
 
 class PackFrontendProtocol(PackServerProtocol):
@@ -179,18 +194,18 @@ class PackFrontendProtocol(PackServerProtocol):
             self.die(b'Repository is read-only')
             return
 
-        client = PackClientFactory()
-        client.setServer(self)
+        client = PackClientFactory(self)
         reactor.connectTCP(
             self.factory.backend_host, self.factory.backend_port, client)
 
-    def setPeer(self, peer):
-        self.peer = peer
-        if self.peer is not None:
-            self.peer.transport.write(
-                helpers.encode_packet(helpers.encode_request(
-                    self.command, self.pathname,
-                    {b'host': self.params[b'host']})))
+    def resumeProducing(self):
+        # Send our translated request and then open the gate to the
+        # client.
+        self.peer.transport.write(
+            helpers.encode_packet(helpers.encode_request(
+                self.command, self.pathname,
+                {b'host': self.params[b'host']})))
+        PackServerProtocol.resumeProducing(self)
 
 
 class PackFrontendFactory(protocol.Factory):
