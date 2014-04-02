@@ -96,14 +96,21 @@ class PackBackendProtocol(PackServerProtocol):
     def requestReceived(self, command, raw_pathname, params):
         path = helpers.compose_path(self.factory.root, raw_pathname)
         if command == b'git-upload-pack':
-            cmd = b'git'
-            args = [b'git', b'upload-pack', path]
+            subcmd = b'upload-pack'
         elif command == b'git-receive-pack':
-            cmd = b'git'
-            args = [b'git', b'receive-pack', path]
+            subcmd = b'receive-pack'
         else:
             self.die(b'Unsupport command in request')
             return
+
+        cmd = b'git'
+        args = [b'git', subcmd]
+        if params.pop(b'turnip-stateless-rpc', None):
+            args.append(b'--stateless-rpc')
+        if params.pop(b'turnip-advertise-refs', None):
+            args.append(b'--advertise-refs')
+        args.append(path)
+
         self.peer = GitProcessProtocol()
         self.peer.setPeer(self)
         reactor.spawnProcess(self.peer, cmd, args)

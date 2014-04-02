@@ -63,3 +63,7 @@ turnip-proto-request alters it to this:
    param = param-name "=" param-value
    param-name = *( %x01-3C / %x3E-FF ) ; exclude NUL and =
    param-value = *%x01-FF ; exclude NUL
+
+The only additional parameters implemented today are
+'turnip-stateless-rpc' and 'turnip-advertise-refs', which are used by
+the smart HTTP server to proxy to the standard pack protocol.
