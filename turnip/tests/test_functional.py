@@ -106,7 +106,7 @@ class FunctionalTestMixin(object):
     def test_no_repo(self):
         test_root = self.useFixture(TempDir()).path
         output = yield utils.getProcessOutput(
-            b'git', (b'clone', b'git://localhost:%d/fail' % self.port),
+            b'git', (b'clone', b'http://localhost:%d/fail' % self.port),
             path=test_root, errortoo=True)
         self.assertIn(b'fatal:', output)
 
