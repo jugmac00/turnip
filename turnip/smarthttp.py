@@ -13,6 +13,7 @@ from twisted.internet import (
     reactor,
     )
 from twisted.web import (
+    http,
     resource,
     server,
     xmlrpc,
@@ -52,7 +53,25 @@ class HTTPPackClientFactory(protocol.ClientFactory):
         self.http_request = http_request
 
 
-class SmartHTTPRefsResource(resource.Resource):
+class BaseSmartHTTPResource(resource.Resource):
+
+    @defer.inlineCallbacks
+    def translateRequestPath(self, request):
+        proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint)
+        translated = yield proxy.callRemote(b'translatePath', self.path)
+        self.pathname = translated['path']
+        self.writable = translated['writable']
+
+    def die(self, request, message):
+        request.setResponseCode(http.INTERNAL_SERVER_ERROR)
+        request.write(encode_packet(b'ERR ' + message + b'\n'))
+        request.finish()
+
+    def die_eb(self, failure, request, message):
+        self.die(request, message + bytes(failure.value))
+
+
+class SmartHTTPRefsResource(BaseSmartHTTPResource):
 
     isLeaf = True
 
@@ -68,6 +87,7 @@ class SmartHTTPRefsResource(resource.Resource):
                 b'Only git smart HTTP clients are supported.')
 
         d = self.doIt(request, service)
+        d.addErrback(self.die_eb, request, b'Boom: ')
         d.addErrback(request.processingFailed)
         return server.NOT_DONE_YET
 
@@ -78,14 +98,7 @@ class SmartHTTPRefsResource(resource.Resource):
         request.write(encode_packet(b'# service=%s\n' % service))
         request.write(encode_packet(None))
 
-        proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint)
-        try:
-            translated = yield proxy.callRemote(b'translatePath', self.path)
-            self.pathname = translated['path']
-            self.writable = translated['writable']
-        except Exception as e:
-            self.die(request, b"Boom: %r" % e)
-            return
+        yield self.translateRequestPath(request)
 
         if service != b'git-upload-pack' and not self.writable:
             self.die(request, b'Repository is read-only')
@@ -97,12 +110,8 @@ class SmartHTTPRefsResource(resource.Resource):
         reactor.connectTCP(
             self.root.backend_host, self.root.backend_port, client_factory)
 
-    def die(self, request, message):
-        request.write(encode_packet(b'ERR ' + message + b'\n'))
-        request.finish()
 
-
-class SmartHTTPCommandResource(resource.Resource):
+class SmartHTTPCommandResource(BaseSmartHTTPResource):
 
     isLeaf = True
 
@@ -123,6 +132,7 @@ class SmartHTTPCommandResource(resource.Resource):
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
 
         d = self.doIt(request, content, self.service)
+        d.addErrback(self.die_eb, request, b'Boom: ')
         d.addErrback(request.processingFailed)
         return server.NOT_DONE_YET
 
@@ -130,14 +140,8 @@ class SmartHTTPCommandResource(resource.Resource):
     def doIt(self, request, content, service):
         request.setHeader(
             b'Content-Type', b'application/x-%s-result' % self.service)
-        proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint)
-        try:
-            translated = yield proxy.callRemote(b'translatePath', self.path)
-            self.pathname = translated['path']
-            self.writable = translated['writable']
-        except Exception as e:
-            self.die(request, b"Boom: %r" % e)
-            return
+
+        yield self.translateRequestPath(request)
 
         if service != b'git-upload-pack' and not self.writable:
             self.die(request, b'Repository is read-only')
@@ -148,10 +152,6 @@ class SmartHTTPCommandResource(resource.Resource):
             {b'turnip-stateless-rpc': b'yes'}, content, request)
         reactor.connectTCP(
             self.root.backend_host, self.root.backend_port, client_factory)
-
-    def die(self, request, message):
-        request.write(encode_packet(b'ERR ' + message + b'\n'))
-        request.finish()
 
 
 class SmartHTTPFrontendResource(resource.Resource):
