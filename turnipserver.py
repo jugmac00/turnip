@@ -17,18 +17,19 @@ from turnip.smarthttp import (
     )
 
 REPO_STORE = '/var/tmp/git.launchpad.dev'
-VIRTINFO_ENDPOINT = b'http://xmlrpc-private.launchpad.dev:8087/githosting'
+VIRTINFO_ENDPOINT = b'http://localhost:6543/githosting'
 
-# Start a backend on 9419, pointed at by a pack frontend on 9418 (the
-# default git:// port) and a smart HTTP frontend on 9421.
-reactor.listenTCP(9419, PackBackendFactory(REPO_STORE))
+# Start a pack storage service on 19418, pointed at by a pack frontend
+# on 9418 (the default git:// port) and a smart HTTP frontend on 9419.
+# An API service runs on 19417.
+reactor.listenTCP(19418, PackBackendFactory(REPO_STORE))
 reactor.listenTCP(
-    9418, PackFrontendFactory('localhost', 9419, VIRTINFO_ENDPOINT))
+    9418, PackFrontendFactory('localhost', 19418, VIRTINFO_ENDPOINT))
 smarthttp_site = server.Site(
-    SmartHTTPFrontendResource(b'localhost', 9419, VIRTINFO_ENDPOINT))
-reactor.listenTCP(9421, smarthttp_site)
+    SmartHTTPFrontendResource(b'localhost', 19418, VIRTINFO_ENDPOINT))
+reactor.listenTCP(9419, smarthttp_site)
 
 api_site = server.Site(TurnipAPIResource(REPO_STORE))
-reactor.listenTCP(9420, api_site)
+reactor.listenTCP(19417, api_site)
 
 reactor.run()
