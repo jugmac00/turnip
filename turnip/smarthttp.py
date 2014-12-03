@@ -53,13 +53,10 @@ class HTTPPackClientFactory(protocol.ClientFactory):
 
 class BaseSmartHTTPResource(resource.Resource):
 
-    def die(self, request, message):
-        request.setResponseCode(http.INTERNAL_SERVER_ERROR)
-        request.write(encode_packet(b'ERR ' + message + b'\n'))
-        request.finish()
-
-    def die_eb(self, failure, request, message):
-        self.die(request, message + bytes(failure.value))
+    def error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
+        request.setResponseCode(code)
+        request.setHeader(b'Content-Type', b'text/plain')
+        return message
 
 
 class SmartHTTPRefsResource(BaseSmartHTTPResource):
@@ -74,8 +71,13 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
         try:
             service = request.args['service'][0]
         except (KeyError, IndexError):
-            return resource.NoResource(
-                b'Only git smart HTTP clients are supported.')
+            return self.error(
+                request, b'Only git smart HTTP clients are supported.',
+                code=http.NOT_FOUND)
+
+        if service not in self.root.allowed_services:
+            return self.error(
+                request, b'Unsupported service.', code=http.FORBIDDEN)
 
         request.setHeader(
             b'Content-Type', b'application/x-%s-advertisement' % service)
@@ -99,13 +101,19 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
         self.path = path
 
     def render_POST(self, request):
+        content_type = request.requestHeaders.getRawHeaders(b'Content-Type')
+        if content_type != [b'application/x-%s-request' % self.service]:
+            return self.error(
+                request, b'Invalid Content-Type for service.',
+                code=http.BAD_REQUEST)
+
         content = request.content
         # XXX: We really need to hack twisted.web to stream the request
         # body, and decode it in a less hacky manner (git always uses
         # C-E: gzip without negotiating).
         content_encoding = request.requestHeaders.getRawHeaders(
-            b'Content-Encoding', default=(None,))[0]
-        if content_encoding == b'gzip':
+            b'Content-Encoding')
+        if content_encoding == [b'gzip']:
             content = StringIO(
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
 
@@ -121,7 +129,7 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
 
 class SmartHTTPFrontendResource(resource.Resource):
 
-    allowed_services = set((b'git-upload-pack', b'git-receive-pack'))
+    allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
 
     def __init__(self, backend_host, backend_port):
         resource.Resource.__init__(self)
