@@ -121,6 +121,8 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
 
 class SmartHTTPFrontendResource(resource.Resource):
 
+    allowed_services = set((b'git-upload-pack', b'git-receive-pack'))
+
     def __init__(self, backend_host, backend_port):
         resource.Resource.__init__(self)
         self.backend_host = backend_host
@@ -130,13 +132,13 @@ class SmartHTTPFrontendResource(resource.Resource):
         if request.path.endswith(b'/info/refs'):
             return SmartHTTPRefsResource(
                 self, request.path[:-len(b'/info/refs')])
-        elif request.path.endswith(b'/git-upload-pack'):
-            return SmartHTTPCommandResource(
-                self, b'git-upload-pack',
-                request.path[:-len(b'/git-upload-pack')])
-        elif request.path.endswith(b'/git-receive-pack'):
-            return SmartHTTPCommandResource(
-                self, b'git-receive-pack',
-                request.path[:-len(b'/git-receive-pack')])
-        else:
-            return resource.NoResource(b'No such resource')
+
+        try:
+            path, service = request.path.rsplit(b'/', 1)
+        except ValueError:
+            path = request.path
+            service = None
+        if service in self.allowed_services:
+            return SmartHTTPCommandResource(self, service, path)
+
+        return resource.NoResource(b'No such resource')
