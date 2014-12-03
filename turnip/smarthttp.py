@@ -77,10 +77,6 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
             return resource.NoResource(
                 b'Only git smart HTTP clients are supported.')
 
-        self.doIt(request, service)
-        return server.NOT_DONE_YET
-
-    def doIt(self, request, service):
         request.setHeader(
             b'Content-Type', b'application/x-%s-advertisement' % service)
         request.write(encode_packet(b'# service=%s\n' % service))
@@ -90,6 +86,7 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
             {b'turnip-advertise-refs': b'yes'}, request.content, request)
         reactor.connectTCP(
             self.root.backend_host, self.root.backend_port, client_factory)
+        return server.NOT_DONE_YET
 
 
 class SmartHTTPCommandResource(BaseSmartHTTPResource):
@@ -112,10 +109,6 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
             content = StringIO(
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
 
-        self.doIt(request, content, self.service)
-        return server.NOT_DONE_YET
-
-    def doIt(self, request, content, service):
         request.setHeader(
             b'Content-Type', b'application/x-%s-result' % self.service)
         client_factory = HTTPPackClientFactory(
@@ -123,6 +116,7 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
             {b'turnip-stateless-rpc': b'yes'}, content, request)
         reactor.connectTCP(
             self.root.backend_host, self.root.backend_port, client_factory)
+        return server.NOT_DONE_YET
 
 
 class SmartHTTPFrontendResource(resource.Resource):
