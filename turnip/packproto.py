@@ -181,7 +181,10 @@ class PackProxyProtocol(PackServerProtocol):
 
     command = pathname = params = None
 
-    def connectToBackend(self):
+    def connectToBackend(self, command, pathname, params):
+        self.command = command
+        self.pathname = pathname
+        self.params = params
         client = PackClientFactory(self)
         reactor.connectTCP(
             self.factory.backend_host, self.factory.backend_port, client)
@@ -207,15 +210,10 @@ class PackVirtProtocol(PackProxyProtocol):
         except Exception as e:
             self.die(b'Virtualisation failed: %r' % e)
             return
-
         if command != b'git-upload-pack' and not writable:
             self.die(b'Repository is read-only')
             return
-
-        self.command = command
-        self.pathname = pathname
-        self.params = params
-        self.connectToBackend()
+        self.connectToBackend(command, pathname, params)
 
 
 class PackVirtFactory(protocol.Factory):
@@ -234,11 +232,7 @@ class PackFrontendProtocol(PackProxyProtocol):
         if set(params.keys()) - SAFE_PARAMS:
             self.die(b'Illegal request parameters')
             return
-
-        self.command = command
-        self.pathname = pathname
-        self.params = params
-        self.connectToBackend()
+        self.connectToBackend(command, pathname, params)
 
 
 class PackFrontendFactory(protocol.Factory):
