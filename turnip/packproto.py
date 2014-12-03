@@ -122,6 +122,10 @@ class PackServerProtocol(protocol.Protocol):
 
 
 class PackBackendProtocol(PackServerProtocol):
+    """Filesystem-backed turnip-flavoured Git pack protocol implementation.
+
+    Invokes the reference C Git implementation.
+    """
 
     def requestReceived(self, command, raw_pathname, params):
         path = helpers.compose_path(self.factory.root, raw_pathname)
@@ -154,6 +158,7 @@ class PackBackendFactory(protocol.Factory):
 
 
 class PackClientProtocol(protocol.Protocol):
+    """Dumb protocol which just forwards between two others."""
 
     def connectionMade(self):
         self.factory.peer.peer = self
@@ -178,6 +183,11 @@ class PackClientFactory(protocol.ClientFactory):
 
 
 class PackProxyProtocol(PackServerProtocol):
+    """Abstract turnip-flavoured Git pack protocol proxy.
+
+    requestReceived can validate or transform requests arbitrarily
+    before forwarding them to the backend.
+    """
 
     command = pathname = params = None
 
@@ -199,6 +209,11 @@ class PackProxyProtocol(PackServerProtocol):
 
 
 class PackVirtProtocol(PackProxyProtocol):
+    """Turnip-flavoured Git pack protocol virtualisation proxy.
+
+    Translates the request path and authorises access via a request to a
+    remote XML-RPC endpoint.
+    """
 
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, params):
@@ -227,6 +242,11 @@ class PackVirtFactory(protocol.Factory):
 
 
 class PackFrontendProtocol(PackProxyProtocol):
+    """Standard Git pack protocol conversion proxy.
+
+    Ensures that it's a vanilla, not turnip-flavoured, pack protocol
+    request before forwarding to a backend.
+    """
 
     def requestReceived(self, command, pathname, params):
         if set(params.keys()) - SAFE_PARAMS:
