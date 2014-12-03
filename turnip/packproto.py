@@ -205,7 +205,7 @@ class PackVirtProtocol(PackProxyProtocol):
             pathname = translated['path']
             writable = translated['writable']
         except Exception as e:
-            self.die(b"Boom: %r" % e)
+            self.die(b'Virtualisation failed: %r' % e)
             return
 
         if command != b'git-upload-pack' and not writable:
