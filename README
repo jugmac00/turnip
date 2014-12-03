@@ -35,9 +35,7 @@ Frontends:
 
 Midends:
  * Pack virtualisation
- * Pack scaling
  * API virtualisation
- * API scaling
 
 Backends:
  * Pack

@@ -24,6 +24,7 @@ from twisted.web import (
 from turnip.packproto import (
     PackBackendFactory,
     PackFrontendFactory,
+    PackVirtFactory,
     )
 from turnip.smarthttp import SmartHTTPFrontendResource
 
@@ -153,9 +154,17 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             0, PackBackendFactory(self.root))
         self.backend_port = self.backend_listener.getHost().port
 
+        self.virt_listener = reactor.listenTCP(
+            0,
+            PackVirtFactory(
+                b'localhost', self.backend_port,
+                b'http://localhost:%d/' % self.virtinfo_port))
+        self.virt_port = self.virt_listener.getHost().port
+
     @defer.inlineCallbacks
     def tearDown(self):
         super(FrontendFunctionalTestMixin, self).tearDown()
+        yield self.virt_listener.stopListening()
         yield self.backend_listener.stopListening()
         yield self.virtinfo_listener.stopListening()
 
@@ -202,10 +211,7 @@ class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         # We run a frontend server connecting to the backend and
         # virtinfo servers started by the mixin.
         self.frontend_listener = reactor.listenTCP(
-            0,
-            PackFrontendFactory(
-                b'localhost', self.backend_port,
-                b'http://localhost:%d/' % self.virtinfo_port))
+            0, PackFrontendFactory(b'localhost', self.virt_port))
         self.port = self.frontend_listener.getHost().port
 
         # Always use a writable URL for now.
@@ -227,9 +233,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         # We run a frontend server connecting to the backend and
         # virtinfo servers started by the mixin.
         frontend_site = server.Site(
-            SmartHTTPFrontendResource(
-                b'localhost', self.backend_port,
-                b'http://localhost:%d/' % self.virtinfo_port))
+            SmartHTTPFrontendResource(b'localhost', self.virt_port))
         self.frontend_listener = reactor.listenTCP(0, frontend_site)
         self.port = self.frontend_listener.getHost().port
 

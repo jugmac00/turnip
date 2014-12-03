@@ -19,6 +19,9 @@ if sys.version_info.major < 3:
 from turnip import helpers
 
 
+SAFE_PARAMS = frozenset(['host'])
+
+
 class GitProcessProtocol(protocol.ProcessProtocol):
 
     def __init__(self, peer):
@@ -174,27 +177,11 @@ class PackClientFactory(protocol.ClientFactory):
         self.peer.transport.loseConnection()
 
 
-class PackFrontendProtocol(PackServerProtocol):
+class PackProxyProtocol(PackServerProtocol):
 
-    command = pathname = params = write = None
+    command = pathname = params = None
 
-    @defer.inlineCallbacks
-    def requestReceived(self, command, pathname, params):
-        proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint)
-        try:
-            translated = yield proxy.callRemote(b'translatePath', pathname)
-            self.pathname = translated['path']
-            self.writable = translated['writable']
-        except Exception as e:
-            self.die(b"Boom: %r" % e)
-            return
-        self.command = command
-        self.params = params
-
-        if command != b'git-upload-pack' and not self.writable:
-            self.die(b'Repository is read-only')
-            return
-
+    def connectToBackend(self):
         client = PackClientFactory(self)
         reactor.connectTCP(
             self.factory.backend_host, self.factory.backend_port, client)
@@ -204,16 +191,60 @@ class PackFrontendProtocol(PackServerProtocol):
         # client.
         self.peer.transport.write(
             helpers.encode_packet(helpers.encode_request(
-                self.command, self.pathname,
-                {b'host': self.params[b'host']})))
+                self.command, self.pathname, self.params)))
         PackServerProtocol.resumeProducing(self)
+
+
+class PackVirtProtocol(PackProxyProtocol):
+
+    @defer.inlineCallbacks
+    def requestReceived(self, command, pathname, params):
+        proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint)
+        try:
+            translated = yield proxy.callRemote(b'translatePath', pathname)
+            pathname = translated['path']
+            writable = translated['writable']
+        except Exception as e:
+            self.die(b"Boom: %r" % e)
+            return
+
+        if command != b'git-upload-pack' and not writable:
+            self.die(b'Repository is read-only')
+            return
+
+        self.command = command
+        self.pathname = pathname
+        self.params = params
+        self.connectToBackend()
+
+
+class PackVirtFactory(protocol.Factory):
+
+    protocol = PackVirtProtocol
+
+    def __init__(self, backend_host, backend_port, virtinfo_endpoint):
+        self.backend_host = backend_host
+        self.backend_port = backend_port
+        self.virtinfo_endpoint = virtinfo_endpoint
+
+
+class PackFrontendProtocol(PackProxyProtocol):
+
+    def requestReceived(self, command, pathname, params):
+        if set(params.keys()) - SAFE_PARAMS:
+            self.die(b'Illegal request parameters')
+            return
+
+        self.command = command
+        self.pathname = pathname
+        self.params = params
+        self.connectToBackend()
 
 
 class PackFrontendFactory(protocol.Factory):
 
     protocol = PackFrontendProtocol
 
-    def __init__(self, backend_host, backend_port, virtinfo_endpoint):
+    def __init__(self, backend_host, backend_port):
         self.backend_host = backend_host
         self.backend_port = backend_port
-        self.virtinfo_endpoint = virtinfo_endpoint

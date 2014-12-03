@@ -11,6 +11,7 @@ from turnip.api import TurnipAPIResource
 from turnip.packproto import (
     PackBackendFactory,
     PackFrontendFactory,
+    PackVirtFactory,
     )
 from turnip.smarthttp import (
     SmartHTTPFrontendResource,
@@ -24,9 +25,9 @@ VIRTINFO_ENDPOINT = b'http://localhost:6543/githosting'
 # An API service runs on 19417.
 reactor.listenTCP(19418, PackBackendFactory(REPO_STORE))
 reactor.listenTCP(
-    9418, PackFrontendFactory('localhost', 19418, VIRTINFO_ENDPOINT))
-smarthttp_site = server.Site(
-    SmartHTTPFrontendResource(b'localhost', 19418, VIRTINFO_ENDPOINT))
+    19419, PackVirtFactory('localhost', 19418, VIRTINFO_ENDPOINT))
+reactor.listenTCP(9418, PackFrontendFactory('localhost', 19419))
+smarthttp_site = server.Site(SmartHTTPFrontendResource(b'localhost', 19419))
 reactor.listenTCP(9419, smarthttp_site)
 
 api_site = server.Site(TurnipAPIResource(REPO_STORE))
