@@ -37,8 +37,12 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.peer.sendData(data)
 
     def processExited(self, status):
-        # XXX: This should be processEnded, but an FD gets left open
-        # somehow when behind the HTTP client.
+        # Close stdin so processEnded can fire. We should possibly do
+        # this as soon as the negotation completes, but we need a better
+        # understanding of the protocol for that.
+        self.transport.closeStdin()
+
+    def processEnded(self, status):
         self.peer.transport.loseConnection()
 
 
