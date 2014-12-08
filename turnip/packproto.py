@@ -36,7 +36,7 @@ class GitProcessProtocol(protocol.ProcessProtocol):
     def errReceived(self, data):
         self.peer.sendData(data)
 
-    def processExited(self, status):
+    def outConnectionLost(self):
         # Close stdin so processEnded can fire. We should possibly do
         # this as soon as the negotation completes, but we need a better
         # understanding of the protocol for that.
