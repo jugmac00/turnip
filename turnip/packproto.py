@@ -186,7 +186,7 @@ class PackClientFactory(protocol.ClientFactory):
         self.peer.transport.loseConnection()
 
 
-class PackProxyProtocol(PackServerProtocol):
+class PackProxyServerProtocol(PackServerProtocol):
     """Abstract turnip-flavoured Git pack protocol proxy.
 
     requestReceived can validate or transform requests arbitrarily
@@ -212,7 +212,7 @@ class PackProxyProtocol(PackServerProtocol):
         PackServerProtocol.resumeProducing(self)
 
 
-class PackVirtProtocol(PackProxyProtocol):
+class PackVirtServerProtocol(PackProxyServerProtocol):
     """Turnip-flavoured Git pack protocol virtualisation proxy.
 
     Translates the request path and authorises access via a request to a
@@ -237,7 +237,7 @@ class PackVirtProtocol(PackProxyProtocol):
 
 class PackVirtFactory(protocol.Factory):
 
-    protocol = PackVirtProtocol
+    protocol = PackVirtServerProtocol
 
     def __init__(self, backend_host, backend_port, virtinfo_endpoint):
         self.backend_host = backend_host
@@ -245,7 +245,7 @@ class PackVirtFactory(protocol.Factory):
         self.virtinfo_endpoint = virtinfo_endpoint
 
 
-class PackFrontendProtocol(PackProxyProtocol):
+class PackFrontendServerProtocol(PackProxyServerProtocol):
     """Standard Git pack protocol conversion proxy.
 
     Ensures that it's a vanilla, not turnip-flavoured, pack protocol
@@ -261,7 +261,7 @@ class PackFrontendProtocol(PackProxyProtocol):
 
 class PackFrontendFactory(protocol.Factory):
 
-    protocol = PackFrontendProtocol
+    protocol = PackFrontendServerProtocol
 
     def __init__(self, backend_host, backend_port):
         self.backend_host = backend_host
