@@ -49,22 +49,13 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.peer.transport.loseConnection()
 
 
-class PackServerProtocol(protocol.Protocol):
+class PackProtocol(protocol.Protocol):
 
     paused = False
-    got_request = False
     raw = False
     _buffer = b''
-    peer = None
 
-    def requestReceived(self, command, pathname, params):
-        """Begin handling of a git pack protocol request.
-
-        Implementations must set peer to an IProtocol connected to the
-        backend transport, and perform any connection setup there (eg.
-        sending a modified request line). Calling resumeProducing()
-        will begin passing data through to the backend.
-        """
+    def packetReceived(self, payload):
         raise NotImplementedError()
 
     def dataReceived(self, raw_data):
@@ -87,24 +78,6 @@ class PackServerProtocol(protocol.Protocol):
             if payload is helpers.INCOMPLETE_PKT:
                 break
             self.packetReceived(payload)
-
-    def packetReceived(self, data):
-        if not self.got_request:
-            if data is None:
-                self.die(b'Bad request: flush-pkt instead')
-                return None
-            try:
-                command, pathname, params = helpers.decode_request(data)
-            except ValueError as e:
-                self.die(str(e).encode('utf-8'))
-                return
-            self.pauseProducing()
-            self.got_request = True
-            self.requestReceived(command, pathname, params)
-            return
-        if data is None:
-            self.raw = True
-        self.peer.sendData(helpers.encode_packet(data))
 
     def connectionLost(self, reason):
         if self.peer is not None:
@@ -129,6 +102,40 @@ class PackServerProtocol(protocol.Protocol):
 
     def stopProducing(self):
         self.pauseProducing()
+
+
+class PackServerProtocol(PackProtocol):
+
+    got_request = False
+    peer = None
+
+    def requestReceived(self, command, pathname, params):
+        """Begin handling of a git pack protocol request.
+
+        Implementations must set peer to an IProtocol connected to the
+        backend transport, and perform any connection setup there (eg.
+        sending a modified request line). Calling resumeProducing()
+        will begin passing data through to the backend.
+        """
+        raise NotImplementedError()
+
+    def packetReceived(self, data):
+        if not self.got_request:
+            if data is None:
+                self.die(b'Bad request: flush-pkt instead')
+                return None
+            try:
+                command, pathname, params = helpers.decode_request(data)
+            except ValueError as e:
+                self.die(str(e).encode('utf-8'))
+                return
+            self.pauseProducing()
+            self.got_request = True
+            self.requestReceived(command, pathname, params)
+            return
+        if data is None:
+            self.raw = True
+        self.peer.sendData(helpers.encode_packet(data))
 
 
 class PackBackendProtocol(PackServerProtocol):
