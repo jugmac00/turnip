@@ -67,7 +67,7 @@ class TestPackServerProtocol(TestCase):
         self.assertEqual(
             (b'git-upload-pack', b'/foo.git', {b'host': b'example.com'}),
             self.proto.test_request)
-        self.assertEqual(b'lol', self.proto._buffer)
+        self.assertEqual(b'lol', self.proto._PackProtocol__buffer)
 
     def test_drops_bad_packet(self):
         # An invalid packet causes the connection to be dropped.

@@ -62,7 +62,7 @@ class PackProtocol(protocol.Protocol):
     raw = False
 
     peer = None
-    _buffer = b''
+    __buffer = b''
 
     def setPeer(self, peer):
         self.peer = peer
@@ -75,18 +75,18 @@ class PackProtocol(protocol.Protocol):
 
     def dataReceived(self, raw_data):
         assert not self.paused
-        self._buffer += raw_data
+        self.__buffer += raw_data
         while True:
             if self.paused:
                 break
             if self.raw:
                 # We don't care about the content any more. Just forward the
                 # bytes.
-                self.peer.sendData(self._buffer)
-                self._buffer = b''
+                self.peer.sendData(self.__buffer)
+                self.__buffer = b''
                 return
             try:
-                payload, self._buffer = helpers.decode_packet(self._buffer)
+                payload, self.__buffer = helpers.decode_packet(self.__buffer)
             except ValueError as e:
                 self.die(str(e).encode('utf-8'))
                 break
