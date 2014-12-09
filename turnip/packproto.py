@@ -70,6 +70,9 @@ class PackProtocol(protocol.Protocol):
     def packetReceived(self, payload):
         raise NotImplementedError()
 
+    def rawDataReceived(self, payload):
+        raise NotImplementedError()
+
     def die(self, message):
         raise NotImplementedError()
 
@@ -82,8 +85,9 @@ class PackProtocol(protocol.Protocol):
             if self.raw:
                 # We don't care about the content any more. Just forward the
                 # bytes.
-                self.peer.sendData(self.__buffer)
+                raw_data = self.__buffer
                 self.__buffer = b''
+                self.rawDataReceived(raw_data)
                 return
             try:
                 payload, self.__buffer = helpers.decode_packet(self.__buffer)
@@ -147,6 +151,9 @@ class PackServerProtocol(PackProtocol):
             self.raw = True
         self.peer.sendData(helpers.encode_packet(data))
 
+    def rawDataReceived(self, data):
+        self.peer.sendData(data)
+
     def die(self, message):
         self.sendData(
             helpers.encode_packet(b'ERR ' + message + b'\n'))
@@ -163,6 +170,9 @@ class PackClientProtocol(PackProtocol):
     def packetReceived(self, data):
         self.raw = True
         self.peer.sendData(helpers.encode_packet(data))
+
+    def rawDataReceived(self, data):
+        self.peer.sendData(data)
 
     def die(self, message):
         # The error always goes to the other side.
