@@ -24,6 +24,8 @@ SAFE_PARAMS = frozenset(['host'])
 
 class GitProcessProtocol(protocol.ProcessProtocol):
 
+    _err_buffer = b''
+
     def __init__(self, peer):
         self.peer = peer
 
@@ -35,13 +37,17 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.peer.sendData(data)
 
     def errReceived(self, data):
-        self.peer.sendData(data)
+        # Just store it up so we can forward it as a single ERR packet
+        # when the process is done.
+        self._err_buffer += data
 
     def outConnectionLost(self):
         # Close stdin so processEnded can fire. We should possibly do
         # this as soon as the negotation completes, but we need a better
         # understanding of the protocol for that.
         self.transport.closeStdin()
+        if self._err_buffer:
+            self.peer.die(self._err_buffer)
 
     def sendData(self, data):
         self.transport.write(data)

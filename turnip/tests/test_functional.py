@@ -107,12 +107,16 @@ class FunctionalTestMixin(object):
     def test_no_repo(self):
         test_root = self.useFixture(TempDir()).path
         output = yield utils.getProcessOutput(
-            b'git', (b'clone', b'http://localhost:%d/fail' % self.port),
+            b'git',
+            (b'clone', b'%s://localhost:%d/fail' % (self.scheme, self.port)),
             path=test_root, errortoo=True)
-        self.assertIn(b'fatal:', output)
+        self.assertIn(b'fatal: remote error:', output)
+        self.assertIn(b'does not appear to be a git repository', output)
 
 
 class TestBackendFunctional(FunctionalTestMixin, TestCase):
+
+    scheme = b'git'
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -204,6 +208,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
 class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
 
+    scheme = b'git'
+
     @defer.inlineCallbacks
     def setUp(self):
         yield super(TestGitFrontendFunctional, self).setUp()
@@ -225,6 +231,8 @@ class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
 
 
 class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
+
+    scheme = b'http'
 
     @defer.inlineCallbacks
     def setUp(self):
