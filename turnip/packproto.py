@@ -94,10 +94,6 @@ class PackProtocol(protocol.Protocol):
                 self.rawDataReceived(raw_data)
                 return
 
-    def connectionLost(self, reason):
-        if self.peer is not None:
-            self.peer.transport.loseConnection()
-
     def sendData(self, data):
         self.transport.write(data)
 
@@ -107,11 +103,12 @@ class PackProtocol(protocol.Protocol):
 
     def resumeProducing(self):
         self.paused = False
-        self.dataReceived(b'')
         self.transport.resumeProducing()
+        self.dataReceived(b'')
 
     def stopProducing(self):
-        self.pauseProducing()
+        self.paused = True
+        self.transport.stopProducing()
 
 
 class PackProxyProtocol(PackProtocol):
@@ -126,6 +123,10 @@ class PackProxyProtocol(PackProtocol):
 
     def die(self, message):
         raise NotImplementedError()
+
+    def connectionLost(self, reason):
+        if self.peer is not None:
+            self.peer.transport.loseConnection()
 
 
 class PackServerProtocol(PackProxyProtocol):
