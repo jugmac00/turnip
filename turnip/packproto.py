@@ -34,7 +34,7 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.peer.resumeProducing()
 
     def outReceived(self, data):
-        self.peer.sendData(data)
+        self.peer.sendRawData(data)
 
     def errReceived(self, data):
         # Just store it up so we can forward it as a single ERR packet
@@ -49,7 +49,10 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         if self._err_buffer:
             self.peer.die(self._err_buffer)
 
-    def sendData(self, data):
+    def sendPacket(self, data):
+        self.sendRawData(helpers.encode_packet(data))
+
+    def sendRawData(self, data):
         self.transport.write(data)
 
     def processEnded(self, status):
@@ -94,7 +97,10 @@ class PackProtocol(protocol.Protocol):
                 self.rawDataReceived(raw_data)
                 return
 
-    def sendData(self, data):
+    def sendPacket(self, data):
+        self.sendRawData(helpers.encode_packet(data))
+
+    def sendRawData(self, data):
         self.transport.write(data)
 
     def pauseProducing(self):
@@ -160,14 +166,13 @@ class PackServerProtocol(PackProxyProtocol):
             return
         if data is None:
             self.raw = True
-        self.peer.sendData(helpers.encode_packet(data))
+        self.peer.sendPacket(data)
 
     def rawDataReceived(self, data):
-        self.peer.sendData(data)
+        self.peer.sendRawData(data)
 
     def die(self, message):
-        self.sendData(
-            helpers.encode_packet(b'ERR ' + message + b'\n'))
+        self.sendPacket(b'ERR ' + message + b'\n')
         self.transport.loseConnection()
 
 
@@ -180,10 +185,10 @@ class PackClientProtocol(PackProxyProtocol):
 
     def packetReceived(self, data):
         self.raw = True
-        self.peer.sendData(helpers.encode_packet(data))
+        self.peer.sendPacket(data)
 
     def rawDataReceived(self, data):
-        self.peer.sendData(data)
+        self.peer.sendRawData(data)
 
     def die(self, message):
         # The error always goes to the other side.
@@ -263,9 +268,8 @@ class PackProxyServerProtocol(PackServerProtocol):
     def resumeProducing(self):
         # Send our translated request and then open the gate to the
         # client.
-        self.peer.sendData(
-            helpers.encode_packet(helpers.encode_request(
-                self.command, self.pathname, self.params)))
+        self.peer.sendPacket(
+            helpers.encode_request(self.command, self.pathname, self.params))
         PackServerProtocol.resumeProducing(self)
 
 
