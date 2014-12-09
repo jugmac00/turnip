@@ -28,6 +28,7 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.peer = peer
 
     def connectionMade(self):
+        self.peer.setPeer(self)
         self.peer.resumeProducing()
 
     def outReceived(self, data):
@@ -53,7 +54,12 @@ class PackProtocol(protocol.Protocol):
 
     paused = False
     raw = False
+
+    peer = None
     _buffer = b''
+
+    def setPeer(self, peer):
+        self.peer = peer
 
     def packetReceived(self, payload):
         raise NotImplementedError()
@@ -138,6 +144,18 @@ class PackServerProtocol(PackProtocol):
         self.peer.sendData(helpers.encode_packet(data))
 
 
+class PackClientProtocol(PackProtocol):
+    """Dumb protocol which just forwards between two others."""
+
+    def connectionMade(self):
+        self.peer.setPeer(self)
+        self.peer.resumeProducing()
+
+    def packetReceived(self, data):
+        self.raw = True
+        self.peer.sendData(helpers.encode_packet(data))
+
+
 class PackBackendProtocol(PackServerProtocol):
     """Filesystem-backed turnip-flavoured Git pack protocol implementation.
 
@@ -174,32 +192,20 @@ class PackBackendFactory(protocol.Factory):
         self.root = root
 
 
-class PackClientProtocol(protocol.Protocol):
-    """Dumb protocol which just forwards between two others."""
-
-    def connectionMade(self):
-        self.factory.peer.peer = self
-        self.factory.peer.resumeProducing()
-
-    def dataReceived(self, data):
-        self.factory.peer.sendData(data)
-
-    def sendData(self, data):
-        self.transport.write(data)
-
-    def connectionLost(self, status):
-        self.factory.peer.transport.loseConnection()
-
-
 class PackClientFactory(protocol.ClientFactory):
 
     protocol = PackClientProtocol
 
-    def __init__(self, peer):
-        self.peer = peer
+    def __init__(self, server):
+        self.server = server
+
+    def buildProtocol(self, *args, **kwargs):
+        p = protocol.ClientFactory.buildProtocol(self, *args, **kwargs)
+        p.setPeer(self.server)
+        return p
 
     def clientConnectionFailed(self, connector, reason):
-        self.peer.transport.loseConnection()
+        self.server.transport.loseConnection()
 
 
 class PackProxyServerProtocol(PackServerProtocol):
