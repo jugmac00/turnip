@@ -61,11 +61,7 @@ class PackProtocol(protocol.Protocol):
     paused = False
     raw = False
 
-    peer = None
     __buffer = b''
-
-    def setPeer(self, peer):
-        self.peer = peer
 
     def packetReceived(self, payload):
         raise NotImplementedError()
@@ -73,7 +69,7 @@ class PackProtocol(protocol.Protocol):
     def rawDataReceived(self, payload):
         raise NotImplementedError()
 
-    def die(self, message):
+    def invalidPacketReceived(self, packet):
         raise NotImplementedError()
 
     def dataReceived(self, raw_data):
@@ -81,8 +77,10 @@ class PackProtocol(protocol.Protocol):
         while not self.paused and not self.raw:
             try:
                 payload, self.__buffer = helpers.decode_packet(self.__buffer)
-            except ValueError as e:
-                self.die(str(e).encode('utf-8'))
+            except ValueError:
+                invalid = self.__buffer
+                self.__buffer = b''
+                self.invalidPacketReceived(invalid)
                 break
             if payload is helpers.INCOMPLETE_PKT:
                 break
@@ -116,7 +114,21 @@ class PackProtocol(protocol.Protocol):
         self.pauseProducing()
 
 
-class PackServerProtocol(PackProtocol):
+class PackProxyProtocol(PackProtocol):
+
+    peer = None
+
+    def invalidPacketReceived(self, packet):
+        self.die(b'Invalid pkt-line')
+
+    def setPeer(self, peer):
+        self.peer = peer
+
+    def die(self, message):
+        raise NotImplementedError()
+
+
+class PackServerProtocol(PackProxyProtocol):
 
     got_request = False
     peer = None
@@ -158,7 +170,7 @@ class PackServerProtocol(PackProtocol):
         self.transport.loseConnection()
 
 
-class PackClientProtocol(PackProtocol):
+class PackClientProtocol(PackProxyProtocol):
     """Dumb protocol which just forwards between two others."""
 
     def connectionMade(self):

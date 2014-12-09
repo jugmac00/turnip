@@ -72,7 +72,7 @@ class TestPackServerProtocol(TestCase):
     def test_drops_bad_packet(self):
         # An invalid packet causes the connection to be dropped.
         self.proto.dataReceived(b'abcg')
-        self.assertKilledWith(b'Invalid pkt-len')
+        self.assertKilledWith(b'Invalid pkt-line')
 
     def test_drops_bad_request(self):
         # An invalid request causes the connection to be dropped.
