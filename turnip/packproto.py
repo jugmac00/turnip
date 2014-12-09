@@ -64,6 +64,9 @@ class PackProtocol(protocol.Protocol):
     def packetReceived(self, payload):
         raise NotImplementedError()
 
+    def die(self, message):
+        raise NotImplementedError()
+
     def dataReceived(self, raw_data):
         assert not self.paused
         self._buffer += raw_data
@@ -88,11 +91,6 @@ class PackProtocol(protocol.Protocol):
     def connectionLost(self, reason):
         if self.peer is not None:
             self.peer.transport.loseConnection()
-
-    def die(self, message):
-        self.transport.write(
-            helpers.encode_packet(b'ERR ' + message + b'\n'))
-        self.transport.loseConnection()
 
     def sendData(self, data):
         self.transport.write(data)
@@ -143,6 +141,11 @@ class PackServerProtocol(PackProtocol):
             self.raw = True
         self.peer.sendData(helpers.encode_packet(data))
 
+    def die(self, message):
+        self.sendData(
+            helpers.encode_packet(b'ERR ' + message + b'\n'))
+        self.transport.loseConnection()
+
 
 class PackClientProtocol(PackProtocol):
     """Dumb protocol which just forwards between two others."""
@@ -154,6 +157,12 @@ class PackClientProtocol(PackProtocol):
     def packetReceived(self, data):
         self.raw = True
         self.peer.sendData(helpers.encode_packet(data))
+
+    def die(self, message):
+        # The error always goes to the other side.
+        self.peer.sendData(
+            helpers.encode_packet(b'ERR backend error: ' + message + b'\n'))
+        self.transport.loseConnection()
 
 
 class PackBackendProtocol(PackServerProtocol):
