@@ -186,8 +186,7 @@ class PackClientProtocol(PackProxyProtocol):
 
     def die(self, message):
         # The error always goes to the other side.
-        self.peer.sendData(
-            helpers.encode_packet(b'ERR backend error: ' + message + b'\n'))
+        self.peer.die(b'backend error: ' + message)
         self.transport.loseConnection()
 
 
