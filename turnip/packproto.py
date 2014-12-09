@@ -42,6 +42,9 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         # understanding of the protocol for that.
         self.transport.closeStdin()
 
+    def sendData(self, data):
+        self.transport.write(data)
+
     def processEnded(self, status):
         self.peer.transport.loseConnection()
 
@@ -96,9 +99,9 @@ class PackServerProtocol(protocol.Protocol):
         elif self.peer is None:
             self.die(b'Garbage after request packet')
         else:
-            self.peer.transport.write(self._buffer)
+            self.peer.sendData(self._buffer)
             self._buffer = b''
-            self.peer.transport.write(data)
+            self.peer.sendData(data)
 
     def connectionLost(self, reason):
         if self.peer is not None:
@@ -169,7 +172,10 @@ class PackClientProtocol(protocol.Protocol):
         self.factory.peer.resumeProducing()
 
     def dataReceived(self, data):
-        self.factory.peer.transport.write(data)
+        self.factory.peer.sendData(data)
+
+    def sendData(self, data):
+        self.transport.write(data)
 
     def connectionLost(self, status):
         self.factory.peer.transport.loseConnection()
@@ -206,7 +212,7 @@ class PackProxyServerProtocol(PackServerProtocol):
     def resumeProducing(self):
         # Send our translated request and then open the gate to the
         # client.
-        self.peer.transport.write(
+        self.peer.sendData(
             helpers.encode_packet(helpers.encode_request(
                 self.command, self.pathname, self.params)))
         PackServerProtocol.resumeProducing(self)
