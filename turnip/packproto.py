@@ -53,6 +53,7 @@ class PackServerProtocol(protocol.Protocol):
 
     paused = False
     got_request = False
+    raw = False
     _buffer = b''
     peer = None
 
@@ -66,28 +67,32 @@ class PackServerProtocol(protocol.Protocol):
         """
         raise NotImplementedError()
 
-    def readPacket(self):
-        try:
-            packet, tail = helpers.decode_packet(self._buffer)
-        except ValueError as e:
-            self.die(b'Bad request: ' + str(e).encode('utf-8'))
-            return None
-        if packet is None:
-            self.die(b'Bad request: flush-pkt instead')
-            return None
-        if packet is helpers.INCOMPLETE_PKT:
-            return None
-        self._buffer = tail
-        return packet
-
-    def dataReceived(self, data):
-        if self.paused:
-            self._buffer += data
-        elif not self.got_request:
-            self._buffer += data
-            data = self.readPacket()
-            if data is None:
+    def dataReceived(self, raw_data):
+        assert not self.paused
+        self._buffer += raw_data
+        while True:
+            if self.paused:
+                break
+            if self.raw:
+                # We don't care about the content any more. Just forward the
+                # bytes.
+                self.peer.sendData(self._buffer)
+                self._buffer = b''
                 return
+            try:
+                payload, self._buffer = helpers.decode_packet(self._buffer)
+            except ValueError as e:
+                self.die(str(e).encode('utf-8'))
+                break
+            if payload is helpers.INCOMPLETE_PKT:
+                break
+            self.packetReceived(payload)
+
+    def packetReceived(self, data):
+        if not self.got_request:
+            if data is None:
+                self.die(b'Bad request: flush-pkt instead')
+                return None
             try:
                 command, pathname, params = helpers.decode_request(data)
             except ValueError as e:
@@ -96,12 +101,10 @@ class PackServerProtocol(protocol.Protocol):
             self.pauseProducing()
             self.got_request = True
             self.requestReceived(command, pathname, params)
-        elif self.peer is None:
-            self.die(b'Garbage after request packet')
-        else:
-            self.peer.sendData(self._buffer)
-            self._buffer = b''
-            self.peer.sendData(data)
+            return
+        if data is None:
+            self.raw = True
+        self.peer.sendData(helpers.encode_packet(data))
 
     def connectionLost(self, reason):
         if self.peer is not None:
