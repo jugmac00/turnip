@@ -77,18 +77,8 @@ class PackProtocol(protocol.Protocol):
         raise NotImplementedError()
 
     def dataReceived(self, raw_data):
-        assert not self.paused
         self.__buffer += raw_data
-        while True:
-            if self.paused:
-                break
-            if self.raw:
-                # We don't care about the content any more. Just forward the
-                # bytes.
-                raw_data = self.__buffer
-                self.__buffer = b''
-                self.rawDataReceived(raw_data)
-                return
+        while not self.paused and not self.raw:
             try:
                 payload, self.__buffer = helpers.decode_packet(self.__buffer)
             except ValueError as e:
@@ -97,6 +87,14 @@ class PackProtocol(protocol.Protocol):
             if payload is helpers.INCOMPLETE_PKT:
                 break
             self.packetReceived(payload)
+        else:
+            if not self.paused:
+                # We don't care about the content any more. Just forward the
+                # bytes.
+                raw_data = self.__buffer
+                self.__buffer = b''
+                self.rawDataReceived(raw_data)
+                return
 
     def connectionLost(self, reason):
         if self.peer is not None:
