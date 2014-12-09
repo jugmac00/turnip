@@ -22,43 +22,6 @@ from turnip import helpers
 SAFE_PARAMS = frozenset(['host'])
 
 
-class GitProcessProtocol(protocol.ProcessProtocol):
-
-    _err_buffer = b''
-
-    def __init__(self, peer):
-        self.peer = peer
-
-    def connectionMade(self):
-        self.peer.setPeer(self)
-        self.peer.resumeProducing()
-
-    def outReceived(self, data):
-        self.peer.sendRawData(data)
-
-    def errReceived(self, data):
-        # Just store it up so we can forward it as a single ERR packet
-        # when the process is done.
-        self._err_buffer += data
-
-    def outConnectionLost(self):
-        # Close stdin so processEnded can fire. We should possibly do
-        # this as soon as the negotation completes, but we need a better
-        # understanding of the protocol for that.
-        self.transport.closeStdin()
-        if self._err_buffer:
-            self.peer.die(self._err_buffer)
-
-    def sendPacket(self, data):
-        self.sendRawData(helpers.encode_packet(data))
-
-    def sendRawData(self, data):
-        self.transport.write(data)
-
-    def processEnded(self, status):
-        self.peer.transport.loseConnection()
-
-
 class PackProtocol(protocol.Protocol):
 
     paused = False
@@ -176,6 +139,43 @@ class PackServerProtocol(PackProxyProtocol):
         self.transport.loseConnection()
 
 
+class GitProcessProtocol(protocol.ProcessProtocol):
+
+    _err_buffer = b''
+
+    def __init__(self, peer):
+        self.peer = peer
+
+    def connectionMade(self):
+        self.peer.setPeer(self)
+        self.peer.resumeProducing()
+
+    def outReceived(self, data):
+        self.peer.sendRawData(data)
+
+    def errReceived(self, data):
+        # Just store it up so we can forward it as a single ERR packet
+        # when the process is done.
+        self._err_buffer += data
+
+    def outConnectionLost(self):
+        # Close stdin so processEnded can fire. We should possibly do
+        # this as soon as the negotation completes, but we need a better
+        # understanding of the protocol for that.
+        self.transport.closeStdin()
+        if self._err_buffer:
+            self.peer.die(self._err_buffer)
+
+    def sendPacket(self, data):
+        self.sendRawData(helpers.encode_packet(data))
+
+    def sendRawData(self, data):
+        self.transport.write(data)
+
+    def processEnded(self, status):
+        self.peer.transport.loseConnection()
+
+
 class PackClientProtocol(PackProxyProtocol):
     """Dumb protocol which just forwards between two others."""
 
@@ -194,42 +194,6 @@ class PackClientProtocol(PackProxyProtocol):
         # The error always goes to the other side.
         self.peer.die(b'backend error: ' + message)
         self.transport.loseConnection()
-
-
-class PackBackendProtocol(PackServerProtocol):
-    """Filesystem-backed turnip-flavoured Git pack protocol implementation.
-
-    Invokes the reference C Git implementation.
-    """
-
-    def requestReceived(self, command, raw_pathname, params):
-        path = helpers.compose_path(self.factory.root, raw_pathname)
-        if command == b'git-upload-pack':
-            subcmd = b'upload-pack'
-        elif command == b'git-receive-pack':
-            subcmd = b'receive-pack'
-        else:
-            self.die(b'Unsupport command in request')
-            return
-
-        cmd = b'git'
-        args = [b'git', subcmd]
-        if params.pop(b'turnip-stateless-rpc', None):
-            args.append(b'--stateless-rpc')
-        if params.pop(b'turnip-advertise-refs', None):
-            args.append(b'--advertise-refs')
-        args.append(path)
-
-        self.peer = GitProcessProtocol(self)
-        reactor.spawnProcess(self.peer, cmd, args)
-
-
-class PackBackendFactory(protocol.Factory):
-
-    protocol = PackBackendProtocol
-
-    def __init__(self, root):
-        self.root = root
 
 
 class PackClientFactory(protocol.ClientFactory):
@@ -271,6 +235,42 @@ class PackProxyServerProtocol(PackServerProtocol):
         self.peer.sendPacket(
             helpers.encode_request(self.command, self.pathname, self.params))
         PackServerProtocol.resumeProducing(self)
+
+
+class PackBackendProtocol(PackServerProtocol):
+    """Filesystem-backed turnip-flavoured Git pack protocol implementation.
+
+    Invokes the reference C Git implementation.
+    """
+
+    def requestReceived(self, command, raw_pathname, params):
+        path = helpers.compose_path(self.factory.root, raw_pathname)
+        if command == b'git-upload-pack':
+            subcmd = b'upload-pack'
+        elif command == b'git-receive-pack':
+            subcmd = b'receive-pack'
+        else:
+            self.die(b'Unsupport command in request')
+            return
+
+        cmd = b'git'
+        args = [b'git', subcmd]
+        if params.pop(b'turnip-stateless-rpc', None):
+            args.append(b'--stateless-rpc')
+        if params.pop(b'turnip-advertise-refs', None):
+            args.append(b'--advertise-refs')
+        args.append(path)
+
+        self.peer = GitProcessProtocol(self)
+        reactor.spawnProcess(self.peer, cmd, args)
+
+
+class PackBackendFactory(protocol.Factory):
+
+    protocol = PackBackendProtocol
+
+    def __init__(self, root):
+        self.root = root
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):
