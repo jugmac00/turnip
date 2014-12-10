@@ -21,27 +21,58 @@ from turnip.helpers import (
     encode_packet,
     encode_request,
     )
+from turnip.packproto import PackProtocol
 
 
-class HTTPPackClientProtocol(protocol.Protocol):
+class HTTPPackClientProtocol(PackProtocol):
+
+    def backendConnected(self):
+        """Called when the backend is connected and has sent a good packet."""
+        raise NotImplementedError()
 
     def connectionMade(self):
-        self.transport.write(
-            encode_packet(encode_request(
+        self.sendPacket(
+            encode_request(
                 self.factory.command, self.factory.pathname,
-                self.factory.params)))
-        self.transport.write(self.factory.body.read())
+                self.factory.params))
+        self.sendRawData(self.factory.body.read())
 
-    def dataReceived(self, data):
+    def packetReceived(self, data):
+        self.raw = True
+        if data is not None and data.startswith(b'ERR virt error: '):
+            self.factory.http_request.setResponseCode(http.NOT_FOUND)
+            self.transport.loseConnection()
+        else:
+            self.backendConnected()
+            self.rawDataReceived(encode_packet(data))
+
+    def rawDataReceived(self, data):
         self.factory.http_request.write(data)
 
     def connectionLost(self, reason):
         self.factory.http_request.finish()
 
 
-class HTTPPackClientFactory(protocol.ClientFactory):
+class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
 
-    protocol = HTTPPackClientProtocol
+    def backendConnected(self):
+        self.factory.http_request.setHeader(
+            b'Content-Type',
+            b'application/x-%s-advertisement' % self.factory.command)
+        self.rawDataReceived(
+            encode_packet(b'# service=%s\n' % self.factory.command))
+        self.rawDataReceived(encode_packet(None))
+
+
+class HTTPPackClientCommandProtocol(HTTPPackClientProtocol):
+
+    def backendConnected(self):
+        self.factory.http_request.setHeader(
+            b'Content-Type',
+            b'application/x-%s-result' % self.factory.command)
+
+
+class HTTPPackClientFactory(protocol.ClientFactory):
 
     def __init__(self, command, pathname, params, body, http_request):
         self.command = command
@@ -49,6 +80,16 @@ class HTTPPackClientFactory(protocol.ClientFactory):
         self.params = params
         self.body = body
         self.http_request = http_request
+
+
+class HTTPPackClientCommandFactory(HTTPPackClientFactory):
+
+    protocol = HTTPPackClientCommandProtocol
+
+
+class HTTPPackClientRefsFactory(HTTPPackClientFactory):
+
+    protocol = HTTPPackClientRefsProtocol
 
 
 class BaseSmartHTTPResource(resource.Resource):
@@ -79,11 +120,7 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
             return self.error(
                 request, b'Unsupported service.', code=http.FORBIDDEN)
 
-        request.setHeader(
-            b'Content-Type', b'application/x-%s-advertisement' % service)
-        request.write(encode_packet(b'# service=%s\n' % service))
-        request.write(encode_packet(None))
-        client_factory = HTTPPackClientFactory(
+        client_factory = HTTPPackClientRefsFactory(
             service, self.path,
             {b'turnip-advertise-refs': b'yes'}, request.content, request)
         reactor.connectTCP(
@@ -117,9 +154,7 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
             content = StringIO(
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
 
-        request.setHeader(
-            b'Content-Type', b'application/x-%s-result' % self.service)
-        client_factory = HTTPPackClientFactory(
+        client_factory = HTTPPackClientCommandFactory(
             self.service, self.path,
             {b'turnip-stateless-rpc': b'yes'}, content, request)
         reactor.connectTCP(

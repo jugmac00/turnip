@@ -220,6 +220,7 @@ class PackProxyServerProtocol(PackServerProtocol):
     """
 
     command = pathname = params = None
+    request_sent = False
 
     def connectToBackend(self, command, pathname, params):
         self.command = command
@@ -232,8 +233,11 @@ class PackProxyServerProtocol(PackServerProtocol):
     def resumeProducing(self):
         # Send our translated request and then open the gate to the
         # client.
-        self.peer.sendPacket(
-            helpers.encode_request(self.command, self.pathname, self.params))
+        if not self.request_sent:
+            self.request_sent = True
+            self.peer.sendPacket(
+                helpers.encode_request(
+                    self.command, self.pathname, self.params))
         PackServerProtocol.resumeProducing(self)
 
 
@@ -288,7 +292,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             pathname = translated['path']
             writable = translated['writable']
         except Exception as e:
-            self.die(b'Virtualisation failed: %r' % e)
+            self.die(b'virt error: %r' % e)
             return
         if command != b'git-upload-pack' and not writable:
             self.die(b'Repository is read-only')
