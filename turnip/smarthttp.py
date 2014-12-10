@@ -39,8 +39,12 @@ class HTTPPackClientProtocol(PackProtocol):
 
     def packetReceived(self, data):
         self.raw = True
-        if data is not None and data.startswith(b'ERR virt error: '):
-            self.factory.http_request.setResponseCode(http.NOT_FOUND)
+        if data is not None and data.startswith(b'ERR '):
+            if data.startswith(b'ERR virt error: '):
+                self.factory.http_request.setResponseCode(http.NOT_FOUND)
+            else:
+                self.factory.http_request.setResponseCode(
+                    http.INTERNAL_SERVER_ERROR)
             self.transport.loseConnection()
         else:
             self.backendConnected()
