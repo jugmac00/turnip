@@ -19,6 +19,8 @@ if sys.version_info.major < 3:
 from turnip import helpers
 
 
+ERROR_PREFIX = b'ERR '
+
 SAFE_PARAMS = frozenset(['host'])
 
 
@@ -135,7 +137,7 @@ class PackServerProtocol(PackProxyProtocol):
         self.peer.sendRawData(data)
 
     def die(self, message):
-        self.sendPacket(b'ERR ' + message + b'\n')
+        self.sendPacket(ERROR_PREFIX + message + b'\n')
         self.transport.loseConnection()
 
 

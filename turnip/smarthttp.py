@@ -21,7 +21,10 @@ from turnip.helpers import (
     encode_packet,
     encode_request,
     )
-from turnip.packproto import PackProtocol
+from turnip.packproto import (
+    ERROR_PREFIX,
+    PackProtocol,
+    )
 
 
 class HTTPPackClientProtocol(PackProtocol):
@@ -29,6 +32,17 @@ class HTTPPackClientProtocol(PackProtocol):
     def backendConnected(self):
         """Called when the backend is connected and has sent a good packet."""
         raise NotImplementedError()
+
+    def backendConnectionFailed(self, msg):
+        if msg.startswith(b'virt error: '):
+            status_code = http.NOT_FOUND
+        elif msg.startswith(b'Repository is read-only'):
+            status_code = http.FORBIDDEN
+        else:
+            status_code = http.INTERNAL_SERVER_ERROR
+        self.factory.http_request.setResponseCode(status_code)
+        self.factory.http_request.setHeader(b'Content-Type', b'text/plain')
+        self.factory.http_request.write(msg)
 
     def connectionMade(self):
         self.sendPacket(
@@ -39,12 +53,8 @@ class HTTPPackClientProtocol(PackProtocol):
 
     def packetReceived(self, data):
         self.raw = True
-        if data is not None and data.startswith(b'ERR '):
-            if data.startswith(b'ERR virt error: '):
-                self.factory.http_request.setResponseCode(http.NOT_FOUND)
-            else:
-                self.factory.http_request.setResponseCode(
-                    http.INTERNAL_SERVER_ERROR)
+        if data is not None and data.startswith(ERROR_PREFIX):
+            self.backendConnectionFailed(data[len(ERROR_PREFIX):])
             self.transport.loseConnection()
         else:
             self.backendConnected()

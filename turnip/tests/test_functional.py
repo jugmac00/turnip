@@ -11,6 +11,7 @@ from fixtures import TempDir
 from testtools import TestCase
 from testtools.content import text_content
 from testtools.deferredruntest import AsynchronousDeferredRunTest
+from testtools.matchers import StartsWith
 from twisted.internet import (
     defer,
     reactor,
@@ -110,13 +111,16 @@ class FunctionalTestMixin(object):
             b'git',
             (b'clone', b'%s://localhost:%d/fail' % (self.scheme, self.port)),
             path=test_root, errortoo=True)
-        self.assertIn(b'fatal: remote error:', output)
+        self.assertIn(
+            b"Cloning into 'fail'...\n" + self.early_error + b'fatal: ',
+            output)
         self.assertIn(b'does not appear to be a git repository', output)
 
 
 class TestBackendFunctional(FunctionalTestMixin, TestCase):
 
     scheme = b'git'
+    early_error = b'fatal: remote error: '
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -192,7 +196,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         out = yield utils.getProcessOutput(
             b'git', (b'push', b'origin', b'master'), path=clone1,
             errortoo=True)
-        self.assertIn(b'fatal: remote error: Repository is read-only', out)
+        self.assertThat(
+            out, StartsWith(self.early_error + b'Repository is read-only'))
 
         # The remote repository is still empty.
         out = yield utils.getProcessOutput(
@@ -209,6 +214,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
 
     scheme = b'git'
+    early_error = b'fatal: remote error: '
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -233,6 +239,7 @@ class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
 class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
 
     scheme = b'http'
+    early_error = b'remote: '
 
     @defer.inlineCallbacks
     def setUp(self):
