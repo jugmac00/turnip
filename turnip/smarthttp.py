@@ -29,20 +29,35 @@ from turnip.packproto import (
 
 class HTTPPackClientProtocol(PackProtocol):
 
+    user_error_possible = True
+
     def backendConnected(self):
         """Called when the backend is connected and has sent a good packet."""
         raise NotImplementedError()
 
     def backendConnectionFailed(self, msg):
+        # stateless-rpc doesn't send a greeting, so we can't always tell if a
+        # backend failed to start at all or rejected some user input
+        # afterwards. But we can make educated guesses.
+        error_code = None
         if msg.startswith(b'virt error: '):
-            status_code = http.NOT_FOUND
+            error_code = http.NOT_FOUND
         elif msg.startswith(b'Repository is read-only'):
-            status_code = http.FORBIDDEN
+            error_code = http.FORBIDDEN
+        elif not self.user_error_possible:
+            error_code = http.INTERNAL_SERVER_ERROR
+
+        if error_code is not None:
+            # This is probably a system error (bad auth, not found,
+            # repository corruption, etc.), so fail the request.
+            self.factory.http_request.setResponseCode(error_code)
+            self.factory.http_request.setHeader(b'Content-Type', b'text/plain')
+            self.factory.http_request.write(msg)
+            self.transport.loseConnection()
         else:
-            status_code = http.INTERNAL_SERVER_ERROR
-        self.factory.http_request.setResponseCode(status_code)
-        self.factory.http_request.setHeader(b'Content-Type', b'text/plain')
-        self.factory.http_request.write(msg)
+            # We don't know it was a system error, so just send it back to the
+            # client as a remote error and continue.
+            self.rawDataReceived(encode_packet(ERROR_PREFIX + msg))
 
     def connectionMade(self):
         self.sendPacket(
@@ -55,7 +70,6 @@ class HTTPPackClientProtocol(PackProtocol):
         self.raw = True
         if data is not None and data.startswith(ERROR_PREFIX):
             self.backendConnectionFailed(data[len(ERROR_PREFIX):])
-            self.transport.loseConnection()
         else:
             self.backendConnected()
             self.rawDataReceived(encode_packet(data))
@@ -68,6 +82,11 @@ class HTTPPackClientProtocol(PackProtocol):
 
 
 class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
+
+    # The only user input is the request line, which the virt proxy should
+    # cause to always be valid. Any unrecognised error is probably a backend
+    # failure from repository corruption or similar.
+    user_error_possible = False
 
     def backendConnected(self):
         self.factory.http_request.setHeader(
