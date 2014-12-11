@@ -37,15 +37,15 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     path is prefixed with '/+rw'
     """
 
-    def xmlrpc_translatePath(self, pathname):
+    def xmlrpc_translatePath(self, pathname, permission):
         writable = False
         if pathname.startswith('/+rw'):
             writable = True
             pathname = pathname[4:]
-        return {
-            'path': hashlib.sha256(pathname).hexdigest(),
-            'writable': writable,
-            }
+
+        if permission != b'read' and not writable:
+            raise xmlrpc.Fault(2, "Repository is read-only")
+        return {'path': hashlib.sha256(pathname).hexdigest()}
 
 
 class FunctionalTestMixin(object):

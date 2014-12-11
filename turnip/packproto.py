@@ -289,14 +289,17 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
 
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, params):
+        permission = b'read' if command == b'git-upload-pack' else b'write'
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint)
         try:
-            translated = yield proxy.callRemote(b'translatePath', pathname)
+            translated = yield proxy.callRemote(
+                b'translatePath', pathname, permission)
             pathname = translated['path']
-            writable = translated['writable']
         except xmlrpc.Fault as e:
             if e.faultCode == 1:
                 fault_type = b'NOT_FOUND'
+            elif e.faultCode == 2:
+                fault_type = b'FORBIDDEN'
             else:
                 fault_type = b'INTERNAL_SERVER_ERROR'
             self.die(VIRT_ERROR_PREFIX + fault_type + b' ' + e.faultString)
@@ -304,10 +307,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + str(e))
             return
         else:
-            if command != b'git-upload-pack' and not writable:
-                self.die(b'Repository is read-only')
-            else:
-                self.connectToBackend(command, pathname, params)
+            self.connectToBackend(command, pathname, params)
 
 
 class PackVirtFactory(protocol.Factory):

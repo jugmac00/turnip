@@ -45,6 +45,8 @@ class HTTPPackClientProtocol(PackProtocol):
             error_name, msg = msg[len(VIRT_ERROR_PREFIX):].split(b' ', 1)
             if error_name == b'NOT_FOUND':
                 error_code = http.NOT_FOUND
+            elif error_name == b'FORBIDDEN':
+                error_code = http.FORBIDDEN
             else:
                 error_code = http.INTERNAL_SERVER_ERROR
         elif msg.startswith(b'Repository is read-only'):
