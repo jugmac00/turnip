@@ -20,6 +20,7 @@ from turnip import helpers
 
 
 ERROR_PREFIX = b'ERR '
+VIRT_ERROR_PREFIX = b'turnip virt error: '
 
 SAFE_PARAMS = frozenset(['host'])
 
@@ -293,13 +294,20 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             translated = yield proxy.callRemote(b'translatePath', pathname)
             pathname = translated['path']
             writable = translated['writable']
+        except xmlrpc.Fault as e:
+            if e.faultCode == 1:
+                fault_type = b'NOT_FOUND'
+            else:
+                fault_type = b'INTERNAL_SERVER_ERROR'
+            self.die(VIRT_ERROR_PREFIX + fault_type + b' ' + e.faultString)
         except Exception as e:
-            self.die(b'virt error: %r' % e)
+            self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + str(e))
             return
-        if command != b'git-upload-pack' and not writable:
-            self.die(b'Repository is read-only')
-            return
-        self.connectToBackend(command, pathname, params)
+        else:
+            if command != b'git-upload-pack' and not writable:
+                self.die(b'Repository is read-only')
+            else:
+                self.connectToBackend(command, pathname, params)
 
 
 class PackVirtFactory(protocol.Factory):

@@ -24,6 +24,7 @@ from turnip.helpers import (
 from turnip.packproto import (
     ERROR_PREFIX,
     PackProtocol,
+    VIRT_ERROR_PREFIX,
     )
 
 
@@ -40,8 +41,12 @@ class HTTPPackClientProtocol(PackProtocol):
         # backend failed to start at all or rejected some user input
         # afterwards. But we can make educated guesses.
         error_code = None
-        if msg.startswith(b'virt error: '):
-            error_code = http.NOT_FOUND
+        if msg.startswith(VIRT_ERROR_PREFIX):
+            error_name, msg = msg[len(VIRT_ERROR_PREFIX):].split(b' ', 1)
+            if error_name == b'NOT_FOUND':
+                error_code = http.NOT_FOUND
+            else:
+                error_code = http.INTERNAL_SERVER_ERROR
         elif msg.startswith(b'Repository is read-only'):
             error_code = http.FORBIDDEN
         elif not self.user_error_possible:
