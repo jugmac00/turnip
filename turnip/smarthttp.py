@@ -147,6 +147,10 @@ class BaseSmartHTTPResource(resource.Resource):
 
     extra_params = {}
 
+    def errback(self, failure, request):
+        request.write(self.error(request, repr(failure)))
+        request.finish()
+
     def error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
         request.setResponseCode(code)
         request.setHeader(b'Content-Type', b'text/plain')
@@ -201,9 +205,10 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
             return self.error(
                 request, b'Unsupported service.', code=http.FORBIDDEN)
 
-        self.connectToBackend(
+        d = self.connectToBackend(
             HTTPPackClientRefsFactory, service, self.path, request.content,
             request)
+        d.addErrback(self.errback, request)
         return server.NOT_DONE_YET
 
 
@@ -234,9 +239,10 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
         if content_encoding == [b'gzip']:
             content = StringIO(
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
-        self.connectToBackend(
+        d = self.connectToBackend(
             HTTPPackClientCommandFactory, self.service, self.path, content,
             request)
+        d.addErrback(self.errback, request)
         return server.NOT_DONE_YET
 
 
