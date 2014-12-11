@@ -8,6 +8,7 @@ from cStringIO import StringIO
 import zlib
 
 from twisted.internet import (
+    defer,
     protocol,
     reactor,
     )
@@ -146,15 +147,19 @@ class BaseSmartHTTPResource(resource.Resource):
         request.setHeader(b'Content-Type', b'text/plain')
         return message
 
+    def authenticateUser(self, request):
+        return request.getUser() or None
+
+    @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, content, request):
         params = {b'turnip-can-authenticate': b'yes'}
-        if request.getUser():
-            params[b'turnip-authenticated-user'] = request.getUser()
+        authenticated_user = yield self.authenticateUser(request)
+        if authenticated_user:
+            params[b'turnip-authenticated-user'] = authenticated_user
         params.update(self.extra_params)
         client_factory = factory(service, path, params, content, request)
         reactor.connectTCP(
             self.root.backend_host, self.root.backend_port, client_factory)
-        return server.NOT_DONE_YET
 
 
 class SmartHTTPRefsResource(BaseSmartHTTPResource):
@@ -179,9 +184,10 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
             return self.error(
                 request, b'Unsupported service.', code=http.FORBIDDEN)
 
-        return self.connectToBackend(
+        self.connectToBackend(
             HTTPPackClientRefsFactory, service, self.path, request.content,
             request)
+        return server.NOT_DONE_YET
 
 
 class SmartHTTPCommandResource(BaseSmartHTTPResource):
@@ -211,9 +217,10 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
         if content_encoding == [b'gzip']:
             content = StringIO(
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
-        return self.connectToBackend(
+        self.connectToBackend(
             HTTPPackClientCommandFactory, self.service, self.path, content,
             request)
+        return server.NOT_DONE_YET
 
 
 class SmartHTTPFrontendResource(resource.Resource):
