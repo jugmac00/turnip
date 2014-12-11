@@ -5,6 +5,7 @@ from __future__ import (
     )
 
 from cStringIO import StringIO
+import sys
 import zlib
 
 from twisted.internet import (
@@ -27,6 +28,10 @@ from turnip.packproto import (
     PackProtocol,
     VIRT_ERROR_PREFIX,
     )
+# twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
+# bits of this module work.
+if sys.version_info.major < 3:
+    from twisted.web import xmlrpc
 
 
 class HTTPPackClientProtocol(PackProtocol):
@@ -147,8 +152,20 @@ class BaseSmartHTTPResource(resource.Resource):
         request.setHeader(b'Content-Type', b'text/plain')
         return message
 
+    @defer.inlineCallbacks
     def authenticateUser(self, request):
-        return request.getUser() or None
+        if request.getUser():
+            proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint)
+            try:
+                translated = yield proxy.callRemote(
+                    b'authenticateWithPassword', request.getUser(),
+                    request.getPassword())
+            except xmlrpc.Fault as e:
+                if e.faultCode == 3:
+                    defer.returnValue(None)
+                else:
+                    raise
+            defer.returnValue(translated['user'])
 
     @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, content, request):
@@ -227,10 +244,11 @@ class SmartHTTPFrontendResource(resource.Resource):
 
     allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
 
-    def __init__(self, backend_host, backend_port):
+    def __init__(self, backend_host, backend_port, virtinfo_endpoint):
         resource.Resource.__init__(self)
         self.backend_host = backend_host
         self.backend_port = backend_port
+        self.virtinfo_endpoint = virtinfo_endpoint
 
     def getChild(self, path, request):
         if request.path.endswith(b'/info/refs'):

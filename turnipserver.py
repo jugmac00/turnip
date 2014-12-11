@@ -27,7 +27,8 @@ reactor.listenTCP(19418, PackBackendFactory(REPO_STORE))
 reactor.listenTCP(
     19419, PackVirtFactory('localhost', 19418, VIRTINFO_ENDPOINT))
 reactor.listenTCP(9418, PackFrontendFactory('localhost', 19419))
-smarthttp_site = server.Site(SmartHTTPFrontendResource(b'localhost', 19419))
+smarthttp_site = server.Site(
+    SmartHTTPFrontendResource(b'localhost', 19419, VIRTINFO_ENDPOINT))
 reactor.listenTCP(9419, smarthttp_site)
 
 api_site = server.Site(TurnipAPIResource(REPO_STORE))

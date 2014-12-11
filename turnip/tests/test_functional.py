@@ -48,6 +48,9 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             raise xmlrpc.Fault(2, "Repository is read-only")
         return {'path': hashlib.sha256(pathname).hexdigest()}
 
+    def xmlrpc_authenticateWithPassword(self, username, password):
+        return {'user': username}
+
 
 class FunctionalTestMixin(object):
 
@@ -152,6 +155,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.virtinfo_listener = reactor.listenTCP(
             0, server.Site(FakeVirtInfoService(allowNone=True)))
         self.virtinfo_port = self.virtinfo_listener.getHost().port
+        self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
 
         # Run a backend server in a repo root containing an empty repo
         # for the path '/test'.
@@ -166,8 +170,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.virt_listener = reactor.listenTCP(
             0,
             PackVirtFactory(
-                b'localhost', self.backend_port,
-                b'http://localhost:%d/' % self.virtinfo_port))
+                b'localhost', self.backend_port, self.virtinfo_url))
         self.virt_port = self.virt_listener.getHost().port
 
     @defer.inlineCallbacks
@@ -249,7 +252,8 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         # We run a frontend server connecting to the backend and
         # virtinfo servers started by the mixin.
         frontend_site = server.Site(
-            SmartHTTPFrontendResource(b'localhost', self.virt_port))
+            SmartHTTPFrontendResource(
+                b'localhost', self.virt_port, self.virtinfo_url))
         self.frontend_listener = reactor.listenTCP(0, frontend_site)
         self.port = self.frontend_listener.getHost().port
 
