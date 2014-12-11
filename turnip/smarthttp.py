@@ -37,6 +37,7 @@ class HTTPPackClientProtocol(PackProtocol):
         raise NotImplementedError()
 
     def backendConnectionFailed(self, msg):
+        """Called when the backend fails to connect or returns an error."""
         # stateless-rpc doesn't send a greeting, so we can't always tell if a
         # backend failed to start at all or rejected some user input
         # afterwards. But we can make educated guesses.
@@ -47,6 +48,10 @@ class HTTPPackClientProtocol(PackProtocol):
                 error_code = http.NOT_FOUND
             elif error_name == b'FORBIDDEN':
                 error_code = http.FORBIDDEN
+            elif error_name == b'UNAUTHORIZED':
+                error_code = http.UNAUTHORIZED
+                self.factory.http_request.setHeader(
+                    b'WWW-Authenticate', b'Basic realm=turnip')
             else:
                 error_code = http.INTERNAL_SERVER_ERROR
         elif msg.startswith(b'Repository is read-only'):
@@ -160,9 +165,13 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
             return self.error(
                 request, b'Unsupported service.', code=http.FORBIDDEN)
 
+        params = {
+            b'turnip-advertise-refs': b'yes',
+            b'turnip-can-authenticate': b'yes'}
+        if request.getUser():
+            params[b'turnip-authenticated-user'] = request.getUser()
         client_factory = HTTPPackClientRefsFactory(
-            service, self.path,
-            {b'turnip-advertise-refs': b'yes'}, request.content, request)
+            service, self.path, params, request.content, request)
         reactor.connectTCP(
             self.root.backend_host, self.root.backend_port, client_factory)
         return server.NOT_DONE_YET
@@ -194,9 +203,14 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
             content = StringIO(
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
 
+        params = {b'turnip-stateless-rpc': b'yes'}
+        params = {
+            b'turnip-stateless-rpc': b'yes',
+            b'turnip-can-authenticate': b'yes'}
+        if request.getUser():
+            params[b'turnip-authenticated-user'] = request.getUser()
         client_factory = HTTPPackClientCommandFactory(
-            self.service, self.path,
-            {b'turnip-stateless-rpc': b'yes'}, content, request)
+            self.service, self.path, params, content, request)
         reactor.connectTCP(
             self.root.backend_host, self.root.backend_port, client_factory)
         return server.NOT_DONE_YET

@@ -291,16 +291,21 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, params):
         permission = b'read' if command == b'git-upload-pack' else b'write'
-        proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint)
+        proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint, allowNone=True)
         try:
+            can_authenticate = (
+                params.get(b'turnip-can-authenticate') == b'yes')
             translated = yield proxy.callRemote(
-                b'translatePath', pathname, permission)
+                b'translatePath', pathname, permission,
+                params.get(b'turnip-authenticated-user'), can_authenticate)
             pathname = translated['path']
         except xmlrpc.Fault as e:
             if e.faultCode == 1:
                 fault_type = b'NOT_FOUND'
             elif e.faultCode == 2:
                 fault_type = b'FORBIDDEN'
+            elif e.faultCode == 3:
+                fault_type = b'UNAUTHORIZED'
             else:
                 fault_type = b'INTERNAL_SERVER_ERROR'
             self.die(VIRT_ERROR_PREFIX + fault_type + b' ' + e.faultString)

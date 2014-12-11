@@ -37,7 +37,8 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     path is prefixed with '/+rw'
     """
 
-    def xmlrpc_translatePath(self, pathname, permission):
+    def xmlrpc_translatePath(self, pathname, permission, authenticated_user,
+                             can_authenticate):
         writable = False
         if pathname.startswith('/+rw'):
             writable = True
@@ -149,7 +150,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         # Set up a fake virt information XML-RPC server which just
         # maps paths to their SHA-256 hash.
         self.virtinfo_listener = reactor.listenTCP(
-            0, server.Site(FakeVirtInfoService()))
+            0, server.Site(FakeVirtInfoService(allowNone=True)))
         self.virtinfo_port = self.virtinfo_listener.getHost().port
 
         # Run a backend server in a repo root containing an empty repo
