@@ -224,12 +224,13 @@ class PackProxyServerProtocol(PackServerProtocol):
 
     command = pathname = params = None
     request_sent = False
+    client_factory = PackClientFactory
 
     def connectToBackend(self, command, pathname, params):
         self.command = command
         self.pathname = pathname
         self.params = params
-        client = PackClientFactory(self)
+        client = self.client_factory(self)
         reactor.connectTCP(
             self.factory.backend_host, self.factory.backend_port, client)
 
@@ -320,12 +321,32 @@ class PackVirtFactory(protocol.Factory):
         self.virtinfo_endpoint = virtinfo_endpoint
 
 
+class PackFrontendClientProtocol(PackClientProtocol):
+
+    def packetReceived(self, data):
+        self.raw = True
+        if data and data.startswith(ERROR_PREFIX + VIRT_ERROR_PREFIX):
+            # Remove the internal metadata from any virt errors. We
+            # don't have the ability to ask for auth.
+            _, msg = data[len(ERROR_PREFIX + VIRT_ERROR_PREFIX):].split(
+                b' ', 1)
+            data = ERROR_PREFIX + msg
+        self.peer.sendPacket(data)
+
+
+class PackFrontendClientFactory(PackClientFactory):
+
+    protocol = PackFrontendClientProtocol
+
+
 class PackFrontendServerProtocol(PackProxyServerProtocol):
     """Standard Git pack protocol conversion proxy.
 
     Ensures that it's a vanilla, not turnip-flavoured, pack protocol
     request before forwarding to a backend.
     """
+
+    client_factory = PackFrontendClientFactory
 
     def requestReceived(self, command, pathname, params):
         if set(params.keys()) - SAFE_PARAMS:
