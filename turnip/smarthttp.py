@@ -139,15 +139,29 @@ class HTTPPackClientRefsFactory(HTTPPackClientFactory):
 
 class BaseSmartHTTPResource(resource.Resource):
 
+    extra_params = {}
+
     def error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
         request.setResponseCode(code)
         request.setHeader(b'Content-Type', b'text/plain')
         return message
 
+    def connectToBackend(self, factory, service, path, content, request):
+        params = {b'turnip-can-authenticate': b'yes'}
+        if request.getUser():
+            params[b'turnip-authenticated-user'] = request.getUser()
+        params.update(self.extra_params)
+        client_factory = factory(service, path, params, content, request)
+        reactor.connectTCP(
+            self.root.backend_host, self.root.backend_port, client_factory)
+        return server.NOT_DONE_YET
+
 
 class SmartHTTPRefsResource(BaseSmartHTTPResource):
 
     isLeaf = True
+
+    extra_params = {b'turnip-advertise-refs': b'yes'}
 
     def __init__(self, root, path):
         self.root = root
@@ -165,21 +179,16 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
             return self.error(
                 request, b'Unsupported service.', code=http.FORBIDDEN)
 
-        params = {
-            b'turnip-advertise-refs': b'yes',
-            b'turnip-can-authenticate': b'yes'}
-        if request.getUser():
-            params[b'turnip-authenticated-user'] = request.getUser()
-        client_factory = HTTPPackClientRefsFactory(
-            service, self.path, params, request.content, request)
-        reactor.connectTCP(
-            self.root.backend_host, self.root.backend_port, client_factory)
-        return server.NOT_DONE_YET
+        return self.connectToBackend(
+            HTTPPackClientRefsFactory, service, self.path, request.content,
+            request)
 
 
 class SmartHTTPCommandResource(BaseSmartHTTPResource):
 
     isLeaf = True
+
+    extra_params = {b'turnip-stateless-rpc': b'yes'}
 
     def __init__(self, root, service, path):
         self.root = root
@@ -202,18 +211,9 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
         if content_encoding == [b'gzip']:
             content = StringIO(
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
-
-        params = {b'turnip-stateless-rpc': b'yes'}
-        params = {
-            b'turnip-stateless-rpc': b'yes',
-            b'turnip-can-authenticate': b'yes'}
-        if request.getUser():
-            params[b'turnip-authenticated-user'] = request.getUser()
-        client_factory = HTTPPackClientCommandFactory(
-            self.service, self.path, params, content, request)
-        reactor.connectTCP(
-            self.root.backend_host, self.root.backend_port, client_factory)
-        return server.NOT_DONE_YET
+        return self.connectToBackend(
+            HTTPPackClientCommandFactory, self.service, self.path, content,
+            request)
 
 
 class SmartHTTPFrontendResource(resource.Resource):
