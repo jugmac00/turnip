@@ -35,6 +35,19 @@ if sys.version_info.major < 3:
 
 
 class HTTPPackClientProtocol(PackProtocol):
+    """Abstract bridge between a Git pack connection and a smart HTTP request.
+
+    The transport must be a connection to a Git pack server.
+    factory.http_request is a Git smart HTTP client request.
+
+    Upon backend connection, a factory-defined request is sent, followed
+    by the client's request body. If the immediate response is a known
+    error, it is mapped to an HTTP response and the connection is
+    terminated. Otherwise all data is forwarded from backend to client.
+
+    Concrete implementations must override backendConnected to prepare
+    the HTTP response for the backend's reply.
+    """
 
     user_error_possible = True
 
@@ -74,10 +87,12 @@ class HTTPPackClientProtocol(PackProtocol):
             self.transport.loseConnection()
         else:
             # We don't know it was a system error, so just send it back to the
-            # client as a remote error and continue.
+            # client as a remote error and proceed to forward data
+            # regardless.
             self.rawDataReceived(encode_packet(ERROR_PREFIX + msg))
 
     def connectionMade(self):
+        """Forward the request and the client's payload to the backend."""
         self.sendPacket(
             encode_request(
                 self.factory.command, self.factory.pathname,
@@ -85,6 +100,11 @@ class HTTPPackClientProtocol(PackProtocol):
         self.sendRawData(self.factory.body.read())
 
     def packetReceived(self, data):
+        """Check and forward the first packet from the backend.
+
+        Assume that any non-error packet indicates a success response,
+        so we can just forward raw data afterward.
+        """
         self.raw = True
         if data is not None and data.startswith(ERROR_PREFIX):
             self.backendConnectionFailed(data[len(ERROR_PREFIX):])
@@ -107,6 +127,7 @@ class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
     user_error_possible = False
 
     def backendConnected(self):
+        """Prepare the HTTP response for forwarding from the backend."""
         self.factory.http_request.setHeader(
             b'Content-Type',
             b'application/x-%s-advertisement' % self.factory.command)
@@ -118,6 +139,7 @@ class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
 class HTTPPackClientCommandProtocol(HTTPPackClientProtocol):
 
     def backendConnected(self):
+        """Prepare the HTTP response for forwarding from the backend."""
         self.factory.http_request.setHeader(
             b'Content-Type',
             b'application/x-%s-result' % self.factory.command)
@@ -144,20 +166,24 @@ class HTTPPackClientRefsFactory(HTTPPackClientFactory):
 
 
 class BaseSmartHTTPResource(resource.Resource):
+    """Base HTTP resource for Git smart HTTP auth and error handling."""
 
     extra_params = {}
 
     def errback(self, failure, request):
+        """Handle a Twisted failure by returning an HTTP error."""
         request.write(self.error(request, repr(failure)))
         request.finish()
 
     def error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
+        """Prepare for an error response and return the body."""
         request.setResponseCode(code)
         request.setHeader(b'Content-Type', b'text/plain')
         return message
 
     @defer.inlineCallbacks
     def authenticateUser(self, request):
+        """Attempt authentication of the request with the virt service."""
         if request.getUser():
             proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint)
             try:
@@ -173,6 +199,11 @@ class BaseSmartHTTPResource(resource.Resource):
 
     @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, content, request):
+        """Establish a pack connection to the backend.
+
+        The turnip-authenticated-user parameter is set to the username
+        returned by the virt service, if any.
+        """
         params = {b'turnip-can-authenticate': b'yes'}
         authenticated_user = yield self.authenticateUser(request)
         if authenticated_user:
@@ -184,6 +215,7 @@ class BaseSmartHTTPResource(resource.Resource):
 
 
 class SmartHTTPRefsResource(BaseSmartHTTPResource):
+    """HTTP resource for Git smart HTTP ref discovery requests."""
 
     isLeaf = True
 
@@ -213,6 +245,7 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
 
 
 class SmartHTTPCommandResource(BaseSmartHTTPResource):
+    """HTTP resource for Git smart HTTP command requests."""
 
     isLeaf = True
 
@@ -247,6 +280,7 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
 
 
 class SmartHTTPFrontendResource(resource.Resource):
+    """HTTP resource to translate Git smart HTTP requests to pack protocol."""
 
     allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
 
@@ -258,10 +292,11 @@ class SmartHTTPFrontendResource(resource.Resource):
 
     def getChild(self, path, request):
         if request.path.endswith(b'/info/refs'):
+            # /PATH/TO/REPO/info/refs
             return SmartHTTPRefsResource(
                 self, request.path[:-len(b'/info/refs')])
-
         try:
+            # /PATH/TO/REPO/SERVICE
             path, service = request.path.rsplit(b'/', 1)
         except ValueError:
             path = request.path
