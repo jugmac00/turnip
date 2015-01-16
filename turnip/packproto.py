@@ -175,10 +175,6 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self._err_buffer += data
 
     def outConnectionLost(self):
-        # Close stdin so processEnded can fire. We should possibly do
-        # this as soon as the negotation completes, but we need a better
-        # understanding of the protocol for that.
-        self.transport.closeStdin()
         if self._err_buffer:
             self.peer.die(self._err_buffer)
 
