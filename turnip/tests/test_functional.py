@@ -59,7 +59,7 @@ class FunctionalTestMixin(object):
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
         out, err, code = yield utils.getProcessOutputAndValue(
-            command[0], command[1:], path=path)
+            command[0], command[1:], env=os.environ, path=path)
         if code != 0:
             self.addDetail('stdout', text_content(out))
             self.addDetail('stderr', text_content(err))
@@ -123,7 +123,7 @@ class FunctionalTestMixin(object):
         output = yield utils.getProcessOutput(
             b'git',
             (b'clone', b'%s://localhost:%d/fail' % (self.scheme, self.port)),
-            path=test_root, errortoo=True)
+            env=os.environ, path=test_root, errortoo=True)
         self.assertIn(
             b"Cloning into 'fail'...\n" + self.early_error + b'fatal: ',
             output)
@@ -207,14 +207,15 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
         # A push attempt is rejected.
         out = yield utils.getProcessOutput(
-            b'git', (b'push', b'origin', b'master'), path=clone1,
-            errortoo=True)
+            b'git', (b'push', b'origin', b'master'),
+            env=os.environ, path=clone1, errortoo=True)
         self.assertThat(
             out, StartsWith(self.early_error + b'Repository is read-only'))
 
         # The remote repository is still empty.
         out = yield utils.getProcessOutput(
-            b'git', (b'clone', self.ro_url, clone2), errortoo=True)
+            b'git', (b'clone', self.ro_url, clone2),
+            env=os.environ, errortoo=True)
         self.assertIn(b'You appear to have cloned an empty repository.', out)
 
         # But the push succeeds if we switch the remote to the writable URL.
