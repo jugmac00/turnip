@@ -11,10 +11,12 @@ from twisted.internet import (
     protocol,
     reactor,
     )
+from twisted.internet.interfaces import IHalfCloseableProtocol
 # twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
 # bits of this module work.
 if sys.version_info.major < 3:
     from twisted.web import xmlrpc
+from zope.interface import implements
 
 from turnip import helpers
 
@@ -85,6 +87,8 @@ class PackProtocol(protocol.Protocol):
 
 class PackProxyProtocol(PackProtocol):
 
+    implements(IHalfCloseableProtocol)
+
     peer = None
 
     def invalidPacketReceived(self, packet):
@@ -95,6 +99,13 @@ class PackProxyProtocol(PackProtocol):
 
     def die(self, message):
         raise NotImplementedError()
+
+    def readConnectionLost(self):
+        if self.peer is not None:
+            self.peer.transport.loseWriteConnection()
+
+    def writeConnectionLost(self):
+        pass
 
     def connectionLost(self, reason):
         if self.peer is not None:
@@ -144,6 +155,8 @@ class PackServerProtocol(PackProxyProtocol):
 
 class GitProcessProtocol(protocol.ProcessProtocol):
 
+    implements(IHalfCloseableProtocol)
+
     _err_buffer = b''
 
     def __init__(self, peer):
@@ -174,6 +187,12 @@ class GitProcessProtocol(protocol.ProcessProtocol):
 
     def sendRawData(self, data):
         self.transport.write(data)
+
+    def readConnectionLost(self):
+        self.transport.closeStdin()
+
+    def writeConnectionLost(self):
+        self.outConnectionLost()
 
     def processEnded(self, status):
         self.peer.transport.loseConnection()
@@ -271,6 +290,12 @@ class PackBackendProtocol(PackServerProtocol):
 
         self.peer = GitProcessProtocol(self)
         reactor.spawnProcess(self.peer, cmd, args)
+
+    def readConnectionLost(self):
+        self.peer.readConnectionLost()
+
+    def writeConnectionLost(self):
+        self.peer.writeConnectionLost()
 
 
 class PackBackendFactory(protocol.Factory):
