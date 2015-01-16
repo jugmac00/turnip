@@ -185,7 +185,7 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.transport.write(data)
 
     def readConnectionLost(self):
-        self.transport.closeStdin()
+        self.transport.closeChildFD(0)
 
     def writeConnectionLost(self):
         self.outConnectionLost()
