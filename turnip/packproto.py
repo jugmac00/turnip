@@ -155,8 +155,6 @@ class PackServerProtocol(PackProxyProtocol):
 
 class GitProcessProtocol(protocol.ProcessProtocol):
 
-    implements(IHalfCloseableProtocol)
-
     _err_buffer = b''
 
     def __init__(self, peer):
@@ -184,11 +182,12 @@ class GitProcessProtocol(protocol.ProcessProtocol):
     def sendRawData(self, data):
         self.transport.write(data)
 
-    def readConnectionLost(self):
+    def loseReadConnection(self):
         self.transport.closeChildFD(0)
 
-    def writeConnectionLost(self):
-        self.outConnectionLost()
+    def loseWriteConnection(self):
+        self.transport.closeChildFD(1)
+        self.transport.closeChildFD(2)
 
     def processEnded(self, status):
         self.peer.transport.loseConnection()
@@ -288,10 +287,10 @@ class PackBackendProtocol(PackServerProtocol):
         reactor.spawnProcess(self.peer, cmd, args)
 
     def readConnectionLost(self):
-        self.peer.readConnectionLost()
+        self.peer.loseReadConnection()
 
     def writeConnectionLost(self):
-        self.peer.writeConnectionLost()
+        self.peer.loseWriteConnection()
 
 
 class PackBackendFactory(protocol.Factory):
