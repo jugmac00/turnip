@@ -4,10 +4,17 @@ from __future__ import (
     unicode_literals,
     )
 
+from collections import defaultdict
 import hashlib
-import os.path
+import os
+import shutil
+import stat
 
-from fixtures import TempDir
+from fixtures import (
+    EnvironmentVariable,
+    TempDir,
+    )
+from lazr.sshserver.auth import NoSuchPersonWithName
 from testtools import TestCase
 from testtools.content import text_content
 from testtools.deferredruntest import AsynchronousDeferredRunTest
@@ -27,7 +34,37 @@ from turnip.packproto import (
     PackFrontendFactory,
     PackVirtFactory,
     )
+from turnip.smartssh import SmartSSHService
 from turnip.smarthttp import SmartHTTPFrontendResource
+
+
+class FakeAuthServerService(xmlrpc.XMLRPC):
+    """A fake version of the Launchpad authserver service."""
+
+    def __init__(self):
+        xmlrpc.XMLRPC.__init__(self)
+        self.keys = defaultdict(list)
+
+    def addSSHKey(self, username, public_key_path):
+        with open(public_key_path, "r") as f:
+            public_key = f.read()
+        kind, keytext, _ = public_key.split(" ", 2)
+        if kind == "ssh-rsa":
+            keytype = "RSA"
+        elif kind == "ssh-dss":
+            keytype = "DSA"
+        else:
+            raise Exception("Unrecognised public key type %s" % kind)
+        self.keys[username].append((keytype, keytext))
+
+    def xmlrpc_getUserAndSSHKeys(self, username):
+        if username not in self.keys:
+            raise NoSuchPersonWithName(username)
+        return {
+            "id": username,
+            "name": username,
+            "keys": self.keys[username],
+            }
 
 
 class FakeVirtInfoService(xmlrpc.XMLRPC):
@@ -59,7 +96,7 @@ class FunctionalTestMixin(object):
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
         out, err, code = yield utils.getProcessOutputAndValue(
-            command[0], command[1:], path=path)
+            command[0], command[1:], env=os.environ, path=path)
         if code != 0:
             self.addDetail('stdout', text_content(out))
             self.addDetail('stderr', text_content(err))
@@ -123,7 +160,7 @@ class FunctionalTestMixin(object):
         output = yield utils.getProcessOutput(
             b'git',
             (b'clone', b'%s://localhost:%d/fail' % (self.scheme, self.port)),
-            path=test_root, errortoo=True)
+            env=os.environ, path=test_root, errortoo=True)
         self.assertIn(
             b"Cloning into 'fail'...\n" + self.early_error + b'fatal: ',
             output)
@@ -159,6 +196,16 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
     def setUp(self):
         super(FrontendFunctionalTestMixin, self).setUp()
 
+        self.data_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "data"))
+
+        # Set up a fake authserver.
+        self.authserver = FakeAuthServerService()
+        self.authserver_listener = reactor.listenTCP(
+            0, server.Site(self.authserver))
+        self.authserver_port = self.authserver_listener.getHost().port
+        self.authserver_url = b'http://localhost:%d/' % self.authserver_port
+
         # Set up a fake virt information XML-RPC server which just
         # maps paths to their SHA-256 hash.
         self.virtinfo_listener = reactor.listenTCP(
@@ -188,6 +235,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         yield self.virt_listener.stopListening()
         yield self.backend_listener.stopListening()
         yield self.virtinfo_listener.stopListening()
+        yield self.authserver_listener.stopListening()
 
     @defer.inlineCallbacks
     def test_read_only(self):
@@ -207,14 +255,15 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
         # A push attempt is rejected.
         out = yield utils.getProcessOutput(
-            b'git', (b'push', b'origin', b'master'), path=clone1,
-            errortoo=True)
+            b'git', (b'push', b'origin', b'master'),
+            env=os.environ, path=clone1, errortoo=True)
         self.assertThat(
             out, StartsWith(self.early_error + b'Repository is read-only'))
 
         # The remote repository is still empty.
         out = yield utils.getProcessOutput(
-            b'git', (b'clone', self.ro_url, clone2), errortoo=True)
+            b'git', (b'clone', self.ro_url, clone2),
+            env=os.environ, errortoo=True)
         self.assertIn(b'You appear to have cloned an empty repository.', out)
 
         # But the push succeeds if we switch the remote to the writable URL.
@@ -274,3 +323,68 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
     def tearDown(self):
         yield super(TestSmartHTTPFrontendFunctional, self).tearDown()
         yield self.frontend_listener.stopListening()
+
+
+class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
+
+    scheme = b'ssh'
+    early_error = b'fatal: remote error: '
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield super(TestSmartSSHServiceFunctional, self).setUp()
+
+        config = os.path.join(self.root, "ssh-config")
+        known_hosts = os.path.join(self.root, "known_hosts")
+        private_key = os.path.join(self.root, "ssh-key")
+        shutil.copy2(os.path.join(self.data_dir, "ssh-key"), private_key)
+        os.chmod(private_key, stat.S_IRUSR | stat.S_IWUSR)
+        public_key = os.path.join(self.data_dir, "ssh-key.pub")
+        with open(config, "w") as config_file:
+            print("IdentitiesOnly yes", file=config_file)
+            print("IdentityFile %s" % private_key, file=config_file)
+            print("StrictHostKeyChecking no", file=config_file)
+            print("User example", file=config_file)
+            print("UserKnownHostsFile %s" % known_hosts, file=config_file)
+        git_ssh = os.path.join(self.root, "ssh-wrapper")
+        with open(git_ssh, "w") as git_ssh_file:
+            print('#! /bin/sh', file=git_ssh_file)
+            print('ssh -F %s "$@"' % config, file=git_ssh_file)
+        new_mode = (
+            os.stat(git_ssh).st_mode |
+            stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        os.chmod(git_ssh, new_mode)
+        self.useFixture(EnvironmentVariable("GIT_SSH", git_ssh))
+
+        self.authserver.addSSHKey("example", public_key)
+
+        # We run a service connecting to the backend and authserver servers
+        # started by the mixin.
+        private_host_key = os.path.join(self.root, "ssh-host-key")
+        shutil.copy2(
+            os.path.join(self.data_dir, "ssh-host-key"), private_host_key)
+        os.chmod(private_host_key, stat.S_IRUSR | stat.S_IWUSR)
+        public_host_key = os.path.join(self.data_dir, "ssh-host-key.pub")
+        self.service = SmartSSHService(
+            b'localhost', self.virt_port, self.authserver_url,
+            private_key_path=private_host_key, public_key_path=public_host_key,
+            main_log="turnip", access_log="turnip.access",
+            access_log_path=os.path.join(self.root, "access.log"),
+            strport=b'tcp:0')
+        self.service.startService()
+        self.addCleanup(self.service.stopService)
+        socket = self.service.service._waitingForPort.result.socket
+        self.port = socket.getsockname()[1]
+
+        # Connect to the service with the command "true".  We expect this to
+        # fail, but it will populate known_hosts as a side-effect so that we
+        # don't have to filter out "Warning: Permanently added ..." messages
+        # later on.
+        code = yield utils.getProcessValue(
+            git_ssh.encode("UTF-8"),
+            (b'-p', str(self.port).encode("UTF-8"), b'localhost', b'true'))
+        self.assertNotEqual(0, code)
+
+        # Always use a writable URL for now.
+        self.url = b'ssh://localhost:%d/+rw/test' % self.port
+        self.ro_url = b'ssh://localhost:%d/test' % self.port
