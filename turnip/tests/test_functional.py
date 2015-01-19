@@ -7,6 +7,7 @@ from __future__ import (
 from collections import defaultdict
 import hashlib
 import os
+import shutil
 import stat
 
 from fixtures import (
@@ -335,7 +336,9 @@ class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
 
         config = os.path.join(self.root, "ssh-config")
         known_hosts = os.path.join(self.root, "known_hosts")
-        private_key = os.path.join(self.data_dir, "ssh-key")
+        private_key = os.path.join(self.root, "ssh-key")
+        shutil.copy2(os.path.join(self.data_dir, "ssh-key"), private_key)
+        os.chmod(private_key, stat.S_IRUSR | stat.S_IWUSR)
         public_key = os.path.join(self.data_dir, "ssh-key.pub")
         with open(config, "w") as config_file:
             print("IdentitiesOnly yes", file=config_file)
@@ -357,11 +360,14 @@ class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
 
         # We run a service connecting to the backend and authserver servers
         # started by the mixin.
-        data_dir = os.path.join(os.path.dirname(__file__), "data")
+        private_host_key = os.path.join(self.root, "ssh-host-key")
+        shutil.copy2(
+            os.path.join(self.data_dir, "ssh-host-key"), private_host_key)
+        os.chmod(private_host_key, stat.S_IRUSR | stat.S_IWUSR)
+        public_host_key = os.path.join(self.data_dir, "ssh-host-key.pub")
         self.service = SmartSSHService(
             b'localhost', self.virt_port, self.authserver_url,
-            private_key_path=os.path.join(data_dir, "ssh-host-key"),
-            public_key_path=os.path.join(data_dir, "ssh-host-key.pub"),
+            private_key_path=private_host_key, public_key_path=public_host_key,
             main_log="turnip", access_log="turnip.access",
             access_log_path=os.path.join(self.root, "access.log"),
             strport=b'tcp:0')
