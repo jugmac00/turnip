@@ -183,11 +183,11 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.transport.write(data)
 
     def loseReadConnection(self):
-        self.transport.closeChildFD(0)
-
-    def loseWriteConnection(self):
         self.transport.closeChildFD(1)
         self.transport.closeChildFD(2)
+
+    def loseWriteConnection(self):
+        self.transport.closeChildFD(0)
 
     def processEnded(self, status):
         self.peer.transport.loseConnection()
@@ -287,10 +287,10 @@ class PackBackendProtocol(PackServerProtocol):
         reactor.spawnProcess(self.peer, cmd, args)
 
     def readConnectionLost(self):
-        self.peer.loseReadConnection()
+        self.peer.loseWriteConnection()
 
     def writeConnectionLost(self):
-        self.peer.loseWriteConnection()
+        self.peer.loseReadConnection()
 
 
 class PackBackendFactory(protocol.Factory):
