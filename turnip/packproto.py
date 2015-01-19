@@ -11,10 +11,12 @@ from twisted.internet import (
     protocol,
     reactor,
     )
+from twisted.internet.interfaces import IHalfCloseableProtocol
 # twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
 # bits of this module work.
 if sys.version_info.major < 3:
     from twisted.web import xmlrpc
+from zope.interface import implements
 
 from turnip import helpers
 
@@ -85,6 +87,8 @@ class PackProtocol(protocol.Protocol):
 
 class PackProxyProtocol(PackProtocol):
 
+    implements(IHalfCloseableProtocol)
+
     peer = None
 
     def invalidPacketReceived(self, packet):
@@ -95,6 +99,13 @@ class PackProxyProtocol(PackProtocol):
 
     def die(self, message):
         raise NotImplementedError()
+
+    def readConnectionLost(self):
+        if self.peer is not None:
+            self.peer.transport.loseWriteConnection()
+
+    def writeConnectionLost(self):
+        pass
 
     def connectionLost(self, reason):
         if self.peer is not None:
@@ -162,10 +173,6 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self._err_buffer += data
 
     def outConnectionLost(self):
-        # Close stdin so processEnded can fire. We should possibly do
-        # this as soon as the negotation completes, but we need a better
-        # understanding of the protocol for that.
-        self.transport.closeStdin()
         if self._err_buffer:
             self.peer.die(self._err_buffer)
 
@@ -174,6 +181,13 @@ class GitProcessProtocol(protocol.ProcessProtocol):
 
     def sendRawData(self, data):
         self.transport.write(data)
+
+    def loseReadConnection(self):
+        self.transport.closeChildFD(1)
+        self.transport.closeChildFD(2)
+
+    def loseWriteConnection(self):
+        self.transport.closeChildFD(0)
 
     def processEnded(self, status):
         self.peer.transport.loseConnection()
@@ -271,6 +285,12 @@ class PackBackendProtocol(PackServerProtocol):
 
         self.peer = GitProcessProtocol(self)
         reactor.spawnProcess(self.peer, cmd, args)
+
+    def readConnectionLost(self):
+        self.peer.loseWriteConnection()
+
+    def writeConnectionLost(self):
+        self.peer.loseReadConnection()
 
 
 class PackBackendFactory(protocol.Factory):

@@ -83,6 +83,15 @@ class FunctionalTestMixin(object):
             (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
             path=clone1)
 
+        # There are no "matching" branches yet, so an attempt to push all
+        # matching branches will exit early on the client side and not push
+        # anything.  Make sure that the frontend disconnects appropriately.
+        out, err, code = yield utils.getProcessOutputAndValue(
+            b'git', (b'push', b'origin', b':'), env=os.environ, path=clone1)
+        self.assertEqual(b'', out)
+        self.assertIn(b'No refs in common and none specified', err)
+        self.assertEqual(0, code)
+
         # Push it back up to the backend.
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'master'), path=clone1)
