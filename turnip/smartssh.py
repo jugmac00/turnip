@@ -77,7 +77,7 @@ class SSHPackClientProtocol(PackProtocol):
 
     def connectionMade(self):
         """Forward the command and arguments to the backend."""
-        self.deferred.callback(self)
+        self.factory.deferred.callback(self)
         self.sendPacket(
             encode_request(
                 self.factory.command, self.factory.pathname,
@@ -125,11 +125,6 @@ class SSHPackClientFactory(protocol.ClientFactory):
         self.params = params
         self.ssh_protocol = ssh_protocol
         self.deferred = deferred
-
-    def buildProtocol(self, addr):
-        p = protocol.ClientFactory.buildProtocol(self, addr)
-        p.deferred = self.deferred
-        return p
 
     def clientConnectionFailed(self, connector, reason):
         self.deferred.errback(reason)
