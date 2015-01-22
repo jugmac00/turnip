@@ -16,7 +16,7 @@ from twisted.internet.interfaces import IHalfCloseableProtocol
 # bits of this module work.
 if sys.version_info.major < 3:
     from twisted.web import xmlrpc
-from zope.interface import implements
+from zope.interface import implementer
 
 from turnip import helpers
 
@@ -85,9 +85,8 @@ class PackProtocol(protocol.Protocol):
         self.transport.stopProducing()
 
 
+@implementer(IHalfCloseableProtocol)
 class PackProxyProtocol(PackProtocol):
-
-    implements(IHalfCloseableProtocol)
 
     peer = None
 
