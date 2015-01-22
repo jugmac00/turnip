@@ -19,14 +19,14 @@ from twisted.web import (
     server,
     )
 
-from turnip.helpers import (
-    encode_packet,
-    encode_request,
-    )
 from turnip.pack.git import (
     ERROR_PREFIX,
     PackProtocol,
     VIRT_ERROR_PREFIX,
+    )
+from turnip.pack.helpers import (
+    encode_packet,
+    encode_request,
     )
 # twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
 # bits of this module work.

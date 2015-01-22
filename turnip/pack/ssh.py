@@ -38,14 +38,14 @@ from twisted.python import (
 from twisted.web.xmlrpc import Proxy
 from zope.interface import implements
 
-from turnip.helpers import (
-    encode_packet,
-    encode_request,
-    )
 from turnip.pack.git import (
     ERROR_PREFIX,
     PackProtocol,
     VIRT_ERROR_PREFIX,
+    )
+from turnip.pack.helpers import (
+    encode_packet,
+    encode_request,
     )
 
 

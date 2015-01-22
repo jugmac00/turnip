@@ -7,8 +7,10 @@ from __future__ import (
 from testtools import TestCase
 from twisted.test import proto_helpers
 
-from turnip import helpers
-from turnip.pack import git
+from turnip.pack import (
+    git,
+    helpers,
+    )
 
 
 class DummyPackServerProtocol(git.PackServerProtocol):

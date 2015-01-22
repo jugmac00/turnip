@@ -18,7 +18,14 @@ if sys.version_info.major < 3:
     from twisted.web import xmlrpc
 from zope.interface import implementer
 
-from turnip import helpers
+from turnip.helpers import compose_path
+from turnip.pack.helpers import (
+    decode_packet,
+    decode_request,
+    encode_packet,
+    encode_request,
+    INCOMPLETE_PKT,
+    )
 
 
 ERROR_PREFIX = b'ERR '
@@ -47,13 +54,13 @@ class PackProtocol(protocol.Protocol):
         self.__buffer += raw_data
         while not self.paused and not self.raw:
             try:
-                payload, self.__buffer = helpers.decode_packet(self.__buffer)
+                payload, self.__buffer = decode_packet(self.__buffer)
             except ValueError:
                 invalid = self.__buffer
                 self.__buffer = b''
                 self.invalidPacketReceived(invalid)
                 break
-            if payload is helpers.INCOMPLETE_PKT:
+            if payload is INCOMPLETE_PKT:
                 break
             self.packetReceived(payload)
         else:
@@ -66,7 +73,7 @@ class PackProtocol(protocol.Protocol):
                 return
 
     def sendPacket(self, data):
-        self.sendRawData(helpers.encode_packet(data))
+        self.sendRawData(encode_packet(data))
 
     def sendRawData(self, data):
         self.transport.write(data)
@@ -132,7 +139,7 @@ class PackServerProtocol(PackProxyProtocol):
                 self.die(b'Bad request: flush-pkt instead')
                 return None
             try:
-                command, pathname, params = helpers.decode_request(data)
+                command, pathname, params = decode_request(data)
             except ValueError as e:
                 self.die(str(e).encode('utf-8'))
                 return
@@ -176,7 +183,7 @@ class GitProcessProtocol(protocol.ProcessProtocol):
             self.peer.die(self._err_buffer)
 
     def sendPacket(self, data):
-        self.sendRawData(helpers.encode_packet(data))
+        self.sendRawData(encode_packet(data))
 
     def sendRawData(self, data):
         self.transport.write(data)
@@ -253,7 +260,7 @@ class PackProxyServerProtocol(PackServerProtocol):
         if not self.request_sent:
             self.request_sent = True
             self.peer.sendPacket(
-                helpers.encode_request(
+                encode_request(
                     self.command, self.pathname, self.params))
         PackServerProtocol.resumeProducing(self)
 
@@ -265,7 +272,7 @@ class PackBackendProtocol(PackServerProtocol):
     """
 
     def requestReceived(self, command, raw_pathname, params):
-        path = helpers.compose_path(self.factory.root, raw_pathname)
+        path = compose_path(self.factory.root, raw_pathname)
         if command == b'git-upload-pack':
             subcmd = b'upload-pack'
         elif command == b'git-receive-pack':
