@@ -42,7 +42,7 @@ from turnip.helpers import (
     encode_packet,
     encode_request,
     )
-from turnip.packproto import (
+from turnip.pack.proto import (
     ERROR_PREFIX,
     PackProtocol,
     VIRT_ERROR_PREFIX,

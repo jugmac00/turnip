@@ -7,13 +7,11 @@ from __future__ import (
 from testtools import TestCase
 from twisted.test import proto_helpers
 
-from turnip import (
-    helpers,
-    packproto,
-    )
+from turnip import helpers
+from turnip.pack import proto
 
 
-class DummyPackServerProtocol(packproto.PackServerProtocol):
+class DummyPackServerProtocol(proto.PackServerProtocol):
 
     test_request = None
 

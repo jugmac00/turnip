@@ -29,13 +29,13 @@ from twisted.web import (
     xmlrpc,
     )
 
-from turnip.packproto import (
+from turnip.pack.http import SmartHTTPFrontendResource
+from turnip.pack.proto import (
     PackBackendFactory,
     PackFrontendFactory,
     PackVirtFactory,
     )
-from turnip.smartssh import SmartSSHService
-from turnip.smarthttp import SmartHTTPFrontendResource
+from turnip.pack.ssh import SmartSSHService
 
 
 class FakeAuthServerService(xmlrpc.XMLRPC):

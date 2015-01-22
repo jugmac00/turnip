@@ -10,20 +10,21 @@ from twisted.internet import reactor
 from twisted.web import server
 
 from turnip.api import TurnipAPIResource
-from turnip.packproto import (
+from turnip.pack.http import SmartHTTPFrontendResource
+from turnip.pack.proto import (
     PackBackendFactory,
     PackFrontendFactory,
     PackVirtFactory,
     )
-from turnip.smartssh import SmartSSHService
-from turnip.smarthttp import SmartHTTPFrontendResource
+from turnip.pack.ssh import SmartSSHService
 
 AUTHENTICATION_ENDPOINT = (
     b'http://xmlrpc-private.launchpad.dev:8087/authserver')
 REPO_STORE = '/var/tmp/git.launchpad.dev'
 VIRTINFO_ENDPOINT = b'http://localhost:6543/githosting'
 
-data_dir = os.path.join(os.path.dirname(__file__), "turnip", "tests", "data")
+data_dir = os.path.join(
+    os.path.dirname(__file__), "turnip", "pack", "tests", "data")
 
 # Start a pack storage service on 19418, pointed at by a pack frontend
 # on 9418 (the default git:// port), a smart HTTP frontend on 9419, and
