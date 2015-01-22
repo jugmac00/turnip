@@ -8,10 +8,10 @@ from testtools import TestCase
 from twisted.test import proto_helpers
 
 from turnip import helpers
-from turnip.pack import proto
+from turnip.pack import git
 
 
-class DummyPackServerProtocol(proto.PackServerProtocol):
+class DummyPackServerProtocol(git.PackServerProtocol):
 
     test_request = None
 

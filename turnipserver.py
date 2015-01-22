@@ -10,12 +10,12 @@ from twisted.internet import reactor
 from twisted.web import server
 
 from turnip.api import TurnipAPIResource
-from turnip.pack.http import SmartHTTPFrontendResource
-from turnip.pack.proto import (
+from turnip.pack.git import (
     PackBackendFactory,
     PackFrontendFactory,
     PackVirtFactory,
     )
+from turnip.pack.http import SmartHTTPFrontendResource
 from turnip.pack.ssh import SmartSSHService
 
 AUTHENTICATION_ENDPOINT = (

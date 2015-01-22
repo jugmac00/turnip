@@ -29,12 +29,12 @@ from twisted.web import (
     xmlrpc,
     )
 
-from turnip.pack.http import SmartHTTPFrontendResource
-from turnip.pack.proto import (
+from turnip.pack.git import (
     PackBackendFactory,
     PackFrontendFactory,
     PackVirtFactory,
     )
+from turnip.pack.http import SmartHTTPFrontendResource
 from turnip.pack.ssh import SmartSSHService
 
 
