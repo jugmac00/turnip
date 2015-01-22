@@ -1,7 +1,6 @@
 Twisted==14.0.2
 argparse==1.2.1
-bzr==2.6.0
-lazr.sshserver==0.1
+lazr.sshserver==0.1.1
 pyasn1==0.1.7
 pycrypto==2.6.1
 wsgiref==0.1.2
