@@ -24,23 +24,20 @@ class TestPreReceiveHook(TestCase):
         return '\n'.join(
             b'%s %s %s' % (old, new, ref) for ref, old, new in updates)
 
-    def assertAccepted(self, updates):
+    def invokeHook(self, input):
         hook = subprocess.Popen(
             [self.hook_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
-        stdout, stderr = hook.communicate(self.encodeRefs(updates))
-        self.assertEqual(0, hook.returncode)
-        self.assertEqual(b'', stderr)
-        self.assertEqual(b'', stdout)
+        stdout, stderr = hook.communicate(input)
+        return hook.returncode, stdout, stderr
+
+    def assertAccepted(self, updates):
+        self.assertEqual(
+            (0, b'', b''), self.invokeHook(self.encodeRefs(updates)))
 
     def assertRejected(self, updates, message):
-        hook = subprocess.Popen(
-            [self.hook_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-        stdout, stderr = hook.communicate(self.encodeRefs(updates))
-        self.assertEqual(1, hook.returncode)
-        self.assertEqual(b'', stderr)
-        self.assertEqual(message, stdout)
+        self.assertEqual(
+            (1, message, b''), self.invokeHook(self.encodeRefs(updates)))
 
     def test_accepted(self):
         # A single valid ref is accepted.
