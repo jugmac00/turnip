@@ -59,6 +59,18 @@ class TestPreReceiveHook(TestCase):
             [b'refs/heads/verboten'],
             b"You can't push to refs/heads/verboten.\n")
 
+    def test_wildcard(self):
+        # "*" in a rule matches any path segment.
+        self.assertRejected(
+            [(b'refs/heads/foo', self.old_sha1, self.new_sha1),
+             (b'refs/tags/bar', self.old_sha1, self.new_sha1),
+             (b'refs/tags/foo', self.old_sha1, self.new_sha1),
+             (b'refs/baz/quux', self.old_sha1, self.new_sha1)],
+            [b'refs/*/foo', b'refs/baz/*'],
+            b"You can't push to refs/heads/foo.\n"
+            b"You can't push to refs/tags/foo.\n"
+            b"You can't push to refs/baz/quux.\n")
+
     def test_rejected_multiple(self):
         # A combination of valid and invalid refs is still rejected.
         self.assertRejected(

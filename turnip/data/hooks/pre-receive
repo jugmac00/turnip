@@ -3,14 +3,21 @@
 import os
 import sys
 
+def match_rule(rule, ref):
+    if len(rule) != len(ref):
+        return False
+    return all(
+        ruleseg in (b'*', refseg) for ruleseg, refseg in zip(rule, ref))
+
+
 rejected = False
 
 with open(os.environ[b'TURNIP_HOOK_REF_RULES'], 'rb') as f:
-    rules = [l.rstrip(b'\n') for l in f.readlines()]
+    rules = [l.rstrip(b'\n').split(b'/') for l in f.readlines()]
 
 for ref_line in sys.stdin.readlines():
     old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
-    if ref in rules:
+    if any(match_rule(rule, ref.split(b'/')) for rule in rules):
         print b"You can't push to %s." % ref
         rejected = True
 
