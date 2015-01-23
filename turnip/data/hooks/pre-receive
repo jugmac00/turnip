@@ -1,12 +1,16 @@
 #!/usr/bin/python
 
+import os
 import sys
 
 rejected = False
 
+with open(os.environ[b'TURNIP_HOOK_REF_RULES'], 'rb') as f:
+    rules = [l.rstrip(b'\n') for l in f.readlines()]
+
 for ref_line in sys.stdin.readlines():
     old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
-    if ref.endswith(b'verboten'):
+    if ref in rules:
         print b"You can't push to %s." % ref
         rejected = True
 
