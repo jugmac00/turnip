@@ -4,6 +4,8 @@ from __future__ import (
     unicode_literals,
     )
 
+import os
+
 from twisted.internet import defer
 from twisted.internet.utils import getProcessValue
 from twisted.web import (
@@ -42,6 +44,8 @@ class CreateResource(resource.Resource):
     @defer.inlineCallbacks
     def createRepo(self, request, raw_path):
         repo_path = compose_path(self.root, raw_path)
+        if os.path.exists(repo_path):
+            raise Exception("Repository '%s' already exists" % repo_path)
         ret = yield getProcessValue('git', ('init', '--bare', repo_path))
         if ret != 0:
             raise Exception("'git init' failed")
