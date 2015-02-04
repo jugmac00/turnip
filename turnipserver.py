@@ -40,8 +40,8 @@ smartssh_service = SmartSSHService(
     b'localhost', 19419, AUTHENTICATION_ENDPOINT,
     private_key_path=os.path.join(data_dir, "ssh-host-key"),
     public_key_path=os.path.join(data_dir, "ssh-host-key.pub"),
-    main_log='turnip', access_log=os.path.join(LOGPATH, 'turnip.access'),
-    access_log_path=os.path.join(LOGPATH, 'turnip-access.log'),
+    main_log='turnip', access_log=os.path.join(LOG_PATH, 'turnip.access'),
+    access_log_path=os.path.join(LOG_PATH, 'turnip-access.log'),
     strport=b'tcp:9422')
 smartssh_service.startService()
 
