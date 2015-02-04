@@ -326,7 +326,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                 params.get(b'turnip-authenticated-user'), can_authenticate)
             pathname = translated['path']
         except xmlrpc.Fault as e:
-            if e.faultCode in (1, 320):
+            if e.faultCode in (1, 290):
                 fault_type = b'NOT_FOUND'
             elif e.faultCode in (2, 310):
                 fault_type = b'FORBIDDEN'
