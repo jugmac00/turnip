@@ -20,9 +20,9 @@ from turnip.pack.ssh import SmartSSHService
 
 AUTHENTICATION_ENDPOINT = (
     b'http://xmlrpc-private.launchpad.dev:8087/authserver')
+LOG_PATH = os.getenv('TURNIP_LOG_DIR', '')
 REPO_STORE = '/var/tmp/git.launchpad.dev'
 VIRTINFO_ENDPOINT = b'http://localhost:6543/githosting'
-
 data_dir = os.path.join(
     os.path.dirname(__file__), "turnip", "pack", "tests", "data")
 
@@ -40,8 +40,8 @@ smartssh_service = SmartSSHService(
     b'localhost', 19419, AUTHENTICATION_ENDPOINT,
     private_key_path=os.path.join(data_dir, "ssh-host-key"),
     public_key_path=os.path.join(data_dir, "ssh-host-key.pub"),
-    main_log='turnip', access_log='turnip.access',
-    access_log_path='turnip-access.log',
+    main_log='turnip', access_log=os.path.join(LOG_PATH, 'turnip.access'),
+    access_log_path=os.path.join(LOG_PATH, 'turnip-access.log'),
     strport=b'tcp:9422')
 smartssh_service.startService()
 
