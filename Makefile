@@ -10,6 +10,8 @@ BUILDOUT_BIN := bin/buildout
 BUILDOUT_CFG := buildout.cfg
 BUILDOUT = PYTHONPATH= $(BUILDOUT_BIN) -qc $(BUILDOUT_CFG)
 
+APP_PATH := ./turnip
+
 
 default: check
 
@@ -54,6 +56,10 @@ $(BUILDOUT_BIN): download-cache eggs
 	touch --no-create $@
 
 
+bin/api:
+	PYTHONPATH=$(APP_PATH) pserve api.ini
+
+
 bin/twistd: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
 	$(BUILDOUT) install runtime
 
@@ -87,7 +93,9 @@ clean: clean_buildout
 
 clean_all: clean_buildout clean_eggs
 
+lint:
+	@flake8 turnip
 
 .PHONY: \
     build build-update-paths check clean clean_all clean_buildout \
-    clean_eggs default dist
+    clean_eggs default dist lint

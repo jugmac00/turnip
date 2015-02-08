@@ -9,7 +9,6 @@ import os
 from twisted.internet import reactor
 from twisted.web import server
 
-from turnip.api import TurnipAPIResource
 from turnip.pack.git import (
     PackBackendFactory,
     PackFrontendFactory,
@@ -45,7 +44,5 @@ smartssh_service = SmartSSHService(
     strport=b'tcp:9422')
 smartssh_service.startService()
 
-api_site = server.Site(TurnipAPIResource(REPO_STORE))
-reactor.listenTCP(19417, api_site)
 
 reactor.run()
