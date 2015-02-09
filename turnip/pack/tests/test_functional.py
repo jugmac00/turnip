@@ -74,7 +74,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     path is prefixed with '/+rw'
     """
 
-    def xmlrpc_translatePath(self, pathname, permission, authenticated_user,
+    def xmlrpc_translatePath(self, pathname, permission, authenticated_uid,
                              can_authenticate):
         writable = False
         if pathname.startswith('/+rw'):

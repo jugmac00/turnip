@@ -192,10 +192,10 @@ class BaseSmartHTTPResource(resource.Resource):
                     request.getPassword())
             except xmlrpc.Fault as e:
                 if e.faultCode == 3:
-                    defer.returnValue(None)
+                    defer.returnValue((None, None))
                 else:
                     raise
-            defer.returnValue(translated['user'])
+            defer.returnValue((translated['user'], translated['uid']))
 
     @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, content, request):
@@ -205,9 +205,11 @@ class BaseSmartHTTPResource(resource.Resource):
         returned by the virt service, if any.
         """
         params = {b'turnip-can-authenticate': b'yes'}
-        authenticated_user = yield self.authenticateUser(request)
+        authenticated_user, authenticated_uid = yield self.authenticateUser(
+            request)
         if authenticated_user:
             params[b'turnip-authenticated-user'] = authenticated_user
+            params[b'turnip-authenticated-uid'] = str(authenticated_uid)
         params.update(self.extra_params)
         client_factory = factory(service, path, params, content, request)
         reactor.connectTCP(

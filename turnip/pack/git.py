@@ -323,7 +323,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                 params.get(b'turnip-can-authenticate') == b'yes')
             translated = yield proxy.callRemote(
                 b'translatePath', pathname, permission,
-                params.get(b'turnip-authenticated-user'), can_authenticate)
+                int(params.get(b'turnip-authenticated-uid')), can_authenticate)
             pathname = translated['path']
         except xmlrpc.Fault as e:
             if e.faultCode in (1, 290):
