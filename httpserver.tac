@@ -2,7 +2,10 @@
 #    twistd -ny httpserver.tac
 from __future__ import unicode_literals
 
-from twisted.application import service, internet
+from twisted.application import (
+    service,
+    internet,
+    )
 from twisted.web import server
 
 from turnip.config import TurnipConfig
@@ -15,9 +18,9 @@ def getSmartHTTPService():
     config = TurnipConfig()
     smarthttp_site = server.Site(
         SmartHTTPFrontendResource(b'localhost',
-                                  config.get('PACK_VIRT_PORT'),
-                                  config.get('VIRTINFO_ENDPOINT')))
-    return internet.TCPServer(config.get('SMART_HTTP_PORT'), smarthttp_site)
+                                  config.get('pack_virt_port'),
+                                  config.get('virtinfo_endpoint')))
+    return internet.TCPServer(config.get('smart_http_port'), smarthttp_site)
 
 application = service.Application("Turnip SmartHTTP Service")
 service = getSmartHTTPService()

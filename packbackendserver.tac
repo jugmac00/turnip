@@ -7,7 +7,10 @@ from __future__ import (
     unicode_literals,
     )
 
-from twisted.application import service, internet
+from twisted.application import (
+    service,
+    internet,
+    )
 
 from turnip.config import TurnipConfig
 from turnip.pack.git import PackBackendFactory
@@ -17,8 +20,8 @@ def getPackBackendService():
     """Return a PackBackendFactory service."""
 
     config = TurnipConfig()
-    return internet.TCPServer(config.get('PACK_BACKEND_PORT'),
-                              PackBackendFactory(config.get('REPO_STORE')))
+    return internet.TCPServer(config.get('pack_backend_port'),
+                              PackBackendFactory(config.get('repo_store')))
 
 application = service.Application("Turnip Pack Backend Service")
 service = getPackBackendService()

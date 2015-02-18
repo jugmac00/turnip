@@ -6,8 +6,11 @@ from __future__ import (
     unicode_literals,
     )
 
+from twisted.application import (
+    service,
+    internet,
+    )
 from twisted.web import server
-from twisted.application import service, internet
 
 from turnip.api import TurnipAPIResource
 from turnip.config import TurnipConfig
@@ -17,8 +20,8 @@ def getAPIService():
     """Return an API service."""
 
     config = TurnipConfig()
-    api_site = server.Site(TurnipAPIResource(config.get('REPO_STORE')))
-    return internet.TCPServer(config.get('REPO_API_PORT'), api_site)
+    api_site = server.Site(TurnipAPIResource(config.get('repo_store')))
+    return internet.TCPServer(config.get('repo_api_port'), api_site)
 
 application = service.Application("Turnip API Service")
 service = getAPIService()

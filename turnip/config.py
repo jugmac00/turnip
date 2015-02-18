@@ -15,4 +15,4 @@ class TurnipConfig(object):
         self.defaults = yaml.load(config_file)
 
     def get(self, key):
-        return os.getenv(key) or self.defaults.get(key) or ''
+        return os.getenv(key.upper()) or self.defaults.get(key.lower()) or ''

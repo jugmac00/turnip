@@ -4,7 +4,10 @@ from __future__ import (
     unicode_literals,
     )
 
-from twisted.application import service, internet
+from twisted.application import (
+    service,
+    internet,
+    )
 
 from turnip.config import TurnipConfig
 from turnip.pack.git import PackVirtFactory
@@ -15,10 +18,10 @@ def getPackVirtService():
 
     config = TurnipConfig()
     return internet.TCPServer(
-        config.get('PACK_VIRT_PORT'),
+        config.get('pack_virt_port'),
         PackVirtFactory('localhost',
-                        config.get('PACK_BACKEND_PORT'),
-                        config.get('VIRTINFO_ENDPOINT')))
+                        config.get('pack_backend_port'),
+                        config.get('virtinfo_endpoint')))
 
 application = service.Application("Turnip Pack Virt Service")
 service = getPackVirtService()

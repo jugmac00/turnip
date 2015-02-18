@@ -23,11 +23,11 @@ data_dir = os.path.join(
     os.path.dirname(__file__), "turnip", "pack", "tests", "data")
 config = TurnipConfig()
 
-LOG_PATH = config.get('TURNIP_LOG_DIR')
-PACK_VIRT_PORT = config.get('PACK_VIRT_PORT')
-PACK_BACKEND_PORT = config.get('PACK_BACKEND_PORT')
-REPO_STORE = config.get('REPO_STORE')
-VIRTINFO_ENDPOINT = config.get('VIRTINFO_ENDPOINT')
+LOG_PATH = config.get('turnip_log_dir')
+PACK_VIRT_PORT = config.get('pack_virt_port')
+PACK_BACKEND_PORT = config.get('pack_backend_port')
+REPO_STORE = config.get('repo_store')
+VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 
 # turnipserver.py is preserved for convenience in development, services
 # in production are run in separate processes.
@@ -41,22 +41,22 @@ reactor.listenTCP(PACK_VIRT_PORT,
                   PackVirtFactory('localhost',
                                   PACK_BACKEND_PORT,
                                   VIRTINFO_ENDPOINT))
-reactor.listenTCP(config.get('PACK_FRONTEND_PORT'),
+reactor.listenTCP(config.get('pack_frontend_port'),
                   PackFrontendFactory('localhost',
                                       PACK_VIRT_PORT))
 smarthttp_site = server.Site(
     SmartHTTPFrontendResource(b'localhost', PACK_VIRT_PORT, VIRTINFO_ENDPOINT))
-reactor.listenTCP(config.get('SMART_HTTP_PORT'), smarthttp_site)
+reactor.listenTCP(config.get('smart_http_port'), smarthttp_site)
 smartssh_service = SmartSSHService(
-    b'localhost', 19419, config.get('AUTHENTICATION_ENDPOINT'),
+    b'localhost', PACK_VIRT_PORT, config.get('authentication_endpoint'),
     private_key_path=os.path.join(data_dir, "ssh-host-key"),
     public_key_path=os.path.join(data_dir, "ssh-host-key.pub"),
     main_log='turnip', access_log=os.path.join(LOG_PATH, 'turnip.access'),
     access_log_path=os.path.join(LOG_PATH, 'turnip-access.log'),
-    strport=b'tcp:{}'.format(config.get('SMART_SSH_PORT')))
+    strport=b'tcp:{}'.format(config.get('smart_ssh_port')))
 smartssh_service.startService()
 
 api_site = server.Site(TurnipAPIResource(REPO_STORE))
-reactor.listenTCP(config.get('REPO_API_PORT'), api_site)
+reactor.listenTCP(config.get('repo_api_port'), api_site)
 
 reactor.run()
