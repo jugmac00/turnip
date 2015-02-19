@@ -26,6 +26,7 @@ setup(
     download_url='https://launchpad.net/turnip/+download',
     install_requires=[
         'lazr.sshserver',
+        'PyYAML',
         'Twisted',
         'zope.interface',
         ],

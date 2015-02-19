@@ -3,6 +3,7 @@ envdir==0.7
 lazr.sshserver==0.1.1
 pyasn1==0.1.7
 pycrypto==2.6.1
+PyYAML==3.11
 Twisted==14.0.2
 wsgiref==0.1.2
 zope.component==4.2.1
