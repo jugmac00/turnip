@@ -57,7 +57,7 @@ $(BUILDOUT_BIN): download-cache eggs
 
 
 bin/api:
-	PYTHONPATH=$(APP_PATH) pserve api.ini
+	PYTHONPATH=$(APP_PATH) pserve api.ini --reload
 
 
 bin/twistd: $(BUILDOUT_BIN) $(BUILDOUT_CFG) setup.py
