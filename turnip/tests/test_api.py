@@ -23,17 +23,16 @@ class ApiTestCase(unittest.TestCase):
     def test_repo_post(self):
         app = TestApp(api.main({}))
         resp = app.post('/repo', json.dumps({'repo_path': self.repo_path}))
-        assert resp.status_code == 200
-
-        # cleanup repo path
+        self.assertEquals(resp.status_code, 200)
+        # cleanup
         shutil.rmtree(self.repo_store)
 
     def test_repo_delete(self):
         app = TestApp(api.main({}))
         app.post('/repo', json.dumps({'repo_path': self.repo_path}))
         resp = app.delete('/repo/{}'.format(self.repo_path))
-        assert resp.status_code == 200
-        assert not os.path.exists(self.repo_store)
+        self.assertEquals(resp.status_code, 200)
+        self.assertFalse(os.path.exists(self.repo_store))
 
 if __name__ == '__main__':
     unittest.main()
