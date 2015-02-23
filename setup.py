@@ -14,7 +14,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README')) as f:
     README = f.read()
 
-requires = ['cornice', 'lazr.sshserver', 'Twisted', 'waitress',
+requires = ['cornice', 'lazr.sshserver', 'pygit2', 'Twisted', 'waitress',
             'zope.interface']
 
 setup(
