@@ -10,3 +10,4 @@ TAGS
 build
 *.egg
 dist
+*.log

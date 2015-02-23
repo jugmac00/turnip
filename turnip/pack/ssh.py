@@ -148,6 +148,7 @@ class SmartSSHSession(DoNothingSession):
         """
         params = {
             b'turnip-authenticated-user': self.avatar.username.encode('utf-8'),
+            b'turnip-authenticated-uid': str(self.avatar.user_id),
             }
         d = defer.Deferred()
         client_factory = factory(service, path, params, ssh_protocol, d)
