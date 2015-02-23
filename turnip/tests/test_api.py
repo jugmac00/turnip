@@ -20,14 +20,20 @@ class ApiTestCase(unittest.TestCase):
         self.repo_path = str(uuid.uuid1())
         self.repo_store = os.path.join(repo_store, self.repo_path)
 
+    def remove_store(self):
+        if os.path.exists(self.repo_store):
+            shutil.rmtree(self.repo_store)
+
     def test_repo_post(self):
+        self.addCleanup(self.remove_store)
         app = TestApp(api.main({}))
         resp = app.post('/repo', json.dumps({'repo_path': self.repo_path}))
         self.assertEquals(resp.status_code, 200)
         # cleanup
-        shutil.rmtree(self.repo_store)
+
 
     def test_repo_delete(self):
+        self.addCleanup(self.remove_store)
         app = TestApp(api.main({}))
         app.post('/repo', json.dumps({'repo_path': self.repo_path}))
         resp = app.delete('/repo/{}'.format(self.repo_path))
