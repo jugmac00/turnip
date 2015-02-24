@@ -29,7 +29,6 @@ class ApiTestCase(unittest.TestCase):
         app = TestApp(api.main({}))
         resp = app.post('/repo', json.dumps({'repo_path': self.repo_path}))
         self.assertEquals(resp.status_code, 200)
-        # cleanup
 
     def test_repo_delete(self):
         self.addCleanup(self.remove_store)
