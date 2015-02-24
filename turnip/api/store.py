@@ -5,8 +5,9 @@ import pygit2
 
 class Store(object):
     """Provides methods for manipulating repos on disk with pygit2."""
-    @classmethod
-    def init(self, repo, isBare=True):
+
+    @staticmethod
+    def init(repo, isBare=True):
         """Initialise a git repo with pygit2."""
         try:
             repo_path = pygit2.init_repository(repo, isBare)
@@ -15,8 +16,8 @@ class Store(object):
             return
         return repo_path
 
-    @classmethod
-    def delete(self, repo):
+    @staticmethod
+    def delete(repo):
         """Permanently delete a git repository from repo store."""
         try:
             shutil.rmtree(repo)
