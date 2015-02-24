@@ -1,12 +1,11 @@
 import os
-import shutil
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
-import pygit2
 
 from turnip.config import TurnipConfig
 from turnip.api.store import Store
+
 
 @resource(collection_path='repo', path='/repo/{name}')
 class RepoAPI(object):
