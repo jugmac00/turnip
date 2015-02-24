@@ -1,3 +1,5 @@
+# Copyright 2015 Canonical Ltd.  All rights reserved.
+
 import shutil
 
 import pygit2

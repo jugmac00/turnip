@@ -1,3 +1,5 @@
+# Copyright 2015 Canonical Ltd.  All rights reserved.
+
 """Main entry point
 """
 from pyramid.config import Configurator
