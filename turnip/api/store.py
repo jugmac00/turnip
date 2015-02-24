@@ -16,7 +16,7 @@ class Store(object):
             raise Exception("Repository '%s' already exists" % repo)
         try:
             repo_path = pygit2.init_repository(repo, isBare)
-        except pygit2.GitError as e:
+        except pygit2.GitError:
             print('Unable to create repository.')
             raise
         return repo_path

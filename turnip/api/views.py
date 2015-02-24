@@ -30,8 +30,8 @@ class RepoAPI(object):
         isBare = extract_json_data(self.request).get('bare_repo')
         try:
             Store.init(repo, isBare)
-        except Exception as e:
-            return exc.HTTPConflict() # 409
+        except Exception:
+            return exc.HTTPConflict()  # 409
 
     def delete(self):
 
@@ -42,5 +42,5 @@ class RepoAPI(object):
         repo = os.path.join(self.repo_store, name)
         try:
             Store.delete(repo)
-        except Exception as e:
-            return exc.HTTPNotFound() # 404
+        except Exception:
+            return exc.HTTPNotFound()  # 404
