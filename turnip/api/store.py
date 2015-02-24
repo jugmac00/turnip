@@ -26,7 +26,6 @@ class Store(object):
         """Permanently delete a git repository from repo store."""
         try:
             shutil.rmtree(repo)
-            raise IOError
         except (IOError, OSError) as e:
             print('Unable to delete repository: %s' % e)
             raise

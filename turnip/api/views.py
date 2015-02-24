@@ -34,7 +34,7 @@ class RepoAPI(object):
             return exc.HTTPConflict()  # 409
 
     def delete(self):
-
+        """Delete an existing git repository."""
         name = self.request.matchdict['name']
         if not name:
             self.request.errors.add('body', 'name', 'repo name is missing')
