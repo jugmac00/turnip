@@ -4,6 +4,7 @@ import os
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
+import pyramid.httpexceptions as exc
 
 from turnip.config import TurnipConfig
 from turnip.api.store import Store
@@ -27,7 +28,10 @@ class RepoAPI(object):
             return
         repo = os.path.join(self.repo_store, repo_path)
         isBare = extract_json_data(self.request).get('bare_repo')
-        Store.init(repo, isBare)
+        try:
+            Store.init(repo, isBare)
+        except Exception as e:
+            return exc.HTTPConflict() # 409
 
     def delete(self):
 
@@ -36,4 +40,7 @@ class RepoAPI(object):
             self.request.errors.add('body', 'name', 'repo name is missing')
             return
         repo = os.path.join(self.repo_store, name)
-        Store.delete(repo)
+        try:
+            Store.delete(repo)
+        except Exception as e:
+            return exc.HTTPNotFound() # 404

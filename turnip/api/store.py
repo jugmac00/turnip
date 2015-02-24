@@ -1,5 +1,6 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import os
 import shutil
 
 import pygit2
@@ -11,11 +12,13 @@ class Store(object):
     @staticmethod
     def init(repo, isBare=True):
         """Initialise a git repo with pygit2."""
+        if os.path.exists(repo):
+            raise Exception("Repository '%s' already exists" % repo)
         try:
             repo_path = pygit2.init_repository(repo, isBare)
         except pygit2.GitError as e:
-            print('Unable to create repository: %s' % e)
-            return
+            print('Unable to create repository.')
+            raise
         return repo_path
 
     @staticmethod
@@ -23,5 +26,7 @@ class Store(object):
         """Permanently delete a git repository from repo store."""
         try:
             shutil.rmtree(repo)
+            raise IOError
         except (IOError, OSError) as e:
             print('Unable to delete repository: %s' % e)
+            raise
