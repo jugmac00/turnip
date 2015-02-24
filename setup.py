@@ -14,8 +14,9 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README')) as f:
     README = f.read()
 
-requires = ['cornice', 'lazr.sshserver', 'pygit2', 'Twisted', 'waitress',
-            'zope.interface']
+requires = ['cornice', 'lazr.sshserver', 'pygit2', 'PyYAML', 'Twisted',
+            'waitress', 'zope.interface']
+test_requires = ['fixtures', 'testtools']
 
 setup(
     name='turnip',
@@ -29,17 +30,9 @@ setup(
     long_description=README,
     url='https://launchpad.net/turnip',
     download_url='https://launchpad.net/turnip/+download',
-    install_requires=[
-        'lazr.sshserver',
-        'PyYAML',
-        'Twisted',
-        'zope.interface',
-        ],
+    install_requires=requires,
     extras_require=dict(
-        test=[
-            'fixtures',
-            'testtools',
-            ]),
+        test=test_requires),
     test_suite='turnip.tests',
     entry_points = """\
     [paste.app_factory]
