@@ -6,7 +6,7 @@ import os
 
 from setuptools import (
     find_packages,
-    setup
+    setup,
 )
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -21,7 +21,8 @@ test_requires = ['fixtures', 'testtools']
 setup(
     name='turnip',
     version='0.1',
-    packages=find_packages(),
+    packages = ['turnip.%s' % package for package in find_packages(
+        'turnip', exclude=['*.tests', 'tests'])],
     include_package_data=True,
     zip_safe=False,
     maintainer='LAZR Developers',
