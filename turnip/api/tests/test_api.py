@@ -29,7 +29,7 @@ class ApiTestCase(TestCase):
 
     def test_repo_post(self):
         resp = self.app.post('/repo', json.dumps({'repo_path': self.repo_path}))
-        self.assertEquals(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 200)
 
     def test_repo_delete(self):
         self.app.post('/repo', json.dumps({'repo_path': self.repo_path}))
