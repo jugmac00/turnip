@@ -5,6 +5,13 @@ import shutil
 
 import pygit2
 
+def get_ref_type_name(ref_type_code):
+    """Returns human readable ref type from ref type int."""
+    types = {1: 'commit',
+             2: 'tree',
+             3: 'blob',
+             4: 'tag'}
+    return types.get(ref_type_code)
 
 class Store(object):
     """Provides methods for manipulating repos on disk with pygit2."""
@@ -29,3 +36,16 @@ class Store(object):
         except (IOError, OSError) as e:
             print('Unable to delete repository: %s' % e)
             raise
+
+    @staticmethod
+    def get_refs(repo_path):
+        """Return all refs for a git repository."""
+        repo = pygit2.Repository(repo_path)
+        ref_list = []
+        for ref in repo.listall_references():
+            object = repo.lookup_reference(ref).get_object()
+            ref_list.append(
+                {"ref": ref,
+                 "object": {'sha': str(object.oid),
+                            'type': get_ref_type_name(object.type)}})
+        return ref_list

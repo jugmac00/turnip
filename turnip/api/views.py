@@ -1,5 +1,6 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import json
 import os
 
 from cornice.resource import resource
@@ -10,7 +11,7 @@ from turnip.config import TurnipConfig
 from turnip.api.store import Store
 
 
-@resource(collection_path='repo', path='/repo/{name}')
+@resource(collection_path='/repo', path='/repo/{name}')
 class RepoAPI(object):
     """Provides HTTP API for repository actions."""
 
@@ -44,3 +45,23 @@ class RepoAPI(object):
             Store.delete(repo)
         except Exception:
             return exc.HTTPNotFound()  # 404
+
+
+@resource(collection_path='/repo/{name}/refs', path='/repo/{name}/refs/{ref}')
+class RefAPI(object):
+    """Provides HTTP API for git references."""
+
+    def __init__(self, request):
+        config = TurnipConfig()
+        self.request = request
+        self.repo_store = config.get('repo_store')
+
+    def collection_get(self):
+        name = self.request.matchdict['name']
+        repo = os.path.join(self.repo_store, name)
+        try:
+            refs = Store.get_refs(repo)
+        except Exception as ex:
+            print(ex)
+            return exc.HTTPNotFound()  # 404
+        return json.dumps(refs)
