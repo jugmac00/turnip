@@ -9,7 +9,6 @@ import os
 from twisted.internet import reactor
 from twisted.web import server
 
-from turnip.api import TurnipAPIResource
 from turnip.config import TurnipConfig
 from turnip.pack.git import (
     PackBackendFactory,
@@ -34,7 +33,7 @@ VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 #
 # Start a pack storage service on 19418, pointed at by a pack frontend
 # on 9418 (the default git:// port), a smart HTTP frontend on 9419, and
-# a smart SSH frontend on 9422.  An API service runs on 19417.
+# a smart SSH frontend on 9422.
 reactor.listenTCP(PACK_BACKEND_PORT,
                   PackBackendFactory(REPO_STORE))
 reactor.listenTCP(PACK_VIRT_PORT,
@@ -55,8 +54,5 @@ smartssh_service = SmartSSHService(
     access_log_path=os.path.join(LOG_PATH, 'turnip-access.log'),
     strport=b'tcp:{}'.format(config.get('smart_ssh_port')))
 smartssh_service.startService()
-
-api_site = server.Site(TurnipAPIResource(REPO_STORE))
-reactor.listenTCP(config.get('repo_api_port'), api_site)
 
 reactor.run()

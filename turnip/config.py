@@ -1,3 +1,5 @@
+# Copyright 2015 Canonical Ltd.  All rights reserved.
+
 from __future__ import unicode_literals
 
 import os
