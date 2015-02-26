@@ -56,7 +56,7 @@ $(BUILDOUT_BIN): download-cache eggs
 	touch --no-create $@
 
 
-bin/api:
+run-api:
 	PYTHONPATH=$(APP_PATH) pserve api.ini --reload
 
 

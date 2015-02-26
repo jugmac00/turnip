@@ -67,6 +67,18 @@ The only additional parameters implemented today are
 the smart HTTP server to proxy to the standard pack protocol.
 
 
+Development
+-----------
+
+Pack smart-http/ssh services can be started with:
+
+    python turnipserver.py
+
+The HTTP API can be started with:
+
+   make run-api                  
+
+
 Deployment
 ----------
 
