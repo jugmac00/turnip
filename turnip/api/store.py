@@ -5,6 +5,7 @@ import shutil
 
 import pygit2
 
+
 def get_ref_type_name(ref_type_code):
     """Returns human readable ref type from ref type int."""
     types = {1: 'commit',
@@ -12,6 +13,7 @@ def get_ref_type_name(ref_type_code):
              3: 'blob',
              4: 'tag'}
     return types.get(ref_type_code)
+
 
 class Store(object):
     """Provides methods for manipulating repos on disk with pygit2."""
@@ -40,12 +42,34 @@ class Store(object):
     @staticmethod
     def get_refs(repo_path):
         """Return all refs for a git repository."""
-        repo = pygit2.Repository(repo_path)
+        try:
+            repo = pygit2.Repository(repo_path)
+        except pygit2.GitError:
+            print('Unable to locate repository in {}.'.format(repo))
+            raise
         ref_list = []
         for ref in repo.listall_references():
-            object = repo.lookup_reference(ref).get_object()
+            git_object = repo.lookup_reference(ref).get_object()
             ref_list.append(
                 {"ref": ref,
-                 "object": {'sha': str(object.oid),
-                            'type': get_ref_type_name(object.type)}})
+                 "object": {'sha': str(git_object.oid),
+                            'type': get_ref_type_name(git_object.type)}})
         return ref_list
+
+    @staticmethod
+    def get_ref(repo_path, ref):
+        """Return a specific ref for a git repository."""
+        try:
+            repo = pygit2.Repository(repo_path)
+        except pygit2.GitError:
+            print('Unable to locate repository in {}.'.format(repo))
+            raise
+        try:
+            git_object = repo.lookup_reference('refs/' + ref).get_object()
+        except pygit2.GitError:
+            print('Ref {} not found.'.format(ref))
+            raise
+        ref = {"ref": ref,
+               "object": {'sha': str(git_object.oid),
+                          'type': get_ref_type_name(git_object.type)}}
+        return ref

@@ -47,7 +47,8 @@ class RepoAPI(object):
             return exc.HTTPNotFound()  # 404
 
 
-@resource(collection_path='/repo/{name}/refs', path='/repo/{name}/refs/{ref}')
+@resource(collection_path='/repo/{name}/refs',
+          path='/repo/{name}/refs/{ref:.*}')
 class RefAPI(object):
     """Provides HTTP API for git references."""
 
@@ -65,3 +66,14 @@ class RefAPI(object):
             print(ex)
             return exc.HTTPNotFound()  # 404
         return json.dumps(refs)
+
+    def get(self):
+        name = self.request.matchdict['name']
+        ref = self.request.matchdict['ref']
+        repo = os.path.join(self.repo_store, name)
+        try:
+            ref = Store.get_ref(repo, ref)
+        except Exception as ex:
+            print(ex)
+            return exc.HTTPNotFound()
+        return json.dumps(ref)
