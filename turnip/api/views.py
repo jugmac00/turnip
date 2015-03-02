@@ -1,5 +1,6 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import json
 import os
 
 from cornice.resource import resource
@@ -10,7 +11,19 @@ from turnip.config import TurnipConfig
 from turnip.api.store import Store
 
 
-@resource(collection_path='repo', path='/repo/{name}')
+def repo_path(func):
+    """Decorator builds repo path from request name and repo_store."""
+    def func_wrapper(self):
+        name = self.request.matchdict['name']
+        if not name:
+            self.request.errors.add('body', 'name', 'repo name is missing')
+            return
+        self.repo = os.path.join(self.repo_store, name)
+        return func(self)
+    return func_wrapper
+
+
+@resource(collection_path='/repo', path='/repo/{name}')
 class RepoAPI(object):
     """Provides HTTP API for repository actions."""
 
@@ -33,14 +46,38 @@ class RepoAPI(object):
         except Exception:
             return exc.HTTPConflict()  # 409
 
+    @repo_path
     def delete(self):
         """Delete an existing git repository."""
-        name = self.request.matchdict['name']
-        if not name:
-            self.request.errors.add('body', 'name', 'repo name is missing')
-            return
-        repo = os.path.join(self.repo_store, name)
         try:
-            Store.delete(repo)
+            Store.delete(self.repo)
         except Exception:
             return exc.HTTPNotFound()  # 404
+
+
+@resource(collection_path='/repo/{name}/refs',
+          path='/repo/{name}/refs/{ref:.*}')
+class RefAPI(object):
+    """Provides HTTP API for git references."""
+
+    def __init__(self, request):
+        config = TurnipConfig()
+        self.request = request
+        self.repo_store = config.get('repo_store')
+
+    @repo_path
+    def collection_get(self):
+        try:
+            refs = Store.get_refs(self.repo)
+        except Exception:
+            return exc.HTTPNotFound()  # 404
+        return json.dumps(refs)
+
+    @repo_path
+    def get(self):
+        ref = 'refs/' + self.request.matchdict['ref']
+        try:
+            ref = Store.get_ref(self.repo, ref)
+        except Exception:
+            return exc.HTTPNotFound()
+        return json.dumps(ref)
