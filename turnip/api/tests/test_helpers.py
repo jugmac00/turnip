@@ -10,28 +10,30 @@ AUTHOR = Signature('Test Author', 'author@bar.com')
 COMMITTER = Signature('Test Commiter', 'committer@bar.com')
 
 
-def create_commit(repo, parents=[]):
+def create_commits(repo, commits, parents=[]):
     tree = repo.TreeBuilder().write()
-    commit = repo.create_commit(
-        'refs/heads/master',
-        AUTHOR, COMMITTER, 'test commit.',
-        tree,
-        parents  # parent
-    )
-    return commit
+    for commit in commits:
+        commit = repo.create_commit(
+            commit['ref'],
+            AUTHOR, COMMITTER, commit['message'],
+            tree,
+            parents
+        )
+    return repo
 
 
-def create_tag(repo):
+def create_tags(repo, tags):
     oid = repo.head.get_object().oid
-    tag = repo.create_tag(
-        'test-tag', oid, GIT_OBJ_COMMIT, COMMITTER, 'test tag')
-    return tag
+    for tag in tags:
+        tag = repo.create_tag(
+            tag['name'], oid, GIT_OBJ_COMMIT, COMMITTER, tag['message'])
+    return repo
 
 
 def init_repo(repo_path, commits=None, tags=None):
     repo = init_repository(repo_path, True)
     if commits:
-        create_commit(repo)
+        repo = create_commits(repo, commits)
     if tags:
-        create_tag(repo)
+        repo = create_tags(repo, tags)
     return repo

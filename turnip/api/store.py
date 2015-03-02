@@ -3,15 +3,23 @@
 import os
 import shutil
 
-import pygit2
+from pygit2 import (
+    GitError,
+    GIT_OBJ_BLOB,
+    GIT_OBJ_COMMIT,
+    GIT_OBJ_TREE,
+    GIT_OBJ_TAG,
+    init_repository,
+    Repository,
+    )
 
 
 def get_ref_type_name(ref_type_code):
     """Returns human readable ref type from ref type int."""
-    types = {1: 'commit',
-             2: 'tree',
-             3: 'blob',
-             4: 'tag'}
+    types = {GIT_OBJ_COMMIT: 'commit',
+             GIT_OBJ_TREE: 'tree',
+             GIT_OBJ_BLOB: 'blob',
+             GIT_OBJ_TAG: 'tag'}
     return types.get(ref_type_code)
 
 
@@ -20,15 +28,23 @@ class Store(object):
 
     @staticmethod
     def init(repo, is_bare=True):
-        """Initialise a git repo with pygit2."""
+        """Initialise a git repository."""
         if os.path.exists(repo):
             raise Exception("Repository '%s' already exists" % repo)
         try:
-            repo_path = pygit2.init_repository(repo, is_bare)
-        except pygit2.GitError:
-            print('Unable to create repository in {}.'.format(repo))
+            repo_path = init_repository(repo, is_bare)
+        except GitError:
             raise
         return repo_path
+
+    @staticmethod
+    def open_repo(repo_path):
+        """Open an existing git repository."""
+        try:
+            repo = Repository(repo_path)
+        except GitError:
+            raise
+        return repo
 
     @staticmethod
     def delete(repo):
@@ -36,40 +52,30 @@ class Store(object):
         try:
             shutil.rmtree(repo)
         except (IOError, OSError):
-            print('Unable to delete repository from {}.'.format(repo))
             raise
 
     @staticmethod
     def get_refs(repo_path):
         """Return all refs for a git repository."""
-        try:
-            repo = pygit2.Repository(repo_path)
-        except pygit2.GitError:
-            print('Unable to locate repository in {}.'.format(repo))
-            raise
-        ref_list = []
+        repo = Store.open_repo(repo_path)
+        refs = {}
         for ref in repo.listall_references():
             git_object = repo.lookup_reference(ref).get_object()
-            ref_list.append(
-                {"ref": ref,
-                 "object": {'sha': str(git_object.oid),
-                            'type': get_ref_type_name(git_object.type)}})
-        return ref_list
+            refs[ref] = {
+                "object": {'sha': git_object.oid.hex,
+                           'type': get_ref_type_name(git_object.type)}
+            }
+        return refs
 
     @staticmethod
     def get_ref(repo_path, ref):
         """Return a specific ref for a git repository."""
+        repo = Store.open_repo(repo_path)
         try:
-            repo = pygit2.Repository(repo_path)
-        except pygit2.GitError:
-            print('Unable to locate repository in {}.'.format(repo))
-            raise
-        try:
-            git_object = repo.lookup_reference('refs/' + ref).get_object()
-        except pygit2.GitError:
-            print('Ref {} not found.'.format(ref))
+            git_object = repo.lookup_reference(ref).get_object()
+        except GitError:
             raise
         ref = {"ref": ref,
-               "object": {'sha': str(git_object.oid),
+               "object": {'sha': git_object.oid.hex,
                           'type': get_ref_type_name(git_object.type)}}
         return ref
