@@ -14,8 +14,8 @@ class RepoFactory():
     """Builds a git repository in a user defined state."""
 
     def __init__(self, repo_store=None, num_commits=1, num_tags=1):
-        self.AUTHOR = Signature('Test Author', 'author@bar.com')
-        self.COMMITTER = Signature('Test Commiter', 'committer@bar.com')
+        self.author = Signature('Test Author', 'author@bar.com')
+        self.committer = Signature('Test Commiter', 'committer@bar.com')
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_store = repo_store
@@ -43,7 +43,7 @@ class RepoFactory():
             # commit
             commit_oid = self.repo.create_commit(
                 'refs/heads/master',
-                self.AUTHOR, self.COMMITTER, 'commit {}'.format(i),
+                self.author, self.committer, 'commit {}'.format(i),
                 tree,
                 parents
             )
@@ -55,7 +55,7 @@ class RepoFactory():
         oid = repo.head.get_object().oid
         for i in xrange(self.num_tags):
             repo.create_tag('tag{}'.format(i), oid, GIT_OBJ_COMMIT,
-                            self.COMMITTER, 'tag message {}'.format(i))
+                            self.committer, 'tag message {}'.format(i))
 
     def init_repo(self):
         return init_repository(self.repo_store)
