@@ -49,7 +49,7 @@ class ApiTestCase(TestCase):
     def test_repo_get_refs(self):
         """Ensure expected ref objects are returned and shas match."""
         ref = self.commit.get('ref')
-        repo = RepoFactory(self.repo_store).build()
+        repo = RepoFactory(self.repo_store, num_commits=1, num_tags=1).build()
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         body = json.loads(resp.json_body)
 
@@ -61,28 +61,30 @@ class ApiTestCase(TestCase):
         self.assertEqual(oid, resp_sha)
 
     def test_repo_get_ref(self):
-        RepoFactory(self.repo_store).build()
+        RepoFactory(self.repo_store, num_commits=1).build()
         ref = self.commit.get('ref')
         resp = self.get_ref(ref)
         self.assertEqual(ref, resp['ref'])
 
     def test_repo_get_tag(self):
-        RepoFactory(self.repo_store).build()
+        RepoFactory(self.repo_store, num_commits=1, num_tags=1).build()
         tag = self.tag.get('ref')
         resp = self.get_ref(tag)
         self.assertEqual(tag, resp['ref'])
 
     def test_repo_compare_commits(self):
-        # this test would be better if pygit2 supported patch parsing.
-        repo = RepoFactory(self.repo_store, num_commits=2)
-        repo.add_commits()
-        c1 = repo.commits[0].oid.hex
-        c2 = repo.commits[1].oid.hex
+        repo = RepoFactory(self.repo_store)
 
-        path = '/repo/{}/compare/{}..{}'.format(self.repo_path, c1, c2)
+        c1_oid = repo.add_commit('foo', 'foobar.txt')
+        c2_oid = repo.add_commit('bar', 'foobar.txt', parents=[c1_oid])
+
+        path = '/repo/{}/compare/{}..{}'.format(self.repo_path, c1_oid, c2_oid)
         resp = self.app.get(path)
-        self.assertTrue(json.loads(resp.body).startswith('"diff --git'))
+        resp_body = json.loads(resp.body)
+        self.assertTrue('-foo' in resp_body)
+        self.assertTrue('+bar' in resp_body)
 
 
 if __name__ == '__main__':
+
     unittest.main()
