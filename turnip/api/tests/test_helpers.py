@@ -19,6 +19,7 @@ class RepoFactory():
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_store = repo_store
+        self.repo = self.init_repo()
 
     @property
     def commits(self):
@@ -57,10 +58,9 @@ class RepoFactory():
                             self.COMMITTER, 'tag message {}'.format(i))
 
     def init_repo(self):
-        self.repo = init_repository(self.repo_store)
+        return init_repository(self.repo_store)
 
     def build(self):
-        self.init_repo()
         self.add_commits()
         self.add_tags()
         return self.repo

@@ -75,7 +75,6 @@ class ApiTestCase(TestCase):
     def test_repo_compare_commits(self):
         # this test would be better if pygit2 supported patch parsing.
         repo = RepoFactory(self.repo_store, num_commits=2)
-        repo.init_repo()
         repo.add_commits()
         c1 = repo.commits[0].oid.hex
         c2 = repo.commits[1].oid.hex
