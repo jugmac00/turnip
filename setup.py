@@ -35,7 +35,7 @@ setup(
     install_requires=requires,
     extras_require=dict(
         test=test_requires),
-    test_suite='turnip.tests',
+    test_suite='turnip',
     entry_points = """\
     [paste.app_factory]
     main = turnip.api:main
