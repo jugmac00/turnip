@@ -27,9 +27,8 @@ class RepoAPI(object):
                                     'repo_path is missing')
             return
         repo = os.path.join(self.repo_store, repo_path)
-        is_bare = extract_json_data(self.request).get('bare_repo')
         try:
-            Store.init(repo, is_bare)
+            Store.init(repo)
         except Exception:
             return exc.HTTPConflict()  # 409
 
