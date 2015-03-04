@@ -1,39 +1,57 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import os
+
 from pygit2 import (
     init_repository,
     GIT_OBJ_COMMIT,
     Signature,
     )
 
-AUTHOR = Signature('Test Author', 'author@bar.com')
-COMMITTER = Signature('Test Commiter', 'committer@bar.com')
 
+class RepoFactory():
+    """Builds a git repository in a user defined state."""
 
-def create_commits(repo, commits, parents=[]):
-    tree = repo.TreeBuilder().write()
-    for commit in commits:
-        commit = repo.create_commit(
-            commit['ref'],
-            AUTHOR, COMMITTER, commit['message'],
-            tree,
-            parents
-        )
-    return repo
+    def __init__(self, repo_store=None, num_commits=1, num_tags=1):
+        self.AUTHOR = Signature('Test Author', 'author@bar.com')
+        self.COMMITTER = Signature('Test Commiter', 'committer@bar.com')
+        self.num_commits = num_commits
+        self.num_tags = num_tags
+        self.repo_store = repo_store
 
+    def add_commits(self):
+        repo = self.repo
 
-def create_tags(repo, tags):
-    oid = repo.head.get_object().oid
-    for tag in tags:
-        tag = repo.create_tag(
-            tag['name'], oid, GIT_OBJ_COMMIT, COMMITTER, tag['message'])
-    return repo
+        parents = []
+        for i in xrange(self.num_commits):
+            test_file = 'test.txt'
+            with open(os.path.join(self.repo_store, test_file), 'w') as f:
+                f.write(b'commit {}'.format(i))
 
+            # stage
+            repo.index.add(test_file)
+            repo.index.write()
+            tree = repo.index.write_tree()
 
-def init_repo(repo_path, commits=None, tags=None):
-    repo = init_repository(repo_path, True)
-    if commits:
-        repo = create_commits(repo, commits)
-    if tags:
-        repo = create_tags(repo, tags)
-    return repo
+            # commit
+            commit_oid = self.repo.create_commit(
+                'refs/heads/master',
+                self.AUTHOR, self.COMMITTER, 'commit {}'.format(i),
+                tree,
+                parents
+            )
+            commit = repo.get(commit_oid)
+            parents = [commit.id]
+
+    def add_tags(self):
+        repo = self.repo
+        oid = repo.head.get_object().oid
+        for i in xrange(self.num_tags):
+            repo.create_tag('tag{}'.format(i), oid, GIT_OBJ_COMMIT,
+                            self.COMMITTER, 'tag message {}'.format(i))
+
+    def build(self):
+        self.repo = init_repository(self.repo_store)
+        self.add_commits()
+        self.add_tags()
+        return self.repo

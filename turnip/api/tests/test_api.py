@@ -11,11 +11,12 @@ from fixtures import (
       EnvironmentVariable,
       TempDir,
       )
+import pygit2
 from testtools import TestCase
 from webtest import TestApp
 
 from turnip import api
-from turnip.api.tests import test_helpers
+from turnip.api.tests.test_helpers import RepoFactory
 
 
 class ApiTestCase(TestCase):
@@ -28,11 +29,9 @@ class ApiTestCase(TestCase):
         self.repo_path = str(uuid.uuid1())
         self.repo_store = os.path.join(repo_store, self.repo_path)
         self.commit = {'ref': 'refs/heads/master', 'message': 'test commit.'}
-        self.tag = {'name': 'test-tag', 'message': 'tag message'}
+        self.tag = {'ref': 'refs/tags/tag0', 'message': 'tag message'}
 
     def get_ref(self, ref):
-        test_helpers.init_repo(self.repo_store,
-                               commits=[self.commit], tags=[self.tag])
         resp = self.app.get('/repo/{}/{}'.format(
             self.repo_path, ref))
         return json.loads(resp.json_body)
@@ -51,27 +50,40 @@ class ApiTestCase(TestCase):
     def test_repo_get_refs(self):
         """Ensure expected ref objects are returned and shas match."""
         ref = self.commit.get('ref')
-        repo = test_helpers.init_repo(self.repo_store,
-                                      commits=[self.commit], tags=[self.tag])
+        repo = RepoFactory(self.repo_store).build()
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         body = json.loads(resp.json_body)
 
         self.assertTrue(ref in body)
-        self.assertTrue('refs/tags/{}'.format(self.tag.get('name') in body))
+        self.assertTrue(self.tag.get('ref') in body)
 
         oid = repo.head.get_object().oid.hex  # git object sha
         resp_sha = body[ref]['object'].get('sha')
         self.assertEqual(oid, resp_sha)
 
     def test_repo_get_ref(self):
-        ref = 'refs/heads/master'
+        RepoFactory(self.repo_store).build()
+        ref = self.commit.get('ref')
         resp = self.get_ref(ref)
         self.assertEqual(ref, resp['ref'])
 
     def test_repo_get_tag(self):
-        tag = 'refs/tags/test-tag'
+        RepoFactory(self.repo_store).build()
+        tag = self.tag.get('ref')
         resp = self.get_ref(tag)
         self.assertEqual(tag, resp['ref'])
+
+    def test_repo_compare_commits(self):
+        # this test would be better if pygit2 supported patch parsing.
+        repo = RepoFactory(self.repo_store, num_commits=2).build()
+        last = repo[repo.head.target]
+        commits = list(repo.walk(last.id, pygit2.GIT_SORT_TIME))
+        c1 = commits[0].oid.hex
+        c2 = commits[1].oid.hex
+
+        path = '/repo/{}/compare/{}..{}'.format(self.repo_path, c1, c2)
+        resp = self.app.get(path)
+        self.assertTrue(json.loads(resp.body).startswith('"diff --git'))
 
 
 if __name__ == '__main__':

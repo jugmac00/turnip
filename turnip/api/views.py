@@ -81,3 +81,28 @@ class RefAPI(object):
         except Exception:
             return exc.HTTPNotFound()
         return json.dumps(ref)
+
+
+@resource(path='/repo/{name}/compare/{c1}..{c2}')
+class DiffAPI(object):
+    """Provides HTTP API for git references."""
+
+    def __init__(self, request):
+        config = TurnipConfig()
+        self.request = request
+        self.repo_store = config.get('repo_store')
+
+    @repo_path
+    def get(self):
+        """Returns diff of two commits."""
+        c1 = self.request.matchdict['c1']
+        c2 = self.request.matchdict['c2']
+        for sha in self.request.matchdict.iteritems():
+            if 'c' in sha[0] and not 7 <= len(sha[1]) <= 40:
+                return exc.HTTPBadRequest(
+                    comment='invalid sha1: {}'.format(sha))
+        try:
+            patch = Store.get_diff(self.repo, c1, c2)
+        except:
+            return exc.HTTPNotFound()
+        return json.dumps(patch)

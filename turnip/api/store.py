@@ -79,3 +79,14 @@ class Store(object):
                "object": {'sha': git_object.oid.hex,
                           'type': get_ref_type_name(git_object.type)}}
         return ref
+
+    @staticmethod
+    def get_diff(repo_path, hash1, hash2):
+        """Get diff of two commits."""
+        repo = Store.open_repo(repo_path)
+        shas = [hash1, hash2]
+        try:
+            commits = [repo.revparse_single(sha) for sha in shas]
+        except (TypeError, KeyError):
+            raise
+        return repo.diff(commits[0], commits[1]).patch
