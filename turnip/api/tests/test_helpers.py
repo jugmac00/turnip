@@ -5,6 +5,7 @@ import os
 from pygit2 import (
     init_repository,
     GIT_OBJ_COMMIT,
+    GIT_SORT_TIME,
     Signature,
     )
 
@@ -18,6 +19,11 @@ class RepoFactory():
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_store = repo_store
+
+    @property
+    def commits(self):
+        last = self.repo[self.repo.head.target]
+        return list(self.repo.walk(last.id, GIT_SORT_TIME))
 
     def add_commits(self):
         repo = self.repo
@@ -50,8 +56,11 @@ class RepoFactory():
             repo.create_tag('tag{}'.format(i), oid, GIT_OBJ_COMMIT,
                             self.COMMITTER, 'tag message {}'.format(i))
 
-    def build(self):
+    def init_repo(self):
         self.repo = init_repository(self.repo_store)
+
+    def build(self):
+        self.init_repo()
         self.add_commits()
         self.add_tags()
         return self.repo

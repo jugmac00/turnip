@@ -11,7 +11,6 @@ from fixtures import (
       EnvironmentVariable,
       TempDir,
       )
-import pygit2
 from testtools import TestCase
 from webtest import TestApp
 
@@ -75,11 +74,11 @@ class ApiTestCase(TestCase):
 
     def test_repo_compare_commits(self):
         # this test would be better if pygit2 supported patch parsing.
-        repo = RepoFactory(self.repo_store, num_commits=2).build()
-        last = repo[repo.head.target]
-        commits = list(repo.walk(last.id, pygit2.GIT_SORT_TIME))
-        c1 = commits[0].oid.hex
-        c2 = commits[1].oid.hex
+        repo = RepoFactory(self.repo_store, num_commits=2)
+        repo.init_repo()
+        repo.add_commits()
+        c1 = repo.commits[0].oid.hex
+        c2 = repo.commits[1].oid.hex
 
         path = '/repo/{}/compare/{}..{}'.format(self.repo_path, c1, c2)
         resp = self.app.get(path)
