@@ -1,5 +1,6 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+from fixtures import TempDir
 from pygit2 import (
     init_repository,
     GIT_OBJ_COMMIT,

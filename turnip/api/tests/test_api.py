@@ -55,23 +55,22 @@ class ApiTestCase(TestCase):
                                       commits=[self.commit], tags=[self.tag])
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         body = json.loads(resp.json_body)
-
         self.assertTrue(ref in body)
         self.assertTrue('refs/tags/{}'.format(self.tag.get('name') in body))
 
         oid = repo.head.get_object().oid.hex  # git object sha
-        resp_sha = body[ref]['object'].get('sha')
+        resp_sha = body[ref]['object'].get('sha1')
         self.assertEqual(oid, resp_sha)
 
     def test_repo_get_ref(self):
         ref = 'refs/heads/master'
         resp = self.get_ref(ref)
-        self.assertEqual(ref, resp['ref'])
+        self.assertTrue(ref in resp)
 
     def test_repo_get_tag(self):
         tag = 'refs/tags/test-tag'
         resp = self.get_ref(tag)
-        self.assertEqual(tag, resp['ref'])
+        self.assertTrue(tag in resp)
 
 
 if __name__ == '__main__':

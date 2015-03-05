@@ -14,13 +14,10 @@ from pygit2 import (
     )
 
 
-def get_ref_type_name(ref_type_code):
-    """Returns human readable ref type from ref type int."""
-    types = {GIT_OBJ_COMMIT: 'commit',
-             GIT_OBJ_TREE: 'tree',
-             GIT_OBJ_BLOB: 'blob',
-             GIT_OBJ_TAG: 'tag'}
-    return types.get(ref_type_code)
+REF_TYPE_NAME = {GIT_OBJ_COMMIT: 'commit',
+                 GIT_OBJ_TREE: 'tree',
+                 GIT_OBJ_BLOB: 'blob',
+                 GIT_OBJ_TAG: 'tag'}
 
 
 class Store(object):
@@ -31,28 +28,19 @@ class Store(object):
         """Initialise a git repository."""
         if os.path.exists(repo):
             raise Exception("Repository '%s' already exists" % repo)
-        try:
-            repo_path = init_repository(repo, is_bare)
-        except GitError:
-            raise
+        repo_path = init_repository(repo, is_bare)
         return repo_path
 
     @staticmethod
     def open_repo(repo_path):
         """Open an existing git repository."""
-        try:
-            repo = Repository(repo_path)
-        except GitError:
-            raise
+        repo = Repository(repo_path)
         return repo
 
     @staticmethod
     def delete(repo):
         """Permanently delete a git repository from repo store."""
-        try:
-            shutil.rmtree(repo)
-        except (IOError, OSError):
-            raise
+        shutil.rmtree(repo)
 
     @staticmethod
     def get_refs(repo_path):
@@ -61,21 +49,22 @@ class Store(object):
         refs = {}
         for ref in repo.listall_references():
             git_object = repo.lookup_reference(ref).get_object()
-            refs[ref] = {
-                "object": {'sha': git_object.oid.hex,
-                           'type': get_ref_type_name(git_object.type)}
-            }
+            refs.update(format_refs(ref, git_object))
         return refs
 
     @staticmethod
     def get_ref(repo_path, ref):
         """Return a specific ref for a git repository."""
         repo = Store.open_repo(repo_path)
-        try:
-            git_object = repo.lookup_reference(ref).get_object()
-        except GitError:
-            raise
-        ref = {"ref": ref,
-               "object": {'sha': git_object.oid.hex,
-                          'type': get_ref_type_name(git_object.type)}}
-        return ref
+        git_object = repo.lookup_reference(ref).peel()
+        ref_obj = format_refs(ref, git_object)
+        return ref_obj
+
+
+def format_refs(ref, git_object):
+    return {
+        ref: {
+            "object": {'sha1': git_object.oid.hex,
+                       'type': REF_TYPE_NAME[git_object.type]}
+        }
+    }

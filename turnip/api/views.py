@@ -5,6 +5,7 @@ import os
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
+from pygit2 import GitError
 import pyramid.httpexceptions as exc
 
 from turnip.config import TurnipConfig
@@ -43,7 +44,7 @@ class RepoAPI(object):
         is_bare = extract_json_data(self.request).get('bare_repo')
         try:
             Store.init(repo, is_bare)
-        except Exception:
+        except GitError:
             return exc.HTTPConflict()  # 409
 
     @repo_path
@@ -51,7 +52,7 @@ class RepoAPI(object):
         """Delete an existing git repository."""
         try:
             Store.delete(self.repo)
-        except Exception:
+        except (IOError, OSError):
             return exc.HTTPNotFound()  # 404
 
 
@@ -69,7 +70,7 @@ class RefAPI(object):
     def collection_get(self):
         try:
             refs = Store.get_refs(self.repo)
-        except Exception:
+        except GitError:
             return exc.HTTPNotFound()  # 404
         return json.dumps(refs)
 
@@ -78,6 +79,6 @@ class RefAPI(object):
         ref = 'refs/' + self.request.matchdict['ref']
         try:
             ref = Store.get_ref(self.repo, ref)
-        except Exception:
+        except GitError:
             return exc.HTTPNotFound()
         return json.dumps(ref)
