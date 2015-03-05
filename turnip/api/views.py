@@ -9,7 +9,7 @@ from pygit2 import GitError
 import pyramid.httpexceptions as exc
 
 from turnip.config import TurnipConfig
-from turnip.api.store import Store
+from turnip.api import store
 
 
 def repo_path(func):
@@ -43,7 +43,7 @@ class RepoAPI(object):
         repo = os.path.join(self.repo_store, repo_path)
         is_bare = extract_json_data(self.request).get('bare_repo')
         try:
-            Store.init(repo, is_bare)
+            store.init_repo(repo, is_bare)
         except GitError:
             return exc.HTTPConflict()  # 409
 
@@ -51,7 +51,7 @@ class RepoAPI(object):
     def delete(self):
         """Delete an existing git repository."""
         try:
-            Store.delete(self.repo)
+            store.delete_repo(self.repo)
         except (IOError, OSError):
             return exc.HTTPNotFound()  # 404
 
@@ -69,7 +69,7 @@ class RefAPI(object):
     @repo_path
     def collection_get(self):
         try:
-            refs = Store.get_refs(self.repo)
+            refs = store.get_refs(self.repo)
         except GitError:
             return exc.HTTPNotFound()  # 404
         return json.dumps(refs)
@@ -78,7 +78,7 @@ class RefAPI(object):
     def get(self):
         ref = 'refs/' + self.request.matchdict['ref']
         try:
-            ref = Store.get_ref(self.repo, ref)
+            ref = store.get_ref(self.repo, ref)
         except GitError:
             return exc.HTTPNotFound()
         return json.dumps(ref)
