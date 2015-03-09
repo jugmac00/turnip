@@ -332,7 +332,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                 fault_type = b'NOT_FOUND'
             elif e.faultCode in (2, 310):
                 fault_type = b'FORBIDDEN'
-            elif e.faultCode == 3:
+            elif e.faultCode in (3, 410):
                 fault_type = b'UNAUTHORIZED'
             else:
                 fault_type = b'INTERNAL_SERVER_ERROR'
