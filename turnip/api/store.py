@@ -52,7 +52,7 @@ def get_refs(repo_path):
     repo = open_repo(repo_path)
     refs = {}
     for ref in repo.listall_references():
-        git_object = repo.lookup_reference(ref).get_object()
+        git_object = repo.lookup_reference(ref).peel()
         refs.update(format_refs(ref, git_object))
         return refs
 
