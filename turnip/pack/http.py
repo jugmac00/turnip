@@ -196,6 +196,7 @@ class BaseSmartHTTPResource(resource.Resource):
                 else:
                     raise
             defer.returnValue((translated['user'], translated['uid']))
+        defer.returnValue((None, None))
 
     @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, content, request):

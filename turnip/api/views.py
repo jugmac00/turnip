@@ -41,9 +41,8 @@ class RepoAPI(object):
                                     'repo_path is missing')
             return
         repo = os.path.join(self.repo_store, repo_path)
-        is_bare = extract_json_data(self.request).get('bare_repo')
         try:
-            store.init_repo(repo, is_bare)
+            store.init_repo(repo)
         except GitError:
             return exc.HTTPConflict()  # 409
 
