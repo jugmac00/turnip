@@ -10,7 +10,7 @@ from pygit2 import (
     GIT_OBJ_TAG,
     init_repository,
     Repository,
-)
+    )
 
 
 REF_TYPE_NAME = {
@@ -18,7 +18,7 @@ REF_TYPE_NAME = {
     GIT_OBJ_TREE: 'tree',
     GIT_OBJ_BLOB: 'blob',
     GIT_OBJ_TAG: 'tag'
-}
+    }
 
 
 def format_ref(ref, git_object):
@@ -26,7 +26,8 @@ def format_ref(ref, git_object):
         ref: {
             "object": {
                 'sha1': git_object.oid.hex,
-                'type': REF_TYPE_NAME[git_object.type]}
+                'type': REF_TYPE_NAME[git_object.type]
+                }
         }
     }
 
