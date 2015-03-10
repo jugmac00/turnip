@@ -13,17 +13,20 @@ from pygit2 import (
 )
 
 
-REF_TYPE_NAME = {GIT_OBJ_COMMIT: 'commit',
-                 GIT_OBJ_TREE: 'tree',
-                 GIT_OBJ_BLOB: 'blob',
-                 GIT_OBJ_TAG: 'tag'}
+REF_TYPE_NAME = {
+    GIT_OBJ_COMMIT: 'commit',
+    GIT_OBJ_TREE: 'tree',
+    GIT_OBJ_BLOB: 'blob',
+    GIT_OBJ_TAG: 'tag'
+}
 
 
-def format_refs(ref, git_object):
+def format_ref(ref, git_object):
     return {
         ref: {
-            "object": {'sha1': git_object.oid.hex,
-                       'type': REF_TYPE_NAME[git_object.type]}
+            "object": {
+                'sha1': git_object.oid.hex,
+                'type': REF_TYPE_NAME[git_object.type]}
         }
     }
 
@@ -53,12 +56,13 @@ def get_refs(repo_path):
     refs = {}
     for ref in repo.listall_references():
         git_object = repo.lookup_reference(ref).peel()
+        # Filter non utf-8 encodable refs from refs collection
         try:
             ref.decode('utf-8')
         except UnicodeDecodeError:
             pass
         else:
-            refs.update(format_refs(ref, git_object))
+            refs.update(format_ref(ref, git_object))
     return refs
 
 
@@ -66,5 +70,5 @@ def get_ref(repo_path, ref):
     """Return a specific ref for a git repository."""
     repo = open_repo(repo_path)
     git_object = repo.lookup_reference(ref).peel()
-    ref_obj = format_refs(ref, git_object)
+    ref_obj = format_ref(ref, git_object)
     return ref_obj

@@ -31,8 +31,7 @@ class ApiTestCase(TestCase):
         self.tag = {'ref': 'refs/tags/tag0', 'message': 'tag message'}
 
     def get_ref(self, ref):
-        resp = self.app.get('/repo/{}/{}'.format(
-            self.repo_path, ref))
+        resp = self.app.get('/repo/{}/{}'.format(self.repo_path, ref))
         return json.loads(resp.json_body)
 
     def test_repo_create(self):
@@ -89,6 +88,17 @@ class ApiTestCase(TestCase):
         ref = 'refs/heads/master'
         resp = self.get_ref(ref)
         self.assertTrue(ref in resp)
+
+    def test_repo_get_unicode_ref(self):
+        factory = RepoFactory(self.repo_store)
+        commit_oid = factory.add_commit('foo', 'foobar.txt')
+        tag_name = u'☃'.encode('utf-8')
+        tag_message = u'☃'.encode('utf-8')
+        factory.add_tag(tag_name, tag_message, commit_oid)
+
+        tag = 'refs/tags/{}'.format(tag_name)
+        resp = self.get_ref(tag)
+        self.assertTrue(tag.decode('utf-8') in resp)
 
     def test_repo_get_tag(self):
         RepoFactory(self.repo_store, num_commits=1, num_tags=1).build()

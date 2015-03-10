@@ -20,6 +20,10 @@ def repo_path(func):
             self.request.errors.add('body', 'name', 'repo name is missing')
             return
         repo_path = os.path.join(self.repo_store, name)
+        if not os.path.realpath(repo_path).startswith(
+                os.path.realpath(self.repo_store)):
+            self.request.errors.add('body', 'name', 'invalid path.')
+            raise exc.HTTPInternalServerError()
         return func(self, repo_path)
     return repo_path_decorator
 
