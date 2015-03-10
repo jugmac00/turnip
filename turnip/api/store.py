@@ -53,8 +53,13 @@ def get_refs(repo_path):
     refs = {}
     for ref in repo.listall_references():
         git_object = repo.lookup_reference(ref).peel()
-        refs.update(format_refs(ref, git_object))
-        return refs
+        try:
+            ref.decode('utf-8')
+        except UnicodeDecodeError:
+            pass
+        else:
+            refs.update(format_refs(ref, git_object))
+    return refs
 
 
 def get_ref(repo_path, ref):

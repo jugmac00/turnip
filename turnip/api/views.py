@@ -14,14 +14,14 @@ from turnip.api import store
 
 def repo_path(func):
     """Decorator builds repo path from request name and repo_store."""
-    def func_wrapper(self):
+    def repo_path_decorator(self):
         name = self.request.matchdict['name']
         if not name:
             self.request.errors.add('body', 'name', 'repo name is missing')
             return
-        self.repo = os.path.join(self.repo_store, name)
-        return func(self)
-    return func_wrapper
+        repo_path = os.path.join(self.repo_store, name)
+        return func(self, repo_path)
+    return repo_path_decorator
 
 
 @resource(collection_path='/repo', path='/repo/{name}')
@@ -47,10 +47,10 @@ class RepoAPI(object):
             return exc.HTTPConflict()  # 409
 
     @repo_path
-    def delete(self):
+    def delete(self, repo_path):
         """Delete an existing git repository."""
         try:
-            store.delete_repo(self.repo)
+            store.delete_repo(repo_path)
         except (IOError, OSError):
             return exc.HTTPNotFound()  # 404
 
@@ -66,18 +66,18 @@ class RefAPI(object):
         self.repo_store = config.get('repo_store')
 
     @repo_path
-    def collection_get(self):
+    def collection_get(self, repo_path):
         try:
-            refs = store.get_refs(self.repo)
+            refs = store.get_refs(repo_path)
         except GitError:
             return exc.HTTPNotFound()  # 404
         return json.dumps(refs)
 
     @repo_path
-    def get(self):
+    def get(self, repo_path):
         ref = 'refs/' + self.request.matchdict['ref']
         try:
-            ref = store.get_ref(self.repo, ref)
+            ref = store.get_ref(repo_path, ref)
         except GitError:
             return exc.HTTPNotFound()
         return json.dumps(ref)
