@@ -81,5 +81,5 @@ def get_diff(repo_path, sha1_from, sha1_to):
     repo = open_repo(repo_path)
     shas = [sha1_from, sha1_to]
     commits = [repo.revparse_single(sha) for sha in shas]
-    patch = repo.diff(commits[0], commits[1]).patch
+    patch = {'patch': repo.diff(commits[0], commits[1]).patch}
     return patch
