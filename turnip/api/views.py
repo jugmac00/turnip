@@ -1,6 +1,5 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
-import json
 import os
 
 from cornice.resource import resource
