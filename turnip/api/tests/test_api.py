@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-import json
 import os
 import unittest
 import uuid
@@ -32,15 +31,14 @@ class ApiTestCase(TestCase):
 
     def get_ref(self, ref):
         resp = self.app.get('/repo/{}/{}'.format(self.repo_path, ref))
-        return json.loads(resp.json_body)
+        return resp.json
 
     def test_repo_create(self):
-        resp = self.app.post('/repo', json.dumps(
-            {'repo_path': self.repo_path}))
+        resp = self.app.post_json('/repo', {'repo_path': self.repo_path})
         self.assertEqual(resp.status_code, 200)
 
     def test_repo_delete(self):
-        self.app.post('/repo', json.dumps({'repo_path': self.repo_path}))
+        self.app.post_json('/repo', {'repo_path': self.repo_path})
         resp = self.app.delete('/repo/{}'.format(self.repo_path))
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(os.path.exists(self.repo_store))
@@ -50,7 +48,7 @@ class ApiTestCase(TestCase):
         ref = self.commit.get('ref')
         repo = RepoFactory(self.repo_store, num_commits=1, num_tags=1).build()
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
-        body = json.loads(resp.json_body)
+        body = resp.json
 
         self.assertTrue(ref in body)
         self.assertTrue(self.tag.get('ref') in body)
@@ -73,7 +71,7 @@ class ApiTestCase(TestCase):
         factory.add_tag(tag, tag_message, commit_oid)
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
-        refs = json.loads(resp.json_body)
+        refs = resp.json
         self.assertEqual(len(refs.keys()), 1)
 
     def test_allow_unicode_refs(self):
@@ -85,7 +83,7 @@ class ApiTestCase(TestCase):
         factory.add_tag(tag, tag_message, commit_oid)
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
-        refs = json.loads(resp.json_body)
+        refs = resp.json
         self.assertEqual(len(refs.keys()), 2)
 
     def test_repo_get_ref(self):
