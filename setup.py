@@ -16,7 +16,7 @@ with open(os.path.join(here, 'README')) as f:
 
 requires = ['cornice', 'lazr.sshserver', 'pygit2', 'PyYAML', 'Twisted',
             'waitress', 'zope.interface']
-test_requires = ['fixtures', 'testtools']
+test_requires = ['fixtures', 'testtools', 'webtest']
 
 setup(
     name='turnip',
