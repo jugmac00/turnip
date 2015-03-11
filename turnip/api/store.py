@@ -13,6 +13,7 @@ from pygit2 import (
     )
 
 
+
 REF_TYPE_NAME = {
     GIT_OBJ_COMMIT: 'commit',
     GIT_OBJ_TREE: 'tree',
@@ -28,8 +29,8 @@ def format_ref(ref, git_object):
                 'sha1': git_object.oid.hex,
                 'type': REF_TYPE_NAME[git_object.type]
                 }
+            }
         }
-    }
 
 
 def init_repo(repo, is_bare=True):
@@ -57,7 +58,8 @@ def get_refs(repo_path):
     refs = {}
     for ref in repo.listall_references():
         git_object = repo.lookup_reference(ref).peel()
-        # Filter non utf-8 encodable refs from refs collection
+        # Filter non-unicode refs, as refs are treated as unicode
+        # given json is unable to represent arbitrary byte strings.
         try:
             ref.decode('utf-8')
         except UnicodeDecodeError:
