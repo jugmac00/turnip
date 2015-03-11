@@ -31,10 +31,11 @@ setup(
     long_description=README,
     url='https://launchpad.net/turnip',
     download_url='https://launchpad.net/turnip/+download',
+    setup_requires=['PasteScript'],
     install_requires=requires,
     extras_require=dict(
         test=test_requires),
-    test_suite='turnip.tests',
+    test_suite='turnip',
     entry_points = """\
     [paste.app_factory]
     main = turnip.api:main

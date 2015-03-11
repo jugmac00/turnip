@@ -5,22 +5,27 @@ import os
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
+from pygit2 import GitError
 import pyramid.httpexceptions as exc
 
 from turnip.config import TurnipConfig
-from turnip.api.store import Store
+from turnip.api import store
 
 
 def repo_path(func):
     """Decorator builds repo path from request name and repo_store."""
-    def func_wrapper(self):
+    def repo_path_decorator(self):
         name = self.request.matchdict['name']
         if not name:
             self.request.errors.add('body', 'name', 'repo name is missing')
             return
-        self.repo = os.path.join(self.repo_store, name)
-        return func(self)
-    return func_wrapper
+        repo_path = os.path.join(self.repo_store, name)
+        if not os.path.realpath(repo_path).startswith(
+                os.path.realpath(self.repo_store)):
+            self.request.errors.add('body', 'name', 'invalid path.')
+            raise exc.HTTPInternalServerError()
+        return func(self, repo_path)
+    return repo_path_decorator
 
 
 @resource(collection_path='/repo', path='/repo/{name}')
@@ -40,18 +45,17 @@ class RepoAPI(object):
                                     'repo_path is missing')
             return
         repo = os.path.join(self.repo_store, repo_path)
-        is_bare = extract_json_data(self.request).get('bare_repo')
         try:
-            Store.init(repo, is_bare)
-        except Exception:
+            store.init_repo(repo)
+        except GitError:
             return exc.HTTPConflict()  # 409
 
     @repo_path
-    def delete(self):
+    def delete(self, repo_path):
         """Delete an existing git repository."""
         try:
-            Store.delete(self.repo)
-        except Exception:
+            store.delete_repo(repo_path)
+        except (IOError, OSError):
             return exc.HTTPNotFound()  # 404
 
 
@@ -66,21 +70,21 @@ class RefAPI(object):
         self.repo_store = config.get('repo_store')
 
     @repo_path
-    def collection_get(self):
+    def collection_get(self, repo_path):
         try:
-            refs = Store.get_refs(self.repo)
-        except Exception:
+            refs = store.get_refs(repo_path)
+        except GitError:
             return exc.HTTPNotFound()  # 404
-        return json.dumps(refs)
+        return json.dumps(refs, ensure_ascii=False)
 
     @repo_path
-    def get(self):
+    def get(self, repo_path):
         ref = 'refs/' + self.request.matchdict['ref']
         try:
-            ref = Store.get_ref(self.repo, ref)
-        except Exception:
+            ref = store.get_ref(repo_path, ref)
+        except GitError:
             return exc.HTTPNotFound()
-        return json.dumps(ref)
+        return json.dumps(ref, ensure_ascii=False)
 
 
 @resource(path='/repo/{name}/compare/{c1}..{c2}')
@@ -93,16 +97,16 @@ class DiffAPI(object):
         self.repo_store = config.get('repo_store')
 
     @repo_path
-    def get(self):
+    def get(self, repo_path):
         """Returns diff of two commits."""
         c1 = self.request.matchdict['c1']
         c2 = self.request.matchdict['c2']
-        for sha in self.request.matchdict.iteritems():
-            if 'c' in sha[0] and not 7 <= len(sha[1]) <= 40:
+        for sha1 in self.request.matchdict.iteritems():
+            if 'c' in sha1[0] and not 7 <= len(sha1[1]) <= 40:
                 return exc.HTTPBadRequest(
-                    comment='invalid sha1: {}'.format(sha))
+                    comment='invalid sha1: {}'.format(sha1))
         try:
-            patch = Store.get_diff(self.repo, c1, c2)
+            patch = store.get_diff(repo_path, c1, c2)
         except:
             return exc.HTTPNotFound()
         return json.dumps(patch)

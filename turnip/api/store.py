@@ -4,7 +4,6 @@ import os
 import shutil
 
 from pygit2 import (
-    GitError,
     GIT_OBJ_BLOB,
     GIT_OBJ_COMMIT,
     GIT_OBJ_TREE,
@@ -14,79 +13,73 @@ from pygit2 import (
     )
 
 
-def get_ref_type_name(ref_type_code):
-    """Returns human readable ref type from ref type int."""
-    types = {GIT_OBJ_COMMIT: 'commit',
-             GIT_OBJ_TREE: 'tree',
-             GIT_OBJ_BLOB: 'blob',
-             GIT_OBJ_TAG: 'tag'}
-    return types.get(ref_type_code)
+REF_TYPE_NAME = {
+    GIT_OBJ_COMMIT: 'commit',
+    GIT_OBJ_TREE: 'tree',
+    GIT_OBJ_BLOB: 'blob',
+    GIT_OBJ_TAG: 'tag'
+    }
 
 
-class Store(object):
-    """Provides methods for manipulating repos on disk with pygit2."""
-
-    @staticmethod
-    def init(repo, is_bare=True):
-        """Initialise a git repository."""
-        if os.path.exists(repo):
-            raise Exception("Repository '%s' already exists" % repo)
-        try:
-            repo_path = init_repository(repo, is_bare)
-        except GitError:
-            raise
-        return repo_path
-
-    @staticmethod
-    def open_repo(repo_path):
-        """Open an existing git repository."""
-        try:
-            repo = Repository(repo_path)
-        except GitError:
-            raise
-        return repo
-
-    @staticmethod
-    def delete(repo):
-        """Permanently delete a git repository from repo store."""
-        try:
-            shutil.rmtree(repo)
-        except (IOError, OSError):
-            raise
-
-    @staticmethod
-    def get_refs(repo_path):
-        """Return all refs for a git repository."""
-        repo = Store.open_repo(repo_path)
-        refs = {}
-        for ref in repo.listall_references():
-            git_object = repo.lookup_reference(ref).get_object()
-            refs[ref] = {
-                "object": {'sha': git_object.oid.hex,
-                           'type': get_ref_type_name(git_object.type)}
+def format_ref(ref, git_object):
+    return {
+        ref: {
+            "object": {
+                'sha1': git_object.oid.hex,
+                'type': REF_TYPE_NAME[git_object.type]
+                }
             }
-        return refs
+        }
 
-    @staticmethod
-    def get_ref(repo_path, ref):
-        """Return a specific ref for a git repository."""
-        repo = Store.open_repo(repo_path)
-        try:
-            git_object = repo.lookup_reference(ref).get_object()
-        except GitError:
-            raise
-        ref = {"ref": ref,
-               "object": {'sha': git_object.oid.hex,
-                          'type': get_ref_type_name(git_object.type)}}
-        return ref
 
-    @staticmethod
-    def get_diff(repo_path, hash1, hash2):
-        """Get diff of two commits."""
-        repo = Store.open_repo(repo_path)
-        shas = [hash1, hash2]
+def init_repo(repo, is_bare=True):
+    """Initialise a git repository."""
+    if os.path.exists(repo):
+        raise Exception("Repository '%s' already exists" % repo)
+    repo_path = init_repository(repo, is_bare)
+    return repo_path
+
+
+def open_repo(repo_path):
+    """Open an existing git repository."""
+    repo = Repository(repo_path)
+    return repo
+
+
+def delete_repo(repo):
+    """Permanently delete a git repository from repo store."""
+    shutil.rmtree(repo)
+
+
+def get_refs(repo_path):
+    """Return all refs for a git repository."""
+    repo = open_repo(repo_path)
+    refs = {}
+    for ref in repo.listall_references():
+        git_object = repo.lookup_reference(ref).peel()
+        # Filter non-unicode refs, as refs are treated as unicode
+        # given json is unable to represent arbitrary byte strings.
         try:
-            commits = [repo.revparse_single(sha) for sha in shas]
-        except (TypeError, KeyError):
-            raise
-        return repo.diff(commits[0], commits[1]).patch
+            ref.decode('utf-8')
+        except UnicodeDecodeError:
+            pass
+        else:
+            refs.update(format_ref(ref, git_object))
+    return refs
+
+
+def get_ref(repo_path, ref):
+    """Return a specific ref for a git repository."""
+    repo = open_repo(repo_path)
+    git_object = repo.lookup_reference(ref).peel()
+    ref_obj = format_ref(ref, git_object)
+    return ref_obj
+
+
+def get_diff(repo_path, sha1_from, sha1_to):
+    """Get diff of two commits."""
+    repo = open_repo(repo_path)
+    shas = [sha1_from, sha1_to]
+    commits = [repo.revparse_single(sha) for sha in shas]
+    patch = repo.diff(commits[0], commits[1]).patch
+    return patch

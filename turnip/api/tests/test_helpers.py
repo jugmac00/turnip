@@ -15,12 +15,12 @@ from pygit2 import (
 class RepoFactory():
     """Builds a git repository in a user defined state."""
 
-    def __init__(self, repo_store=None, num_commits=None, num_tags=None):
+    def __init__(self, repo_path=None, num_commits=None, num_tags=None):
         self.author = Signature('Test Author', 'author@bar.com')
         self.committer = Signature('Test Commiter', 'committer@bar.com')
         self.num_commits = num_commits
         self.num_tags = num_tags
-        self.repo_store = repo_store
+        self.repo_path = repo_path
         self.repo = self.init_repo()
 
     @property
@@ -44,6 +44,12 @@ class RepoFactory():
                                  'commit', tree_id, parents)
         return oid
 
+    def add_tag(self, tag_name, tag_message, oid):
+        """Create a tag from tag_name and oid."""
+        repo = self.repo
+        repo.create_tag(tag_name, oid, GIT_OBJ_COMMIT,
+                        self.committer, tag_message)
+
     def stage(self, file_path):
         """Stage a file and return a tree id."""
         repo = self.repo
@@ -51,35 +57,32 @@ class RepoFactory():
         repo.index.write()
         return repo.index.write_tree()
 
-    def generate_commits(self):
+    def generate_commits(self, num_commits):
         """Generate n number of commits."""
         parents = []
-        for i in xrange(self.num_commits):
+        for i in xrange(num_commits):
             blob_content = b'commit {}'.format(i)
             test_file = 'test.txt'
-            with open(os.path.join(self.repo_store, test_file), 'w') as f:
+            with open(os.path.join(self.repo_path, test_file), 'w') as f:
                 f.write(blob_content)
-
             self.stage(test_file)
-
             commit_oid = self.add_commit(blob_content, test_file, parents)
             parents = [commit_oid]
 
-    def generate_tags(self):
+    def generate_tags(self, num_tags):
         """Generate n number of tags."""
         repo = self.repo
         oid = repo.head.get_object().oid
-        for i in xrange(self.num_tags):
-            repo.create_tag('tag{}'.format(i), oid, GIT_OBJ_COMMIT,
-                            self.committer, 'tag message {}'.format(i))
+        for i in xrange(num_tags):
+            self.add_tag('tag{}'.format(i), 'tag message {}'.format(i), oid)
 
     def init_repo(self):
-        return init_repository(self.repo_store)
+        return init_repository(self.repo_path)
 
     def build(self):
         """Return a repo, optionally with generated commits and tags."""
         if self.num_commits:
-            self.generate_commits()
+            self.generate_commits(self.num_commits)
         if self.num_tags:
-            self.generate_tags()
+            self.generate_tags(self.num_tags)
         return self.repo
