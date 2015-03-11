@@ -73,7 +73,7 @@ class RefAPI(object):
     def collection_get(self, repo_path):
         try:
             refs = store.get_refs(repo_path)
-        except GitError:
+        except (KeyError, GitError):
             return exc.HTTPNotFound()  # 404
         return json.dumps(refs, ensure_ascii=False)
 
@@ -82,6 +82,6 @@ class RefAPI(object):
         ref = 'refs/' + self.request.matchdict['ref']
         try:
             ref = store.get_ref(repo_path, ref)
-        except GitError:
+        except (KeyError, GitError):
             return exc.HTTPNotFound()
         return json.dumps(ref, ensure_ascii=False)

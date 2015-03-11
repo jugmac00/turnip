@@ -59,6 +59,11 @@ class ApiTestCase(TestCase):
         resp_sha = body[ref]['object'].get('sha1')
         self.assertEqual(oid, resp_sha)
 
+    def test_repo_get_refs_nonexistent(self):
+        """get_refs on a non-existent repository returns HTTP 404."""
+        resp = self.app.get('/repo/1/refs', expect_errors=True)
+        self.assertEqual(resp.status_code, 404)
+
     def test_ignore_non_unicode_refs(self):
         """Ensure non-unicode refs are dropped from ref collection."""
         factory = RepoFactory(self.repo_store)
@@ -88,6 +93,22 @@ class ApiTestCase(TestCase):
         ref = 'refs/heads/master'
         resp = self.get_ref(ref)
         self.assertTrue(ref in resp)
+
+    def test_repo_get_ref_nonexistent_repository(self):
+        """get_ref on a non-existent repository returns HTTP 404."""
+        resp = self.app.get('/repo/1/refs/heads/master', expect_errors=True)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_repo_get_ref_nonexistent_ref(self):
+        """get_ref on a non-existent ref in a repository returns HTTP 404."""
+        RepoFactory(self.repo_store, num_commits=1).build()
+        resp = self.app.get(
+            '/repo/{}/refs/heads/master'.format(self.repo_path))
+        self.assertEqual(resp.status_code, 200)
+        resp = self.app.get(
+            '/repo/{}/refs/heads/nonexistent'.format(self.repo_path),
+            expect_errors=True)
+        self.assertEqual(resp.status_code, 404)
 
     def test_repo_get_unicode_ref(self):
         factory = RepoFactory(self.repo_store)
