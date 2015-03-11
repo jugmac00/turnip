@@ -106,6 +106,34 @@ class ApiTestCase(TestCase):
         resp = self.get_ref(tag)
         self.assertTrue(tag in resp)
 
+    def test_repo_get_commits(self):
+        repo = RepoFactory(self.repo_store, num_commits=10).build()
+        resp = self.app.get('/repo/{}/commits'.format(self.repo_path))
+        commits = json.loads(resp.json_body)
+        self.assertEqual(len(commits), 10)
+
+    def test_repo_get_commits_from_start(self):
+        repo = RepoFactory(self.repo_store, num_commits=4)
+        repo.build()
+        resp = self.app.get('/repo/{}/commits?start={}'.format(
+            self.repo_path, repo.commits[2]))
+        commit_resp = json.loads(resp.json_body)
+        # view needs to parse start param
+        self.expectFailure('should return commits from start',
+                           self.assertEqual, len(commit_resp), 2)
+
+    def test_repo_get_commit(self):
+        factory = RepoFactory(self.repo_store)
+        message = 'Computers make me angry.'
+        commit_oid = factory.add_commit(message, 'foobar.txt')
+
+        resp = self.app.get('/repo/{}/commits/{}'.format(
+            self.repo_path, commit_oid.hex))
+        commit_resp = json.loads(resp.json_body)
+        self.assertEqual(commit_oid.hex, commit_resp['sha1'])
+        self.assertEqual(message, commit_resp['message'])
+
+
 
 if __name__ == '__main__':
     unittest.main()

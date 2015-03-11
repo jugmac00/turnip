@@ -18,6 +18,7 @@ class RepoFactory():
     def __init__(self, repo_path=None, num_commits=None, num_tags=None):
         self.author = Signature('Test Author', 'author@bar.com')
         self.committer = Signature('Test Commiter', 'committer@bar.com')
+        self.commits = []
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_path = repo_path
@@ -38,10 +39,8 @@ class RepoFactory():
         blob_entry = IndexEntry(file_path, blob_oid, GIT_FILEMODE_BLOB)
         repo.index.add(blob_entry)
         tree_id = repo.index.write_tree()
-        oid = repo.create_commit(ref,
-                                 self.author,
-                                 self.committer,
-                                 'commit', tree_id, parents)
+        oid = repo.create_commit(ref, self.author, self.committer,
+                                 blob_content, tree_id, parents)
         return oid
 
     def add_tag(self, tag_name, tag_message, oid):
@@ -69,6 +68,7 @@ class RepoFactory():
             self.stage(test_file)
 
             commit_oid = self.add_commit(blob_content, test_file, parents)
+            self.commits.append(commit_oid)
             parents = [commit_oid]
 
     def generate_tags(self, num_tags):

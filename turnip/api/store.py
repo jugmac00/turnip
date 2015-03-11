@@ -13,7 +13,6 @@ from pygit2 import (
     )
 
 
-
 REF_TYPE_NAME = {
     GIT_OBJ_COMMIT: 'commit',
     GIT_OBJ_TREE: 'tree',
@@ -30,6 +29,28 @@ def format_ref(ref, git_object):
                 'type': REF_TYPE_NAME[git_object.type]
                 }
             }
+        }
+
+
+def format_commit(git_object):
+    parents = []
+    for parent in git_object.parent_ids:
+        parents.append(str(parent))
+    return {
+        'sha1': git_object.oid.hex,
+        'commit_time': git_object.commit_time,
+        'message': git_object.message,
+        'author': {
+            'name': git_object.author.name,
+            'email': git_object.author.email,
+            'time': git_object.author.time
+            },
+        'committer': {
+            'name': git_object.committer.name,
+            'email': git_object.committer.email,
+            'time': git_object.committer.time
+            },
+        'parents': parents
         }
 
 
@@ -75,3 +96,27 @@ def get_ref(repo_path, ref):
     git_object = repo.lookup_reference(ref).peel()
     ref_obj = format_ref(ref, git_object)
     return ref_obj
+
+
+def get_commits(repo_path, start=None):
+    """Return a commit collection from a list of oids.
+
+    :param start: sha1 or branch to start listing commits from.
+    """
+    commits = []
+    repo = open_repo(repo_path)
+    if not start:
+        start = repo.head.target  # Start from head
+    for commit in repo.walk(start):
+        commits.append(format_commit(commit))
+    return commits
+
+
+def get_commit(repo_path, commit_oid):
+    """Return a single commit object from an oid."""
+    repo = open_repo(repo_path)
+    git_object = repo.get(commit_oid)
+    if git_object.type != GIT_OBJ_COMMIT:
+        raise GitError
+    commit = format_commit(git_object)
+    return commit
