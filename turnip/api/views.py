@@ -107,6 +107,6 @@ class DiffAPI(object):
                     comment='invalid sha1: {}'.format(sha1))
         try:
             patch = store.get_diff(repo_path, c1, c2)
-        except:
+        except GitError:
             return exc.HTTPNotFound()
         return json.dumps(patch)
