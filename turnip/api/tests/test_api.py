@@ -132,6 +132,20 @@ class ApiTestCase(TestCase):
             self.repo_path, commits_from))
         self.assertEqual(len(resp.json), 3)
 
+    def test_repo_get_unicode_log(self):
+        factory = RepoFactory(self.repo_store)
+        message = u'나는 김치 사랑'.encode('utf-8')
+        message2 = u'(╯°□°)╯︵ ┻━┻'.encode('utf-8')
+        oid = factory.add_commit(message,'자장면/짜장면.py')
+        oid2 = factory.add_commit(message2, '엄마야!.js', [oid])
+
+        resp = self.app.get('/repo/{}/log/{}'.format(
+            self.repo_path, oid2))
+        self.assertEqual(resp.json[0]['message'],
+                         message2.decode('utf-8', 'replace'))
+        self.assertEqual(resp.json[1]['message'],
+                         message.decode('utf-8', 'replace'))
+
     def test_repo_get_log_with_limit(self):
         """Ensure the commit log can filtered by limit."""
         factory = RepoFactory(self.repo_store, num_commits=10)
