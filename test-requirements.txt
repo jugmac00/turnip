@@ -1,0 +1,6 @@
+WebTest==2.0.18
+beautifulsoup4==4.3.2
+extras==0.0.3
+fixtures==0.3.12
+six==1.9.0
+testtools==0.9.30
