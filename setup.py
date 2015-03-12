@@ -14,15 +14,28 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README')) as f:
     README = f.read()
 
-requires = ['cornice', 'lazr.sshserver', 'pygit2', 'PyYAML', 'Twisted',
-            'waitress', 'zope.interface']
-test_requires = ['fixtures', 'flake8', 'testtools', 'webtest']
+requires = [
+    'cornice',
+    'lazr.sshserver',
+    'pygit2',
+    'PyYAML',
+    'Twisted',
+    'waitress',
+    'zope.interface',
+    ]
+test_requires = [
+    'fixtures',
+    'flake8',
+    'testtools',
+    'webtest',
+    ]
 
 setup(
     name='turnip',
     version='0.1',
-    packages = ['turnip.%s' % package for package in find_packages(
-        'turnip', exclude=['*.tests', 'tests'])],
+    packages=[
+        'turnip.%s' % package for package in
+        find_packages('turnip', exclude=['*.tests', 'tests'])],
     include_package_data=True,
     zip_safe=False,
     maintainer='LAZR Developers',
@@ -36,7 +49,7 @@ setup(
     extras_require=dict(
         test=test_requires),
     test_suite='turnip',
-    entry_points = """\
+    entry_points="""\
     [paste.app_factory]
     main = turnip.api:main
     """,
