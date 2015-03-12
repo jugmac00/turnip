@@ -27,14 +27,19 @@ def repo_path(func):
     return repo_path_decorator
 
 
+class BaseAPI(object):
+    def __init__(self):
+        config = TurnipConfig()
+        self.repo_store = config.get('repo_store')
+
+
 @resource(collection_path='/repo', path='/repo/{name}')
-class RepoAPI(object):
+class RepoAPI(BaseAPI):
     """Provides HTTP API for repository actions."""
 
     def __init__(self, request):
-        config = TurnipConfig()
+        super(RepoAPI, self).__init__()
         self.request = request
-        self.repo_store = config.get('repo_store')
 
     def collection_post(self):
         """Initialise a new git repository."""
@@ -60,13 +65,12 @@ class RepoAPI(object):
 
 @resource(collection_path='/repo/{name}/refs',
           path='/repo/{name}/refs/{ref:.*}')
-class RefAPI(object):
+class RefAPI(BaseAPI):
     """Provides HTTP API for git references."""
 
     def __init__(self, request):
-        config = TurnipConfig()
+        super(RefAPI, self).__init__()
         self.request = request
-        self.repo_store = config.get('repo_store')
 
     @repo_path
     def collection_get(self, repo_path):
@@ -86,18 +90,15 @@ class RefAPI(object):
 
 @resource(collection_path='/repo/{name}/commits',
           path='/repo/{name}/commits/{sha1}')
-class CommitAPI(object):
+class CommitAPI(BaseAPI):
     """Provides HTTP API for git commits."""
 
     def __init__(self, request):
-        config = TurnipConfig()
+        super(CommitAPI, self).__init__()
         self.request = request
-        self.repo_store = config.get('repo_store')
 
     @repo_path
     def get(self, repo_path):
-        # XXX: Provide a validator here for sha1's checking length
-        # between 7 and 40 characters
         commit_sha1 = self.request.matchdict['sha1']
         try:
             commit = store.get_commit(repo_path, commit_sha1)
@@ -106,9 +107,33 @@ class CommitAPI(object):
         return commit
 
     @repo_path
-    def collection_get(self, repo_path):
+    def collection_post(self, repo_path):
+        """Get commits in bulk."""
+        commits = extract_json_data(self.request).get('commits')
         try:
-            commits = store.get_commits(repo_path)
+            commits = store.get_commits(repo_path, commits)
         except GitError:
             return exc.HTTPNotFound()
-        return json.dumps(commits, ensure_ascii=False)
+        return commits
+
+
+@resource(path='/repo/{name}/log/{sha1}')
+class LogAPI(BaseAPI):
+    """Provides HTTP API for git logs."""
+
+    def __init__(self, request):
+        super(LogAPI, self).__init__()
+        self.request = request
+
+    @repo_path
+    def get(self, repo_path):
+        """Get log by sha1, filtered by limit and stop."""
+        sha1 = self.request.matchdict['sha1']
+        limit = self.request.params.get('limit')
+        stop = self.request.params.get('stop')
+
+        try:
+            log = store.get_log(repo_path, sha1, limit, stop)
+        except GitError:
+            return exc.HTTPNotFound()
+        return log

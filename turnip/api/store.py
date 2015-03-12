@@ -1,9 +1,11 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import itertools
 import os
 import shutil
 
 from pygit2 import (
+    GitError,
     GIT_OBJ_BLOB,
     GIT_OBJ_COMMIT,
     GIT_OBJ_TREE,
@@ -50,7 +52,8 @@ def format_commit(git_object):
             'email': git_object.committer.email,
             'time': git_object.committer.time
             },
-        'parents': parents
+        'parents': parents,
+        'tree': git_object.tree.hex
         }
 
 
@@ -98,16 +101,23 @@ def get_ref(repo_path, ref):
     return ref_obj
 
 
-def get_commits(repo_path, start=None):
-    """Return a commit collection from a list of oids.
+def get_log(repo_path, start=None, limit=None, stop=None):
+    """Return a commit collection from HEAD or optionally a start oid.
 
     :param start: sha1 or branch to start listing commits from.
+    :param limit: limit number of commits to return.
+    :param stop: ignore a commit (and its ancestors).
     """
-    commits = []
     repo = open_repo(repo_path)
     if not start:
-        start = repo.head.target  # Start from head
-    for commit in repo.walk(start):
+        start = repo.head.target  # walk from HEAD
+    walker = repo.walk(start)
+    if stop:
+        walker.hide(stop)  # filter stop sha1 and its ancestors
+    if limit:
+        walker = itertools.islice(walker, int(limit))
+    commits = []
+    for commit in walker:
         commits.append(format_commit(commit))
     return commits
 
@@ -120,3 +130,11 @@ def get_commit(repo_path, commit_oid):
         raise GitError
     commit = format_commit(git_object)
     return commit
+
+
+def get_commits(repo_path, commit_oids):
+    """Return a collection of commit objects from a list of oids."""
+    commit_objects = []
+    for commit in commit_oids:
+        commit_objects.append(get_commit(repo_path, commit))
+    return commit_objects

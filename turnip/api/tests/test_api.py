@@ -104,22 +104,6 @@ class ApiTestCase(TestCase):
         resp = self.get_ref(tag)
         self.assertTrue(tag in resp)
 
-    def test_repo_get_commits(self):
-        repo = RepoFactory(self.repo_store, num_commits=10).build()
-        resp = self.app.get('/repo/{}/commits'.format(self.repo_path))
-        commits = json.loads(resp.json_body)
-        self.assertEqual(len(commits), 10)
-
-    def test_repo_get_commits_from_start(self):
-        repo = RepoFactory(self.repo_store, num_commits=4)
-        repo.build()
-        resp = self.app.get('/repo/{}/commits?start={}'.format(
-            self.repo_path, repo.commits[2]))
-        commit_resp = json.loads(resp.json_body)
-        # view needs to parse start param
-        self.expectFailure('should return commits from start',
-                           self.assertEqual, len(commit_resp), 2)
-
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
         message = 'Computers make me angry.'
@@ -127,10 +111,47 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/commits/{}'.format(
             self.repo_path, commit_oid.hex))
-        commit_resp = json.loads(resp.json_body)
+        commit_resp = resp.json
         self.assertEqual(commit_oid.hex, commit_resp['sha1'])
         self.assertEqual(message, commit_resp['message'])
 
+    def test_repo_get_commit_collection(self):
+        """Ensure commits can be returned in bulk."""
+        factory = RepoFactory(self.repo_store, num_commits=10)
+        factory.build()
+        bulk_commits = {'commits': [c.hex for c in factory.commits[0::2]]}
+        resp = self.app.post_json('/repo/{}/commits'.format(
+            self.repo_path), bulk_commits)
+        self.assertEqual(len(resp.json), 5)
+
+    def test_repo_get_log(self):
+        factory = RepoFactory(self.repo_store, num_commits=4)
+        factory.build()
+        commits_from = factory.commits[2].hex
+        resp = self.app.get('/repo/{}/log/{}'.format(
+            self.repo_path, commits_from))
+        self.assertEqual(len(resp.json), 3)
+
+    def test_repo_get_log_with_limit(self):
+        """Ensure the commit log can filtered by limit."""
+        factory = RepoFactory(self.repo_store, num_commits=10)
+        repo = factory.build()
+        head = repo.head.target
+        resp = self.app.get('/repo/{}/log/{}?limit=5'.format(
+            self.repo_path, head))
+        self.assertEqual(len(resp.json), 5)
+
+    def test_repo_get_log_with_stop(self):
+        """Ensure the commit log can be filtered by a stop commit."""
+        factory = RepoFactory(self.repo_store, num_commits=10)
+        repo = factory.build()
+        stop_commit = factory.commits[4]
+        excluded_commit = factory.commits[5]
+        head = repo.head.target
+        resp = self.app.get('/repo/{}/log/{}?stop={}'.format(
+            self.repo_path, head, stop_commit))
+        self.assertEqual(len(resp.json), 5)
+        self.assertNotIn(resp.json, excluded_commit)
 
 
 if __name__ == '__main__':
