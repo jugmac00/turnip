@@ -40,7 +40,6 @@ def format_commit(git_object):
         parents.append(str(parent))
     return {
         'sha1': git_object.oid.hex,
-        'commit_time': git_object.commit_time,
         'message': git_object.message,
         'author': {
             'name': git_object.author.name,
