@@ -120,9 +120,11 @@ class ApiTestCase(TestCase):
         factory = RepoFactory(self.repo_store, num_commits=10)
         factory.build()
         bulk_commits = {'commits': [c.hex for c in factory.commits[0::2]]}
+
         resp = self.app.post_json('/repo/{}/commits'.format(
             self.repo_path), bulk_commits)
         self.assertEqual(len(resp.json), 5)
+        self.assertEqual(bulk_commits['commits'][0], resp.json[0]['sha1'])
 
     def test_repo_get_log(self):
         factory = RepoFactory(self.repo_store, num_commits=4)
