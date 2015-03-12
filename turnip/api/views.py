@@ -1,6 +1,5 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
-import json
 import os
 
 from cornice.resource import resource
@@ -72,19 +71,17 @@ class RefAPI(object):
     @repo_path
     def collection_get(self, repo_path):
         try:
-            refs = store.get_refs(repo_path)
+            return store.get_refs(repo_path)
         except GitError:
             return exc.HTTPNotFound()  # 404
-        return json.dumps(refs, ensure_ascii=False)
 
     @repo_path
     def get(self, repo_path):
         ref = 'refs/' + self.request.matchdict['ref']
         try:
-            ref = store.get_ref(repo_path, ref)
+            return store.get_ref(repo_path, ref)
         except GitError:
             return exc.HTTPNotFound()
-        return json.dumps(ref, ensure_ascii=False)
 
 
 @resource(collection_path='/repo/{name}/commits',
@@ -106,7 +103,7 @@ class CommitAPI(object):
             commit = store.get_commit(repo_path, commit_sha1)
         except GitError:
             return exc.HTTPNotFound()
-        return json.dumps(commit, ensure_ascii=False)
+        return commit
 
     @repo_path
     def collection_get(self, repo_path):
