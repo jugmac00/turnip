@@ -1,10 +1,12 @@
 # Copyright 2005-2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-PYTHON = python
+PYTHON=python
+PSERVE=pserve
+FLAKE8=flake8
 
 check:
-	PYTHONPATH=$(PWD) $(PYTHON) -m unittest discover turnip
+	$(PYTHON) -m unittest discover turnip
 
 clean:
 	find turnip -name '*.py[co]' -exec rm '{}' \;
@@ -19,9 +21,9 @@ tags:
 	ctags -R turnip
 
 lint:
-	@flake8 turnip
+	@$(FLAKE8) turnip
 
 run-api:
-	PYTHONPATH=$(PWD) pserve api.ini --reload
+	$(PSERVE) api.ini --reload
 
 .PHONY: check clean dist lint run-api
