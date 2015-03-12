@@ -1,11 +1,8 @@
-cffi==0.9.1
 cornice==0.19.0
 lazr.sshserver==0.1.1
 PasteDeploy==1.5.2
 pyasn1==0.1.7
-pycparser==2.10
 pycrypto==2.6.1
-pygit2==0.21.4
 pyramid==1.5.4
 PyYAML==3.11
 repoze.lru==0.6
