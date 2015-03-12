@@ -46,6 +46,7 @@ setup(
     download_url='https://launchpad.net/turnip/+download',
     setup_requires=['PasteScript'],
     install_requires=requires,
+    tests_require=test_requires,
     extras_require=dict(
         test=test_requires),
     test_suite='turnip',
