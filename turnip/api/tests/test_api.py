@@ -136,7 +136,7 @@ class ApiTestCase(TestCase):
         factory = RepoFactory(self.repo_store)
         message = u'나는 김치 사랑'.encode('utf-8')
         message2 = u'(╯°□°)╯︵ ┻━┻'.encode('utf-8')
-        oid = factory.add_commit(message,'자장면/짜장면.py')
+        oid = factory.add_commit(message, '자장면/짜장면.py')
         oid2 = factory.add_commit(message2, '엄마야!.js', [oid])
 
         resp = self.app.get('/repo/{}/log/{}'.format(
