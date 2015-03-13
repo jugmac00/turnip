@@ -129,7 +129,7 @@ class LogAPI(BaseAPI):
     def get(self, repo_path):
         """Get log by sha1, filtered by limit and stop."""
         sha1 = self.request.matchdict['sha1']
-        limit = self.request.params.get('limit')
+        limit = int(self.request.params.get('limit', -1))
         stop = self.request.params.get('stop')
 
         try:

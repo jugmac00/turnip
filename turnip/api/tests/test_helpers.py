@@ -53,7 +53,7 @@ class RepoFactory():
                         self.committer, tag_message)
 
     def makeSignature(self, name, email, encoding='utf-8'):
-        """Return an author or commiter."""
+        """Return an author or committer signature."""
         return Signature(name, email, encoding=encoding)
 
     def stage(self, file_path):

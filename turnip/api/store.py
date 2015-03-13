@@ -117,8 +117,8 @@ def get_log(repo_path, start=None, limit=None, stop=None):
     walker = repo.walk(start)
     if stop:
         walker.hide(stop)  # filter stop sha1 and its ancestors
-    if limit:
-        walker = itertools.islice(walker, int(limit))
+    if limit > 0:
+        walker = itertools.islice(walker, limit)
     commits = [format_commit(commit) for commit in walker]
     return commits
 
