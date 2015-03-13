@@ -18,6 +18,7 @@ class RepoFactory():
     def __init__(self, repo_path=None, num_commits=None, num_tags=None):
         self.author = Signature('Test Author', 'author@bar.com')
         self.committer = Signature('Test Commiter', 'committer@bar.com')
+        self.commits = []
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_path = repo_path
@@ -30,18 +31,19 @@ class RepoFactory():
         return list(self.repo.walk(last.id, GIT_SORT_TIME))
 
     def add_commit(self, blob_content, file_path, parents=[],
-                   ref='refs/heads/master'):
+                   ref='refs/heads/master', author=None, committer=None):
         """Create a commit from blob_content and file_path."""
         repo = self.repo
-
+        if not author:
+            author = self.author
+        if not committer:
+            committer = self.committer
         blob_oid = repo.create_blob(blob_content)
         blob_entry = IndexEntry(file_path, blob_oid, GIT_FILEMODE_BLOB)
         repo.index.add(blob_entry)
         tree_id = repo.index.write_tree()
-        oid = repo.create_commit(ref,
-                                 self.author,
-                                 self.committer,
-                                 'commit', tree_id, parents)
+        oid = repo.create_commit(ref, author, committer,
+                                 blob_content, tree_id, parents)
         return oid
 
     def add_tag(self, tag_name, tag_message, oid):
@@ -49,6 +51,10 @@ class RepoFactory():
         repo = self.repo
         repo.create_tag(tag_name, oid, GIT_OBJ_COMMIT,
                         self.committer, tag_message)
+
+    def makeSignature(self, name, email, encoding='utf-8'):
+        """Return an author or commiter."""
+        return Signature(name, email, encoding=encoding)
 
     def stage(self, file_path):
         """Stage a file and return a tree id."""
@@ -69,6 +75,7 @@ class RepoFactory():
             self.stage(test_file)
 
             commit_oid = self.add_commit(blob_content, test_file, parents)
+            self.commits.append(commit_oid)
             parents = [commit_oid]
 
     def generate_tags(self, num_tags):

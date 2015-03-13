@@ -125,6 +125,93 @@ class ApiTestCase(TestCase):
         resp = self.get_ref(tag)
         self.assertTrue(tag in resp)
 
+    def test_repo_get_commit(self):
+        factory = RepoFactory(self.repo_store)
+        message = 'Computers make me angry.'
+        commit_oid = factory.add_commit(message, 'foobar.txt')
+
+        resp = self.app.get('/repo/{}/commits/{}'.format(
+            self.repo_path, commit_oid.hex))
+        commit_resp = resp.json
+        self.assertEqual(commit_oid.hex, commit_resp['sha1'])
+        self.assertEqual(message, commit_resp['message'])
+
+    def test_repo_get_commit_collection(self):
+        """Ensure commits can be returned in bulk."""
+        factory = RepoFactory(self.repo_store, num_commits=10)
+        factory.build()
+        bulk_commits = {'commits': [c.hex for c in factory.commits[0::2]]}
+
+        resp = self.app.post_json('/repo/{}/commits'.format(
+            self.repo_path), bulk_commits)
+        self.assertEqual(len(resp.json), 5)
+        self.assertEqual(bulk_commits['commits'][0], resp.json[0]['sha1'])
+
+    def test_repo_get_log_signatures(self):
+        """Ensure signatures are correct."""
+        factory = RepoFactory(self.repo_store)
+        committer = factory.makeSignature(u'村上 春樹'.encode('utf-8'),
+                                          u'tsukuru@猫の町.co.jp'.encode('utf-8'),
+                                          encoding='utf-8')
+        author = factory.makeSignature(
+            u'Владимир Владимирович Набоков'.encode('utf-8'),
+            u'Набоко@zembla.ru'.encode('utf-8'), encoding='utf-8')
+        oid = factory.add_commit('Obfuscate colophon.', 'path.foo',
+                                 author=author, committer=committer)
+        resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid))
+        self.assertEqual(resp.json[0]['author']['name'], author.name)
+
+    def test_repo_get_log(self):
+        factory = RepoFactory(self.repo_store, num_commits=4)
+        factory.build()
+        commits_from = factory.commits[2].hex
+        resp = self.app.get('/repo/{}/log/{}'.format(
+            self.repo_path, commits_from))
+        self.assertEqual(len(resp.json), 3)
+
+    def test_repo_get_unicode_log(self):
+        factory = RepoFactory(self.repo_store)
+        message = u'나는 김치 사랑'.encode('utf-8')
+        message2 = u'(╯°□°)╯︵ ┻━┻'.encode('utf-8')
+        oid = factory.add_commit(message, '자장면/짜장면.py')
+        oid2 = factory.add_commit(message2, '엄마야!.js', [oid])
+
+        resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid2))
+        self.assertEqual(resp.json[0]['message'],
+                         message2.decode('utf-8', 'replace'))
+        self.assertEqual(resp.json[1]['message'],
+                         message.decode('utf-8', 'replace'))
+
+    def test_repo_get_non_unicode_log(self):
+        """Ensure that non-unicode data is discarded."""
+        factory = RepoFactory(self.repo_store)
+        message = '\xe9\xe9\xe9'  # latin-1
+        oid = factory.add_commit(message, 'foo.py')
+        resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid))
+        self.assertEqual(resp.json[0]['message'],
+                         message.decode('utf-8', 'replace'))
+
+    def test_repo_get_log_with_limit(self):
+        """Ensure the commit log can filtered by limit."""
+        factory = RepoFactory(self.repo_store, num_commits=10)
+        repo = factory.build()
+        head = repo.head.target
+        resp = self.app.get('/repo/{}/log/{}?limit=5'.format(
+            self.repo_path, head))
+        self.assertEqual(len(resp.json), 5)
+
+    def test_repo_get_log_with_stop(self):
+        """Ensure the commit log can be filtered by a stop commit."""
+        factory = RepoFactory(self.repo_store, num_commits=10)
+        repo = factory.build()
+        stop_commit = factory.commits[4]
+        excluded_commit = factory.commits[5]
+        head = repo.head.target
+        resp = self.app.get('/repo/{}/log/{}?stop={}'.format(
+            self.repo_path, head, stop_commit))
+        self.assertEqual(len(resp.json), 5)
+        self.assertNotIn(resp.json, excluded_commit)
+
 
 if __name__ == '__main__':
     unittest.main()
