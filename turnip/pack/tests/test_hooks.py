@@ -51,3 +51,8 @@ class TestJSONNetStringProtocol(TestCase):
         self.assertEqual([], self.proto.test_value_log)
         self.assertEqual(
             ['{"foo": "bar', '"ga'], self.proto.test_invalid_log)
+
+    def test_sendValue(self):
+        # sendValue serialises to JSON and encodes as a netstring.
+        self.proto.sendValue({"yay": "it works"})
+        self.assertEqual('19:{"yay": "it works"},', self.transport.value())

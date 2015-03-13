@@ -15,12 +15,15 @@ class JSONNetstringProtocol(basic.NetstringReceiver):
         try:
             val = json.loads(string)
         except ValueError:
-            return self.invalidValueReceived(string)
+            self.invalidValueReceived(string)
         else:
-            return self.valueReceived(val)
+            self.valueReceived(val)
 
     def valueReceived(self, value):
         raise NotImplementedError()
 
     def invalidValueReceived(self, string):
         raise NotImplementedError()
+
+    def sendValue(self, value):
+        self.sendString(json.dumps(value))
