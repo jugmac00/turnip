@@ -13,10 +13,14 @@ from turnip.pack import hooks
 class DummyJSONNetstringProtocol(hooks.JSONNetstringProtocol):
 
     def __init__(self):
-        self.test_json_log = []
+        self.test_value_log = []
+        self.test_invalid_log = []
 
-    def jsonReceived(self, obj):
-        self.test_json_log.append(obj)
+    def valueReceived(self, val):
+        self.test_value_log.append(val)
+
+    def invalidValueReceived(self, string):
+        self.test_invalid_log.append(string)
 
 
 class TestJSONNetStringProtocol(TestCase):
@@ -29,6 +33,21 @@ class TestJSONNetStringProtocol(TestCase):
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
 
-    def test_calls_jsonReceived(self):
+    def test_calls_valueReceived(self):
+        # A valid netstring containing valid JSON is given to
+        # valueReceived.
         self.proto.dataReceived(b'14:{"foo": "bar"},')
-        self.assertEqual([{"foo": "bar"}], self.proto.test_json_log)
+        self.proto.dataReceived(b'19:[{"it": ["works"]}],')
+        self.assertEqual(
+            [{"foo": "bar"}, [{"it": ["works"]}]],
+            self.proto.test_value_log)
+
+    def test_calls_invalidValueReceived(self):
+        # A valid nestring containing invalid JSON calls
+        # invalidValueReceived. Framing is preserved, so the connection
+        # need not be destroyed.
+        self.proto.dataReceived(b'12:{"foo": "bar,')
+        self.proto.dataReceived(b'3:"ga,')
+        self.assertEqual([], self.proto.test_value_log)
+        self.assertEqual(
+            ['{"foo": "bar', '"ga'], self.proto.test_invalid_log)
