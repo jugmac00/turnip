@@ -65,3 +65,27 @@ turnip-proto-request alters it to this:
 The only additional parameters implemented today are
 'turnip-stateless-rpc' and 'turnip-advertise-refs', which are used by
 the smart HTTP server to proxy to the standard pack protocol.
+
+
+Development
+-----------
+
+Pack smart-http/ssh services can be started with:
+
+    python turnipserver.py
+
+The HTTP API can be started with:
+
+   make run-api                  
+
+
+Deployment
+----------
+
+Turnip is deployed with the turnip juju charm, available from bzr branch lp:~canonical-launchpad-branches/charms/trusty/turnip/devel.
+
+To deploy with the local provider:
+
+   juju switch local
+   juju bootstrap
+   juju deploy --repository=/path/to/loca/charm/repo/root local:trusty/turnip

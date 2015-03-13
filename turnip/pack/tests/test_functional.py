@@ -61,7 +61,7 @@ class FakeAuthServerService(xmlrpc.XMLRPC):
         if username not in self.keys:
             raise NoSuchPersonWithName(username)
         return {
-            "id": username,
+            "id": hash(username),
             "name": username,
             "keys": self.keys[username],
             }
@@ -74,7 +74,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     path is prefixed with '/+rw'
     """
 
-    def xmlrpc_translatePath(self, pathname, permission, authenticated_user,
+    def xmlrpc_translatePath(self, pathname, permission, authenticated_uid,
                              can_authenticate):
         writable = False
         if pathname.startswith('/+rw'):
