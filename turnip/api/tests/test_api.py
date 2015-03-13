@@ -126,6 +126,20 @@ class ApiTestCase(TestCase):
         self.assertEqual(len(resp.json), 5)
         self.assertEqual(bulk_commits['commits'][0], resp.json[0]['sha1'])
 
+    def test_repo_get_log_signatures(self):
+        """Ensure signatures are correct."""
+        factory = RepoFactory(self.repo_store)
+        committer = factory.makeSignature(u'村上 春樹'.encode('utf-8'),
+                                          u'tsukuru@猫の町.co.jp'.encode('utf-8'),
+                                          encoding='utf-8')
+        author = factory.makeSignature(
+            u'Владимир Владимирович Набоков'.encode('utf-8'),
+            u'Набоко@zembla.ru'.encode('utf-8'), encoding='utf-8')
+        oid = factory.add_commit('Obfuscate colophon.', 'path.foo',
+                                 author=author, committer=committer)
+        resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid))
+        self.assertEqual(resp.json[0]['author']['name'], author.name)
+
     def test_repo_get_log(self):
         factory = RepoFactory(self.repo_store, num_commits=4)
         factory.build()
@@ -141,8 +155,7 @@ class ApiTestCase(TestCase):
         oid = factory.add_commit(message, '자장면/짜장면.py')
         oid2 = factory.add_commit(message2, '엄마야!.js', [oid])
 
-        resp = self.app.get('/repo/{}/log/{}'.format(
-            self.repo_path, oid2))
+        resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid2))
         self.assertEqual(resp.json[0]['message'],
                          message2.decode('utf-8', 'replace'))
         self.assertEqual(resp.json[1]['message'],

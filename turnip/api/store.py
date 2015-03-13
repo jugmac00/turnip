@@ -24,6 +24,7 @@ REF_TYPE_NAME = {
 
 
 def format_ref(ref, git_object):
+    """Return a formatted object dict from a ref."""
     return {
         ref: {
             "object": {
@@ -35,24 +36,27 @@ def format_ref(ref, git_object):
 
 
 def format_commit(git_object):
-    parents = []
-    for parent in git_object.parent_ids:
-        parents.append(str(parent))
+    """Return a formatted commit object dict."""
+    if git_object.type != GIT_OBJ_COMMIT:
+        raise GitError('Invalid type: object {} is not a commit.'.format(
+            git_object.oid.hex))
+    parents = [parent.hex for parent in git_object.parent_ids]
     return {
         'sha1': git_object.oid.hex,
         'message': git_object.message,
-        'author': {
-            'name': git_object.author.name,
-            'email': git_object.author.email,
-            'time': git_object.author.time
-            },
-        'committer': {
-            'name': git_object.committer.name,
-            'email': git_object.committer.email,
-            'time': git_object.committer.time
-            },
+        'author': format_signature(git_object.author),
+        'committer': format_signature(git_object.committer),
         'parents': parents,
         'tree': git_object.tree.hex
+        }
+
+
+def format_signature(signature):
+    """Return a formatted signature dict."""
+    return {
+        'name': signature.name,
+        'email': signature.email,
+        'time': signature.time
         }
 
 
@@ -115,25 +119,21 @@ def get_log(repo_path, start=None, limit=None, stop=None):
         walker.hide(stop)  # filter stop sha1 and its ancestors
     if limit:
         walker = itertools.islice(walker, int(limit))
-    commits = []
-    for commit in walker:
-        commits.append(format_commit(commit))
+    commits = [format_commit(commit) for commit in walker]
     return commits
 
 
-def get_commit(repo_path, commit_oid):
+def get_commit(repo_path, commit_oid, repo=None):
     """Return a single commit object from an oid."""
-    repo = open_repo(repo_path)
+    if not repo:
+        repo = open_repo(repo_path)
     git_object = repo.get(commit_oid)
-    if git_object.type != GIT_OBJ_COMMIT:
-        raise GitError
     commit = format_commit(git_object)
     return commit
 
 
 def get_commits(repo_path, commit_oids):
     """Return a collection of commit objects from a list of oids."""
-    commit_objects = []
-    for commit in commit_oids:
-        commit_objects.append(get_commit(repo_path, commit))
-    return commit_objects
+    repo = open_repo(repo_path)
+    commits = [get_commit(repo_path, commit, repo) for commit in commit_oids]
+    return commits
