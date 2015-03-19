@@ -1,6 +1,5 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
-import json
 import os
 
 from cornice.resource import resource
@@ -28,14 +27,19 @@ def repo_path(func):
     return repo_path_decorator
 
 
+class BaseAPI(object):
+    def __init__(self):
+        config = TurnipConfig()
+        self.repo_store = config.get('repo_store')
+
+
 @resource(collection_path='/repo', path='/repo/{name}')
-class RepoAPI(object):
+class RepoAPI(BaseAPI):
     """Provides HTTP API for repository actions."""
 
     def __init__(self, request):
-        config = TurnipConfig()
+        super(RepoAPI, self).__init__()
         self.request = request
-        self.repo_store = config.get('repo_store')
 
     def collection_post(self):
         """Initialise a new git repository."""
@@ -61,30 +65,27 @@ class RepoAPI(object):
 
 @resource(collection_path='/repo/{name}/refs',
           path='/repo/{name}/refs/{ref:.*}')
-class RefAPI(object):
+class RefAPI(BaseAPI):
     """Provides HTTP API for git references."""
 
     def __init__(self, request):
-        config = TurnipConfig()
+        super(RefAPI, self).__init__()
         self.request = request
-        self.repo_store = config.get('repo_store')
 
     @repo_path
     def collection_get(self, repo_path):
         try:
-            refs = store.get_refs(repo_path)
-        except GitError:
+            return store.get_refs(repo_path)
+        except (KeyError, GitError):
             return exc.HTTPNotFound()  # 404
-        return json.dumps(refs, ensure_ascii=False)
 
     @repo_path
     def get(self, repo_path):
         ref = 'refs/' + self.request.matchdict['ref']
         try:
-            ref = store.get_ref(repo_path, ref)
-        except GitError:
+            return store.get_ref(repo_path, ref)
+        except (KeyError, GitError):
             return exc.HTTPNotFound()
-        return json.dumps(ref, ensure_ascii=False)
 
 
 @resource(path='/repo/{name}/compare/{c1}..{c2}')
@@ -110,3 +111,54 @@ class DiffAPI(object):
         except GitError:
             return exc.HTTPNotFound()
         return json.dumps(patch)
+
+
+@resource(collection_path='/repo/{name}/commits',
+          path='/repo/{name}/commits/{sha1}')
+class CommitAPI(BaseAPI):
+    """Provides HTTP API for git commits."""
+
+    def __init__(self, request):
+        super(CommitAPI, self).__init__()
+        self.request = request
+
+    @repo_path
+    def get(self, repo_path):
+        commit_sha1 = self.request.matchdict['sha1']
+        try:
+            commit = store.get_commit(repo_path, commit_sha1)
+        except GitError:
+            return exc.HTTPNotFound()
+        return commit
+
+    @repo_path
+    def collection_post(self, repo_path):
+        """Get commits in bulk."""
+        commits = extract_json_data(self.request).get('commits')
+        try:
+            commits = store.get_commits(repo_path, commits)
+        except GitError:
+            return exc.HTTPNotFound()
+        return commits
+
+
+@resource(path='/repo/{name}/log/{sha1}')
+class LogAPI(BaseAPI):
+    """Provides HTTP API for git logs."""
+
+    def __init__(self, request):
+        super(LogAPI, self).__init__()
+        self.request = request
+
+    @repo_path
+    def get(self, repo_path):
+        """Get log by sha1, filtered by limit and stop."""
+        sha1 = self.request.matchdict['sha1']
+        limit = int(self.request.params.get('limit', -1))
+        stop = self.request.params.get('stop')
+
+        try:
+            log = store.get_log(repo_path, sha1, limit, stop)
+        except GitError:
+            return exc.HTTPNotFound()
+        return log

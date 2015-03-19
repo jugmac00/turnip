@@ -1,9 +1,11 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import itertools
 import os
 import shutil
 
 from pygit2 import (
+    GitError,
     GIT_OBJ_BLOB,
     GIT_OBJ_COMMIT,
     GIT_OBJ_TREE,
@@ -22,6 +24,7 @@ REF_TYPE_NAME = {
 
 
 def format_ref(ref, git_object):
+    """Return a formatted object dict from a ref."""
     return {
         ref: {
             "object": {
@@ -29,6 +32,31 @@ def format_ref(ref, git_object):
                 'type': REF_TYPE_NAME[git_object.type]
                 }
             }
+        }
+
+
+def format_commit(git_object):
+    """Return a formatted commit object dict."""
+    if git_object.type != GIT_OBJ_COMMIT:
+        raise GitError('Invalid type: object {} is not a commit.'.format(
+            git_object.oid.hex))
+    parents = [parent.hex for parent in git_object.parent_ids]
+    return {
+        'sha1': git_object.oid.hex,
+        'message': git_object.message,
+        'author': format_signature(git_object.author),
+        'committer': format_signature(git_object.committer),
+        'parents': parents,
+        'tree': git_object.tree.hex
+        }
+
+
+def format_signature(signature):
+    """Return a formatted signature dict."""
+    return {
+        'name': signature.name,
+        'email': signature.email,
+        'time': signature.time
         }
 
 
@@ -83,3 +111,38 @@ def get_diff(repo_path, sha1_from, sha1_to):
     commits = [repo.revparse_single(sha) for sha in shas]
     patch = {'patch': repo.diff(commits[0], commits[1]).patch}
     return patch
+
+
+def get_log(repo_path, start=None, limit=None, stop=None):
+    """Return a commit collection from HEAD or optionally a start oid.
+
+    :param start: sha1 or branch to start listing commits from.
+    :param limit: limit number of commits to return.
+    :param stop: ignore a commit (and its ancestors).
+    """
+    repo = open_repo(repo_path)
+    if not start:
+        start = repo.head.target  # walk from HEAD
+    walker = repo.walk(start)
+    if stop:
+        walker.hide(stop)  # filter stop sha1 and its ancestors
+    if limit > 0:
+        walker = itertools.islice(walker, limit)
+    commits = [format_commit(commit) for commit in walker]
+    return commits
+
+
+def get_commit(repo_path, commit_oid, repo=None):
+    """Return a single commit object from an oid."""
+    if not repo:
+        repo = open_repo(repo_path)
+    git_object = repo.get(commit_oid)
+    commit = format_commit(git_object)
+    return commit
+
+
+def get_commits(repo_path, commit_oids):
+    """Return a collection of commit objects from a list of oids."""
+    repo = open_repo(repo_path)
+    commits = [get_commit(repo_path, commit, repo) for commit in commit_oids]
+    return commits
