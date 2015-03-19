@@ -105,12 +105,15 @@ def get_ref(repo_path, ref):
 
 
 def get_diff(repo_path, sha1_from, sha1_to):
-    """Get diff of two commits."""
+    """Get patch and associated commits of two shas."""
     repo = open_repo(repo_path)
     shas = [sha1_from, sha1_to]
-    commits = [repo.revparse_single(sha) for sha in shas]
-    patch = {'patch': repo.diff(commits[0], commits[1]).patch}
-    return patch
+    commits = [get_commit(repo_path, sha, repo) for sha in shas]
+    diff = {
+        'commits': commits,
+        'patch': repo.diff(commits[0]['sha1'], commits[1]['sha1']).patch
+        }
+    return diff
 
 
 def get_log(repo_path, start=None, limit=None, stop=None):

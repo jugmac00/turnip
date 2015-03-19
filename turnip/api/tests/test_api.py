@@ -126,16 +126,33 @@ class ApiTestCase(TestCase):
         self.assertTrue(tag in resp)
 
     def test_repo_compare_commits(self):
+        """Ensure expected changes exist in diff patch."""
         repo = RepoFactory(self.repo_store)
-
         c1_oid = repo.add_commit('foo', 'foobar.txt')
         c2_oid = repo.add_commit('bar', 'foobar.txt', parents=[c1_oid])
 
         path = '/repo/{}/compare/{}..{}'.format(self.repo_path, c1_oid, c2_oid)
         resp = self.app.get(path)
-        resp_body = json.loads(resp.body)
-        self.assertIn('-foo', resp_body)
-        self.assertIn('+bar', resp_body)
+        self.assertIn('-foo', resp.body)
+        self.assertIn('+bar', resp.body)
+
+    def test_repo_diff_commits(self):
+        """Ensure expected commits objects are returned in diff."""
+        repo = RepoFactory(self.repo_store)
+        c1_oid = repo.add_commit('foo', 'foobar.txt')
+        c2_oid = repo.add_commit('bar', 'foobar.txt', parents=[c1_oid])
+
+        path = '/repo/{}/compare/{}..{}'.format(self.repo_path, c1_oid, c2_oid)
+        resp = self.app.get(path)
+        self.assertIn(c1_oid.hex, resp.json['commits'][0]['sha1'])
+        self.assertIn(c2_oid.hex, resp.json['commits'][1]['sha1'])
+
+    def test_repo_get_diff_nonexistent(self):
+        """get_diff on a non-existent sha returns HTTP 404."""
+        repo = RepoFactory(self.repo_store)
+        resp = self.app.get('/repo/{}/compare/1..2'.format(
+            self.repo_path), expect_errors=True)
+        self.assertEqual(resp.status_code, 404)
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
