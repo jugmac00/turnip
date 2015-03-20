@@ -104,14 +104,20 @@ def get_ref(repo_path, ref):
     return ref_obj
 
 
-def get_diff(repo_path, sha1_from, sha1_to):
-    """Get patch and associated commits of two shas."""
+def get_diff(repo_path, sha1_from, sha1_to, context_lines=3):
+    """Get patch and associated commits of two shas.
+
+    :param sha1_fron: diff from sha1.
+    :param sha2_to: diff to sha1.
+    :param context_lines: number of unchanged lines that define a hunk boundary.
+    """
     repo = open_repo(repo_path)
     shas = [sha1_from, sha1_to]
     commits = [get_commit(repo_path, sha, repo) for sha in shas]
     diff = {
         'commits': commits,
-        'patch': repo.diff(commits[0]['sha1'], commits[1]['sha1']).patch
+        'patch': repo.diff(commits[0]['sha1'],commits[1]['sha1'],
+                           False, 0, context_lines).patch
         }
     return diff
 

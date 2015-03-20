@@ -102,8 +102,9 @@ class DiffAPI(object):
         """Returns diff of two commits."""
         c1 = self.request.matchdict['c1']
         c2 = self.request.matchdict['c2']
+        context_lines = int(self.request.params.get('context_lines', 3))
         try:
-            patch = store.get_diff(repo_path, c1, c2)
+            patch = store.get_diff(repo_path, c1, c2, context_lines)
         except (ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()
