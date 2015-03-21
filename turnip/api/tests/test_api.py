@@ -147,9 +147,9 @@ class ApiTestCase(TestCase):
         self.assertIn(c1_oid.hex, resp.json['commits'][0]['sha1'])
         self.assertIn(c2_oid.hex, resp.json['commits'][1]['sha1'])
 
-    def test_repo_get_diff_nonexistent(self):
-        """get_diff on a non-existent sha returns HTTP 404."""
-        repo = RepoFactory(self.repo_store)
+    def test_repo_get_diff_nonexistent_sha1(self):
+        """get_diff on a non-existent sha1 returns HTTP 404."""
+        RepoFactory(self.repo_store).build()
         resp = self.app.get('/repo/{}/compare/1..2'.format(
             self.repo_path), expect_errors=True)
         self.assertEqual(resp.status_code, 404)
