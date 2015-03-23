@@ -10,14 +10,15 @@ import tempfile
 
 from testtools import TestCase
 
-import turnip
+import turnip.pack
 
 
 class TestPreReceiveHook(TestCase):
     """Tests for the git pre-receive hook."""
 
     hook_path = os.path.join(
-        os.path.dirname(turnip.__file__), b'data', b'hooks', b'pre-receive')
+        os.path.dirname(turnip.pack.__file__), b'data', b'hooks',
+        b'pre-receive')
     old_sha1 = b'a' * 40
     new_sha1 = b'b' * 40
 
