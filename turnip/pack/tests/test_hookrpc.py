@@ -7,10 +7,10 @@ from __future__ import (
 from testtools import TestCase
 from twisted.test import proto_helpers
 
-from turnip.pack import hooks
+from turnip.pack import hookrpc
 
 
-class DummyJSONNetstringProtocol(hooks.JSONNetstringProtocol):
+class DummyJSONNetstringProtocol(hookrpc.JSONNetstringProtocol):
 
     def __init__(self):
         self.test_value_log = []
@@ -63,7 +63,7 @@ class TestHookRPCServerProtocol(TestCase):
 
     def setUp(self):
         super(TestHookRPCServerProtocol, self).setUp()
-        self.proto = hooks.HookRPCServerProtocol(
+        self.proto = hookrpc.HookRPCServerProtocol(
             {'foo': lambda proto, args: args.items()})
         self.transport = proto_helpers.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
