@@ -56,3 +56,42 @@ class TestJSONNetStringProtocol(TestCase):
         # sendValue serialises to JSON and encodes as a netstring.
         self.proto.sendValue({"yay": "it works"})
         self.assertEqual('19:{"yay": "it works"},', self.transport.value())
+
+
+class TestHookRPCServerProtocol(TestCase):
+    """Test the socket server that handles git hook callbacks."""
+
+    def setUp(self):
+        super(TestHookRPCServerProtocol, self).setUp()
+        self.proto = hooks.HookRPCServerProtocol(
+            {'foo': lambda proto, args: args.items()})
+        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport.protocol = self.proto
+        self.proto.makeConnection(self.transport)
+
+    def test_call(self):
+        self.proto.dataReceived(b'27:{"op": "foo", "bar": "baz"},')
+        self.assertEqual(
+            '28:{"result": [["bar", "baz"]]},', self.transport.value())
+
+    def test_bad_op(self):
+        self.proto.dataReceived(b'27:{"op": "bar", "bar": "baz"},')
+        self.assertEqual(
+            '28:{"error": "Unknown op: bar"},', self.transport.value())
+
+    def test_no_op(self):
+        self.proto.dataReceived(b'28:{"nop": "bar", "bar": "baz"},')
+        self.assertEqual(
+            '28:{"error": "No op specified"},', self.transport.value())
+
+    def test_bad_value(self):
+        self.proto.dataReceived(b'14:["foo", "bar"],')
+        self.assertEqual(
+            '42:{"error": "Command must be a JSON object"},',
+            self.transport.value())
+
+    def test_bad_json(self):
+        self.proto.dataReceived(b'12:["nop", "bar,')
+        self.assertEqual(
+            '42:{"error": "Command must be a JSON object"},',
+            self.transport.value())
