@@ -16,7 +16,8 @@ import turnip.pack.hooks.pre_receive
 class TestPreReceiveHook(TestCase):
     """Tests for the git pre-receive hook."""
 
-    hook_path = turnip.pack.hooks.pre_receive.__file__
+    hook_path = os.path.join(
+        os.path.dirname(turnip.pack.hooks.__file__), 'pre_receive.py')
     old_sha1 = b'a' * 40
     new_sha1 = b'b' * 40
 
