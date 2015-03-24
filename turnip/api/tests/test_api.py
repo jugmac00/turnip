@@ -147,6 +147,33 @@ class ApiTestCase(TestCase):
         self.assertIn(c1_oid.hex, resp.json['commits'][0]['sha1'])
         self.assertIn(c2_oid.hex, resp.json['commits'][1]['sha1'])
 
+    def test_repo_diff_unicode_commits(self):
+        """Ensure expected utf-8 commits objects are returned in diff."""
+        factory = RepoFactory(self.repo_store)
+        message = u'屋漏偏逢连夜雨'.encode('utf-8')
+        message2 = u'说曹操，曹操到'.encode('utf-8')
+        oid = factory.add_commit(message, 'foo.py')
+        oid2 = factory.add_commit(message2, 'bar.py', [oid])
+
+        resp = self.app.get('/repo/{}/compare/{}..{}'.format(
+            self.repo_path, oid, oid2))
+        self.assertEqual(resp.json['commits'][0]['message'],
+                         message.decode('utf-8'))
+        self.assertEqual(resp.json['commits'][1]['message'],
+                         message2.decode('utf-8'))
+
+    def test_repo_diff_non_unicode_commits(self):
+        """Ensure non utf-8 chars are handled but stripped from diff."""
+        factory = RepoFactory(self.repo_store)
+        message = 'not particularly sensible latin-1: \xe9\xe9\xe9.'
+        oid = factory.add_commit(message, 'foo.py')
+        oid2 = factory.add_commit('a sensible commit message', 'foo.py', [oid])
+
+        resp = self.app.get('/repo/{}/compare/{}..{}'.format(
+            self.repo_path, oid, oid2))
+        self.assertEqual(resp.json['commits'][0]['message'],
+                         message.decode('utf-8', 'replace'))
+
     def test_repo_get_diff_nonexistent_sha1(self):
         """get_diff on a non-existent sha1 returns HTTP 404."""
         RepoFactory(self.repo_store).build()
