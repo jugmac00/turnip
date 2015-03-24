@@ -24,7 +24,7 @@ class ApiTestCase(TestCase):
         repo_store = self.useFixture(TempDir()).path
         self.useFixture(EnvironmentVariable("REPO_STORE", repo_store))
         self.app = TestApp(api.main({}))
-        self.repo_path = str(uuid.uuid1())
+        self.repo_path = uuid.uuid1().hex
         self.repo_store = os.path.join(repo_store, self.repo_path)
         self.commit = {'ref': 'refs/heads/master', 'message': 'test commit.'}
         self.tag = {'ref': 'refs/tags/tag0', 'message': 'tag message'}
@@ -33,9 +33,24 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}/{}'.format(self.repo_path, ref))
         return resp.json
 
-    def test_repo_create(self):
+    def test_repo_init(self):
         resp = self.app.post_json('/repo', {'repo_path': self.repo_path})
+        self.assertIn(self.repo_path, resp.json['repo_url'])
         self.assertEqual(resp.status_code, 200)
+
+    def test_repo_init_with_invalid_repo_path(self):
+        resp = self.app.post_json('/repo', {'repo_path': '../1234'},
+                                  expect_errors=True)
+        self.assertEqual(resp.status_code, 500)
+
+    def test_repo_init_with_clone(self):
+        repo = RepoFactory(self.repo_store, num_commits=2)
+        repo.build()
+        new_repo_path = uuid.uuid1().hex
+        resp = self.app.post_json('/repo', {'repo_path': self.repo_path,
+                                            'clone_path': new_repo_path})
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(new_repo_path, resp.json['repo_url'])
 
     def test_repo_delete(self):
         self.app.post_json('/repo', {'repo_path': self.repo_path})

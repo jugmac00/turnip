@@ -3,6 +3,8 @@
 import itertools
 import os
 import shutil
+import urllib
+import urlparse
 
 from pygit2 import (
     GitError,
@@ -10,6 +12,7 @@ from pygit2 import (
     GIT_OBJ_COMMIT,
     GIT_OBJ_TREE,
     GIT_OBJ_TAG,
+    clone_repository,
     init_repository,
     Repository,
     )
@@ -60,23 +63,34 @@ def format_signature(signature):
         }
 
 
-def init_repo(repo, is_bare=True):
-    """Initialise a git repository."""
-    if os.path.exists(repo):
-        raise Exception("Repository '%s' already exists" % repo)
-    repo_path = init_repository(repo, is_bare)
-    return repo_path
+def is_valid_new_path(path):
+    """Verify repo path is new, or raise Exception."""
+    if os.path.exists(path):
+        raise Exception("Repository '%s' already exists" % path)
+    return True
+
+
+def init_repo(repo_path, clone_path=None, is_bare=True):
+    """Initialise a new git repository or clone from existing."""
+    if clone_path:
+        assert is_valid_new_path(clone_path)
+        repo_url = urlparse.urljoin('file:', urllib.pathname2url(repo_path))
+        repo = clone_repository(repo_url, clone_path, is_bare)
+        return repo.path
+    else:
+        assert is_valid_new_path(repo_path)
+        repo = init_repository(repo_path, is_bare)
+        return repo.path
 
 
 def open_repo(repo_path):
     """Open an existing git repository."""
-    repo = Repository(repo_path)
-    return repo
+    return Repository(repo_path)
 
 
-def delete_repo(repo):
+def delete_repo(repo_path):
     """Permanently delete a git repository from repo store."""
-    shutil.rmtree(repo)
+    shutil.rmtree(repo_path)
 
 
 def get_refs(repo_path):
