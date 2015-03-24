@@ -76,11 +76,10 @@ def init_repo(repo_path, clone_path=None, is_bare=True):
         assert is_valid_new_path(clone_path)
         repo_url = urlparse.urljoin('file:', urllib.pathname2url(repo_path))
         repo = clone_repository(repo_url, clone_path, is_bare)
-        return repo.path
     else:
         assert is_valid_new_path(repo_path)
         repo = init_repository(repo_path, is_bare)
-        return repo.path
+    return repo.path
 
 
 def open_repo(repo_path):

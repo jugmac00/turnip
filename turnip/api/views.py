@@ -56,19 +56,19 @@ class RepoAPI(BaseAPI):
                                     'repo_path is missing')
             return
         repo = os.path.join(self.repo_store, repo_path)
-        if clone_path:
-            repo_clone = os.path.join(self.repo_store, clone_path)
-        else:
-            repo_clone = None
         if not is_valid_path(self.repo_store, repo):
             self.request.errors.add('body', 'name', 'invalid path.')
             raise exc.HTTPInternalServerError()
 
+        if clone_path:
+            repo_clone = os.path.join(self.repo_store, clone_path)
+        else:
+            repo_clone = None
+
         try:
             new_repo_path = store.init_repo(repo, repo_clone)
-            return {'repo_url': '/'.join(
-                [self.request.url,
-                 os.path.basename(os.path.normpath(new_repo_path))])}
+            repo_name = os.path.basename(os.path.normpath(new_repo_path))
+            return {'repo_url': '/'.join([self.request.url, repo_name])}
         except GitError:
             return exc.HTTPConflict()  # 409
 

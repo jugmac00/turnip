@@ -14,7 +14,11 @@ from testtools import TestCase
 from webtest import TestApp
 
 from turnip import api
-from turnip.api.tests.test_helpers import RepoFactory
+from turnip.api.tests.test_helpers import (
+    get_revlist,
+    open_repo,
+    RepoFactory,
+    )
 
 
 class ApiTestCase(TestCase):
@@ -26,6 +30,7 @@ class ApiTestCase(TestCase):
         self.app = TestApp(api.main({}))
         self.repo_path = uuid.uuid1().hex
         self.repo_store = os.path.join(repo_store, self.repo_path)
+        self.repo_root = repo_store
         self.commit = {'ref': 'refs/heads/master', 'message': 'test commit.'}
         self.tag = {'ref': 'refs/tags/tag0', 'message': 'tag message'}
 
@@ -44,11 +49,18 @@ class ApiTestCase(TestCase):
         self.assertEqual(resp.status_code, 500)
 
     def test_repo_init_with_clone(self):
-        repo = RepoFactory(self.repo_store, num_commits=2)
-        repo.build()
+        """Repo can be initialised with optional clone."""
+        factory = RepoFactory(self.repo_store, num_commits=2)
+        factory.build()
         new_repo_path = uuid.uuid1().hex
         resp = self.app.post_json('/repo', {'repo_path': self.repo_path,
                                             'clone_path': new_repo_path})
+        repo1_revlist = get_revlist(factory.repo)
+        clone_path = resp.json['repo_url'].split('/')[-1]
+        repo2 = open_repo(os.path.join(self.repo_root, clone_path))
+        repo2_revlist = get_revlist(repo2)
+
+        self.assertEqual(repo1_revlist, repo2_revlist)
         self.assertEqual(resp.status_code, 200)
         self.assertIn(new_repo_path, resp.json['repo_url'])
 
