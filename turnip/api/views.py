@@ -41,6 +41,10 @@ class RepoAPI(BaseAPI):
         super(RepoAPI, self).__init__()
         self.request = request
 
+    def collection_options(self):
+        """Trivial response for the sake of haproxy."""
+        pass
+
     def collection_post(self):
         """Initialise a new git repository."""
         repo_path = extract_json_data(self.request).get('repo_path')

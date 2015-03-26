@@ -282,6 +282,14 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
         return server.NOT_DONE_YET
 
 
+class SmartHTTPRootResource(resource.Resource):
+    """HTTP resource to handle operations on the root path."""
+
+    def render_OPTIONS(self, request):
+        # Trivially respond to OPTIONS / for the sake of haproxy.
+        return b''
+
+
 class SmartHTTPFrontendResource(resource.Resource):
     """HTTP resource to translate Git smart HTTP requests to pack protocol."""
 
@@ -292,6 +300,7 @@ class SmartHTTPFrontendResource(resource.Resource):
         self.backend_host = backend_host
         self.backend_port = backend_port
         self.virtinfo_endpoint = virtinfo_endpoint
+        self.putChild('', SmartHTTPRootResource())
 
     def getChild(self, path, request):
         if request.path.endswith(b'/info/refs'):
