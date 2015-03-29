@@ -66,7 +66,7 @@ def format_signature(signature):
 def is_valid_new_path(path):
     """Verify repo path is new, or raise Exception."""
     if os.path.exists(path):
-        raise Exception("Repository '%s' already exists" % path)
+        raise GitError("Repository '%s' already exists" % path)
     return True
 
 

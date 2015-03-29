@@ -48,6 +48,14 @@ class ApiTestCase(TestCase):
                                   expect_errors=True)
         self.assertEqual(resp.status_code, 404)
 
+    def test_repo_init_with_existing_repo(self):
+        """Repo can be not be initialised with existing path."""
+        factory = RepoFactory(self.repo_store)
+        repo_path = os.path.basename(os.path.normpath(factory.repo_path))
+        resp = self.app.post_json('/repo', {'repo_path': repo_path},
+                                  expect_errors=True)
+        self.assertEqual(resp.status_code, 409)
+
     def test_repo_init_with_clone(self):
         """Repo can be initialised with optional clone."""
         factory = RepoFactory(self.repo_store, num_commits=2)
