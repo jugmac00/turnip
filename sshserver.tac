@@ -23,8 +23,8 @@ def getSmartSSHService():
     return SmartSSHService(
         b'localhost', config.get('pack_virt_port'),
         config.get('authentication_endpoint'),
-        private_key_path=config.get('private_key_path'),
-        public_key_path=config.get('public_key_path'),
+        private_key_path=config.get('private_ssh_key_path'),
+        public_key_path=config.get('public_ssh_key_path'),
         main_log='turnip', access_log=os.path.join(log_path, 'turnip.access'),
         access_log_path=os.path.join(log_path, 'turnip-access.log'),
         strport=b'tcp:{}'.format(config.get('smart_ssh_port')))
