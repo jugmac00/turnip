@@ -46,18 +46,18 @@ class ApiTestCase(TestCase):
     def test_repo_init_with_invalid_repo_path(self):
         resp = self.app.post_json('/repo', {'repo_path': '../1234'},
                                   expect_errors=True)
-        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(resp.status_code, 404)
 
     def test_repo_init_with_clone(self):
         """Repo can be initialised with optional clone."""
         factory = RepoFactory(self.repo_store, num_commits=2)
         factory.build()
         new_repo_path = uuid.uuid1().hex
-        resp = self.app.post_json('/repo', {'repo_path': self.repo_path,
-                                            'clone_path': new_repo_path})
+        resp = self.app.post_json('/repo', {'repo_path': new_repo_path,
+                                            'clone_from': self.repo_path})
         repo1_revlist = get_revlist(factory.repo)
-        clone_path = resp.json['repo_url'].split('/')[-1]
-        repo2 = open_repo(os.path.join(self.repo_root, clone_path))
+        clone_from = resp.json['repo_url'].split('/')[-1]
+        repo2 = open_repo(os.path.join(self.repo_root, clone_from))
         repo2_revlist = get_revlist(repo2)
 
         self.assertEqual(repo1_revlist, repo2_revlist)

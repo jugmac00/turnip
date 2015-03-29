@@ -49,7 +49,7 @@ class RepoAPI(BaseAPI):
     def collection_post(self):
         """Initialise a new git repository, or clone from an existing repo."""
         repo_path = extract_json_data(self.request).get('repo_path')
-        clone_path = extract_json_data(self.request).get('clone_path')
+        clone_path = extract_json_data(self.request).get('clone_from')
 
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
@@ -58,7 +58,7 @@ class RepoAPI(BaseAPI):
         repo = os.path.join(self.repo_store, repo_path)
         if not is_valid_path(self.repo_store, repo):
             self.request.errors.add('body', 'name', 'invalid path.')
-            raise exc.HTTPInternalServerError()
+            raise exc.HTTPNotFound()
 
         if clone_path:
             repo_clone = os.path.join(self.repo_store, clone_path)

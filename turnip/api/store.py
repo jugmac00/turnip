@@ -70,14 +70,14 @@ def is_valid_new_path(path):
     return True
 
 
-def init_repo(repo_path, clone_path=None, is_bare=True):
+def init_repo(repo_path, clone_from=None, is_bare=True):
     """Initialise a new git repository or clone from existing."""
-    if clone_path:
-        assert is_valid_new_path(clone_path)
-        repo_url = urlparse.urljoin('file:', urllib.pathname2url(repo_path))
-        repo = clone_repository(repo_url, clone_path, is_bare)
+    assert is_valid_new_path(repo_path)
+    if clone_from:
+        clone_from_url = urlparse.urljoin('file:',
+                                          urllib.pathname2url(clone_from))
+        repo = clone_repository(clone_from_url, repo_path, is_bare)
     else:
-        assert is_valid_new_path(repo_path)
         repo = init_repository(repo_path, is_bare)
     return repo.path
 
