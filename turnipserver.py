@@ -48,8 +48,8 @@ smarthttp_site = server.Site(
 reactor.listenTCP(config.get('smart_http_port'), smarthttp_site)
 smartssh_service = SmartSSHService(
     b'localhost', PACK_VIRT_PORT, config.get('authentication_endpoint'),
-    private_key_path=os.path.join(data_dir, "ssh-host-key"),
-    public_key_path=os.path.join(data_dir, "ssh-host-key.pub"),
+    private_key_path=config.get('private_ssh_key_path'),
+    public_key_path=config.get('public_ssh_key_path'),
     main_log='turnip', access_log=os.path.join(LOG_PATH, 'turnip.access'),
     access_log_path=os.path.join(LOG_PATH, 'turnip-access.log'),
     strport=b'tcp:{}'.format(config.get('smart_ssh_port')))
