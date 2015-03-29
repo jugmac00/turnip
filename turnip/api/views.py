@@ -11,6 +11,11 @@ from turnip.config import TurnipConfig
 from turnip.api import store
 
 
+def is_valid_path(repo_store, repo_path):
+    """Ensure path in within repo root and has not been subverted."""
+    return os.path.realpath(repo_path).startswith(os.path.realpath(repo_store))
+
+
 def repo_path(func):
     """Decorator builds repo path from request name and repo_store."""
     def repo_path_decorator(self):
@@ -19,10 +24,10 @@ def repo_path(func):
             self.request.errors.add('body', 'name', 'repo name is missing')
             return
         repo_path = os.path.join(self.repo_store, name)
-        if not os.path.realpath(repo_path).startswith(
-                os.path.realpath(self.repo_store)):
+        if not is_valid_path(self.repo_store, repo_path):
             self.request.errors.add('body', 'name', 'invalid path.')
             raise exc.HTTPInternalServerError()
+
         return func(self, repo_path)
     return repo_path_decorator
 
@@ -46,15 +51,28 @@ class RepoAPI(BaseAPI):
         pass
 
     def collection_post(self):
-        """Initialise a new git repository."""
+        """Initialise a new git repository, or clone from an existing repo."""
         repo_path = extract_json_data(self.request).get('repo_path')
+        clone_path = extract_json_data(self.request).get('clone_from')
+
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
                                     'repo_path is missing')
             return
         repo = os.path.join(self.repo_store, repo_path)
+        if not is_valid_path(self.repo_store, repo):
+            self.request.errors.add('body', 'name', 'invalid path.')
+            raise exc.HTTPNotFound()
+
+        if clone_path:
+            repo_clone = os.path.join(self.repo_store, clone_path)
+        else:
+            repo_clone = None
+
         try:
-            store.init_repo(repo)
+            new_repo_path = store.init_repo(repo, repo_clone)
+            repo_name = os.path.basename(os.path.normpath(new_repo_path))
+            return {'repo_url': '/'.join([self.request.url, repo_name])}
         except GitError:
             return exc.HTTPConflict()  # 409
 
