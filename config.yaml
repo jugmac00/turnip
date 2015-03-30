@@ -9,4 +9,4 @@ smart_http_port: 9419
 smart_ssh_port: 9422
 repo_store: /var/tmp/git.launchpad.dev
 turnip_log_dir: ./
-virtinfo_endpoint: http://localhost:6543/githosting
+virtinfo_endpoint: http://xmlrpc-private.launchpad.dev:8087/git
