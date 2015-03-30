@@ -356,6 +356,7 @@ class CGitScriptResource(twcgi.CGIScript):
         request.notifyFinish().addBoth(self._finished)
         self.cgit_config = tempfile.NamedTemporaryFile(
             mode='w+', prefix='turnip-cgit-')
+        os.chmod(self.cgit_config.name, 0o644)
         fmt = {'repo_url': repo_url, 'repo_path': repo_path}
         print(textwrap.dedent("""\
             # XXX clone-prefix
