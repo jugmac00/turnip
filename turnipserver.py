@@ -15,6 +15,10 @@ from turnip.pack.git import (
     PackFrontendFactory,
     PackVirtFactory,
     )
+from turnip.pack.hookrpc import (
+    HookRPCHandler,
+    HookRPCServerFactory,
+    )
 from turnip.pack.http import SmartHTTPFrontendResource
 from turnip.pack.ssh import SmartSSHService
 
@@ -34,8 +38,18 @@ VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 # Start a pack storage service on 19418, pointed at by a pack frontend
 # on 9418 (the default git:// port), a smart HTTP frontend on 9419, and
 # a smart SSH frontend on 9422.
-reactor.listenTCP(PACK_BACKEND_PORT,
-                  PackBackendFactory(REPO_STORE))
+
+hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT)
+hookrpc_path = os.path.join(REPO_STORE, 'hookrpc_sock')
+reactor.listenUNIX(
+    hookrpc_path,
+    HookRPCServerFactory({
+        'list_ref_rules': hookrpc_handler.listRefRules,
+        'notify_push': hookrpc_handler.notifyPush}))
+
+reactor.listenTCP(
+    PACK_BACKEND_PORT,
+    PackBackendFactory(REPO_STORE, hookrpc_handler, hookrpc_path))
 reactor.listenTCP(PACK_VIRT_PORT,
                   PackVirtFactory('localhost',
                                   PACK_BACKEND_PORT,
