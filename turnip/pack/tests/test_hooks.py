@@ -57,18 +57,19 @@ class HookProcessProtocol(protocol.ProcessProtocol):
             (status.value.exitCode, self.stdout, self.stderr))
 
 
-class TestPreReceiveHook(TestCase):
-    """Tests for the git pre-receive hook."""
-
+class HookTestMixin(object):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
 
-    hook_path = os.path.join(
-        os.path.dirname(turnip.pack.hooks.__file__), 'pre-receive')
     old_sha1 = b'a' * 40
     new_sha1 = b'b' * 40
 
+    @property
+    def hook_path(self):
+        return os.path.join(
+            os.path.dirname(turnip.pack.hooks.__file__), self.hook_name)
+
     def setUp(self):
-        super(TestPreReceiveHook, self).setUp()
+        super(HookTestMixin, self).setUp()
         self.hook_handler = HookHandler()
         self.hookrpc = hookrpc.HookRPCServerFactory({
             'list_ref_rules': self.hook_handler.list_ref_rules})
@@ -108,6 +109,12 @@ class TestPreReceiveHook(TestCase):
     def assertRejected(self, updates, rules, message):
         code, out, err = yield self.invokeHook(self.encodeRefs(updates), rules)
         self.assertEqual((1, message, b''), (code, out, err))
+
+
+class TestPreReceiveHook(HookTestMixin, TestCase):
+    """Tests for the git pre-receive hook."""
+
+    hook_name = 'pre-receive'
 
     @defer.inlineCallbacks
     def test_accepted(self):
