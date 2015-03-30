@@ -4,7 +4,10 @@ from __future__ import (
     unicode_literals,
     )
 
+import os
+import shutil
 import sys
+import uuid
 
 from twisted.internet import (
     defer,
@@ -18,6 +21,7 @@ if sys.version_info.major < 3:
     from twisted.web import xmlrpc
 from zope.interface import implementer
 
+import turnip.pack.hooks
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
     decode_packet,
@@ -289,8 +293,20 @@ class PackBackendProtocol(PackServerProtocol):
             args.append(b'--advertise-refs')
         args.append(path)
 
+        env = {}
+        if subcmd == b'receive-pack' and self.factory.hookmanager:
+            key = str(uuid.uuid4())
+            self.factory.hookmanager.registerKey(key, raw_pathname, [])
+            env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hook_sock_path
+            env[b'TURNIP_HOOK_RPC_KEY'] = key
+
+            hook_bin = os.path.join(
+                os.path.dirname(turnip.pack.hooks.__file__), 'hook.py')
+            shutil.copy(hook_bin, os.path.join(path, 'hooks', 'pre-receive'))
+            shutil.copy(hook_bin, os.path.join(path, 'hooks', 'post-receive'))
+
         self.peer = GitProcessProtocol(self)
-        reactor.spawnProcess(self.peer, cmd, args)
+        reactor.spawnProcess(self.peer, cmd, args, env=env)
 
     def readConnectionLost(self):
         self.peer.loseWriteConnection()
@@ -303,8 +319,10 @@ class PackBackendFactory(protocol.Factory):
 
     protocol = PackBackendProtocol
 
-    def __init__(self, root):
+    def __init__(self, root, hookmanager, hook_sock_path):
         self.root = root
+        self.hookmanager = hookmanager
+        self.hook_sock_path = hook_sock_path
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):

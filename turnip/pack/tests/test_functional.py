@@ -34,6 +34,10 @@ from turnip.pack.git import (
     PackFrontendFactory,
     PackVirtFactory,
     )
+from turnip.pack.hookrpc import (
+    HookHandler,
+    HookRPCServerFactory,
+    )
 from turnip.pack.http import SmartHTTPFrontendResource
 from turnip.pack.ssh import SmartSSHService
 
@@ -74,6 +78,10 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     path is prefixed with '/+rw'
     """
 
+    def __init__(self, *args, **kwargs):
+        xmlrpc.XMLRPC.__init__(self, *args, **kwargs)
+        self.push_notifications = []
+
     def xmlrpc_translatePath(self, pathname, permission, authenticated_uid,
                              can_authenticate):
         writable = False
@@ -88,10 +96,25 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     def xmlrpc_authenticateWithPassword(self, username, password):
         return {'user': username}
 
+    def xmlrpc_notify(self, path):
+        self.push_notifications.append(path)
+
 
 class FunctionalTestMixin(object):
 
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+
+    def startHookRPC(self):
+        self.hook_handler = HookHandler(self.virtinfo.push_notifications.append)
+
+        dir = self.useFixture(TempDir()).path
+        self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
+        self.hookrpc_port = reactor.listenUNIX(
+            self.hookrpc_path,
+            HookRPCServerFactory({
+                'list_ref_rules': self.hook_handler.listRefRules,
+                'notify_push': self.hook_handler.notifyPush}))
+        self.addCleanup(self.hookrpc_port.stopListening)
 
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
@@ -175,9 +198,14 @@ class TestBackendFunctional(FunctionalTestMixin, TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         super(TestBackendFunctional, self).setUp()
+
         # Set up a PackBackendFactory on a free port in a clean repo root.
+        self.startHookRPC()
         self.root = self.useFixture(TempDir()).path
-        self.listener = reactor.listenTCP(0, PackBackendFactory(self.root))
+        self.listener = reactor.listenTCP(
+            0,
+            PackBackendFactory(
+                self.root, self.hook_handler, self.hookrpc_path))
         self.port = self.listener.getHost().port
 
         yield self.assertCommandSuccess(
@@ -208,19 +236,23 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
         # Set up a fake virt information XML-RPC server which just
         # maps paths to their SHA-256 hash.
+        self.virtinfo = FakeVirtInfoService(allowNone=True)
         self.virtinfo_listener = reactor.listenTCP(
-            0, server.Site(FakeVirtInfoService(allowNone=True)))
+            0, server.Site(self.virtinfo))
         self.virtinfo_port = self.virtinfo_listener.getHost().port
         self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
 
         # Run a backend server in a repo root containing an empty repo
         # for the path '/test'.
+        self.startHookRPC()
         self.root = self.useFixture(TempDir()).path
-        internal_name = hashlib.sha256(b'/test').hexdigest()
+        self.internal_name = hashlib.sha256(b'/test').hexdigest()
         yield self.assertCommandSuccess(
-            (b'git', b'init', b'--bare', internal_name), path=self.root)
+            (b'git', b'init', b'--bare', self.internal_name), path=self.root)
         self.backend_listener = reactor.listenTCP(
-            0, PackBackendFactory(self.root))
+            0,
+            PackBackendFactory(
+                self.root, self.hook_handler, self.hookrpc_path))
         self.backend_port = self.backend_listener.getHost().port
 
         self.virt_listener = reactor.listenTCP(
@@ -259,6 +291,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             env=os.environ, path=clone1, errortoo=True)
         self.assertThat(
             out, StartsWith(self.early_error + b'Repository is read-only'))
+        self.assertEqual([], self.virtinfo.push_notifications)
 
         # The remote repository is still empty.
         out = yield utils.getProcessOutput(
@@ -271,6 +304,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             (b'git', b'remote', b'set-url', b'origin', self.url), path=clone1)
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'master'), path=clone1)
+        self.assertEqual(
+            [self.internal_name], self.virtinfo.push_notifications)
 
 
 class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
