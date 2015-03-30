@@ -5,7 +5,7 @@ from __future__ import (
     )
 
 import os.path
-import tempfile
+import uuid
 
 from fixtures import TempDir
 from testtools import TestCase
@@ -23,10 +23,16 @@ import turnip.pack.hooks.pre_receive
 class HookHandler(object):
 
     def __init__(self):
-        self.ref_rules = []
+        self.ref_rules = {}
+
+    def register_key(self, key, ref_rules):
+        self.ref_rules[key] = ref_rules
+
+    def unregister_key(self, key):
+        del self.ref_rules[key]
 
     def list_ref_rules(self, proto, args):
-        return self.ref_rules
+        return self.ref_rules[args['key']]
 
 
 class HookProcessProtocol(protocol.ProcessProtocol):
@@ -78,13 +84,19 @@ class TestPreReceiveHook(TestCase):
 
     @defer.inlineCallbacks
     def invokeHook(self, input, rules):
-        self.hook_handler.ref_rules = list(rules)
-        d = defer.Deferred()
-        reactor.spawnProcess(
-            HookProcessProtocol(d, input),
-            self.hook_path, [self.hook_path],
-            env={b'TURNIP_HOOK_RPC_SOCK': self.hookrpc_path})
-        code, stdout, stderr = yield d
+        key = str(uuid.uuid4())
+        self.hook_handler.register_key(key, list(rules))
+        try:
+            d = defer.Deferred()
+            reactor.spawnProcess(
+                HookProcessProtocol(d, input),
+                self.hook_path, [self.hook_path],
+                env={
+                    b'TURNIP_HOOK_RPC_SOCK': self.hookrpc_path,
+                    b'TURNIP_HOOK_RPC_KEY': key})
+            code, stdout, stderr = yield d
+        finally:
+            self.hook_handler.unregister_key(key)
         defer.returnValue((code, stdout, stderr))
 
     @defer.inlineCallbacks
