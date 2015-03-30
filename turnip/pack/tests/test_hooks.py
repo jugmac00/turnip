@@ -154,3 +154,14 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
             [b'refs/heads/verboten', b'refs/heads/super-verboten'],
             b"You can't push to refs/heads/verboten.\n"
             b"You can't push to refs/heads/super-verboten.\n")
+
+
+class TestPostReceiveHook(HookTestMixin, TestCase):
+    """Tests for the git post-receive hook."""
+
+    hook_name = 'post-receive'
+
+    @defer.inlineCallbacks
+    def test_notifies(self):
+        # A notification is sent with just the key as data.
+        yield self.assertAccepted([], [b'refs/heads/foo'])

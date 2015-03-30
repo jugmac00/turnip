@@ -73,5 +73,7 @@ if __name__ == '__main__':
         for error in errors:
             sys.stdout.write(error + b'\n')
         sys.exit(1 if errors else 0)
+    elif hook == 'post-receive':
+        sys.exit(0)
     else:
         sys.stderr.write(b'Invalid hook name: %s' % hook)
