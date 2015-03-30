@@ -5,16 +5,45 @@ from __future__ import (
     )
 
 import os.path
-import subprocess
 import tempfile
 
 from testtools import TestCase
+from testtools.deferredruntest import AsynchronousDeferredRunTest
+from twisted.internet import (
+    defer,
+    protocol,
+    reactor,
+    )
 
 import turnip.pack.hooks.pre_receive
 
 
+class HookProcessProtocol(protocol.ProcessProtocol):
+
+    def __init__(self, deferred, stdin):
+        self.deferred = deferred
+        self.stdin = stdin
+        self.stdout = self.stderr = ''
+
+    def connectionMade(self):
+        self.transport.write(self.stdin)
+        self.transport.closeStdin()
+
+    def outReceived(self, data):
+        self.stdout += data
+
+    def errReceived(self, data):
+        self.stderr += data
+
+    def processEnded(self, status):
+        self.deferred.callback(
+            (status.value.exitCode, self.stdout, self.stderr))
+
+
 class TestPreReceiveHook(TestCase):
     """Tests for the git pre-receive hook."""
+
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
 
     hook_path = os.path.join(
         os.path.dirname(turnip.pack.hooks.__file__), 'pre_receive.py')
@@ -22,46 +51,51 @@ class TestPreReceiveHook(TestCase):
     new_sha1 = b'b' * 40
 
     def encodeRefs(self, updates):
-        return '\n'.join(
+        return b'\n'.join(
             b'%s %s %s' % (old, new, ref) for ref, old, new in updates)
 
+    @defer.inlineCallbacks
     def invokeHook(self, input, rules):
         with tempfile.NamedTemporaryFile(mode='wb') as rulefile:
             rulefile.writelines(rule + b'\n' for rule in rules)
             rulefile.flush()
-
-            hook = subprocess.Popen(
-                [self.hook_path], stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            d = defer.Deferred()
+            reactor.spawnProcess(
+                HookProcessProtocol(d, input),
+                self.hook_path, [self.hook_path],
                 env={b'TURNIP_HOOK_REF_RULES': rulefile.name})
-            stdout, stderr = hook.communicate(input)
-        return hook.returncode, stdout, stderr
+            code, stdout, stderr = yield d
+        defer.returnValue((code, stdout, stderr))
 
+    @defer.inlineCallbacks
     def assertAccepted(self, updates, rules):
-        self.assertEqual(
-            (0, b'', b''), self.invokeHook(self.encodeRefs(updates), rules))
+        code, out, err = yield self.invokeHook(self.encodeRefs(updates), rules)
+        self.assertEqual((0, b'', b''), (code, out, err))
 
+    @defer.inlineCallbacks
     def assertRejected(self, updates, rules, message):
-        self.assertEqual(
-            (1, message, b''),
-            self.invokeHook(self.encodeRefs(updates), rules))
+        code, out, err = yield self.invokeHook(self.encodeRefs(updates), rules)
+        self.assertEqual((1, message, b''), (code, out, err))
 
+    @defer.inlineCallbacks
     def test_accepted(self):
         # A single valid ref is accepted.
-        self.assertAccepted(
+        yield self.assertAccepted(
             [(b'refs/heads/master', self.old_sha1, self.new_sha1)],
             [])
 
+    @defer.inlineCallbacks
     def test_rejected(self):
         # An invalid ref is rejected.
-        self.assertRejected(
+        yield self.assertRejected(
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1)],
             [b'refs/heads/verboten'],
             b"You can't push to refs/heads/verboten.\n")
 
+    @defer.inlineCallbacks
     def test_wildcard(self):
         # "*" in a rule matches any path segment.
-        self.assertRejected(
+        yield self.assertRejected(
             [(b'refs/heads/foo', self.old_sha1, self.new_sha1),
              (b'refs/tags/bar', self.old_sha1, self.new_sha1),
              (b'refs/tags/foo', self.old_sha1, self.new_sha1),
@@ -71,9 +105,10 @@ class TestPreReceiveHook(TestCase):
             b"You can't push to refs/tags/foo.\n"
             b"You can't push to refs/baz/quux.\n")
 
+    @defer.inlineCallbacks
     def test_rejected_multiple(self):
         # A combination of valid and invalid refs is still rejected.
-        self.assertRejected(
+        yield self.assertRejected(
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1),
              (b'refs/heads/master', self.old_sha1, self.new_sha1),
              (b'refs/heads/super-verboten', self.old_sha1, self.new_sha1)],
