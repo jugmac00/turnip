@@ -6,6 +6,7 @@ from __future__ import (
 
 import json
 
+from twisted.internet import protocol
 from twisted.protocols import basic
 
 
@@ -51,3 +52,14 @@ class HookRPCServerProtocol(JSONNetstringProtocol):
 
     def invalidValueReceived(self, string):
         self.sendValue({"error": "Command must be a JSON object"})
+
+
+class HookRPCServerFactory(protocol.ServerFactory):
+
+    protocol = HookRPCServerProtocol
+
+    def __init__(self, methods):
+        self.methods = dict(methods)
+
+    def buildProtocol(self, addr):
+        return self.protocol(self.methods)

@@ -7,6 +7,7 @@ from __future__ import (
 import os.path
 import tempfile
 
+from fixtures import TempDir
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (
@@ -15,6 +16,7 @@ from twisted.internet import (
     reactor,
     )
 
+from turnip.pack import hookrpc
 import turnip.pack.hooks.pre_receive
 
 
@@ -50,6 +52,15 @@ class TestPreReceiveHook(TestCase):
     old_sha1 = b'a' * 40
     new_sha1 = b'b' * 40
 
+    def setUp(self):
+        super(TestPreReceiveHook, self).setUp()
+        self.hookrpc = hookrpc.HookRPCServerFactory({})
+        dir = self.useFixture(TempDir()).path
+        self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
+        self.hookrpc_port = reactor.listenUNIX(
+            self.hookrpc_path, self.hookrpc)
+        self.addCleanup(self.hookrpc_port.stopListening)
+
     def encodeRefs(self, updates):
         return b'\n'.join(
             b'%s %s %s' % (old, new, ref) for ref, old, new in updates)
@@ -63,7 +74,9 @@ class TestPreReceiveHook(TestCase):
             reactor.spawnProcess(
                 HookProcessProtocol(d, input),
                 self.hook_path, [self.hook_path],
-                env={b'TURNIP_HOOK_REF_RULES': rulefile.name})
+                env={
+                    b'TURNIP_HOOK_REF_RULES': rulefile.name,
+                    b'TURNIP_HOOK_RPC_SOCK': self.hookrpc_path})
             code, stdout, stderr = yield d
         defer.returnValue((code, stdout, stderr))
 
