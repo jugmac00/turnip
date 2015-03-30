@@ -5,6 +5,7 @@ from __future__ import (
     )
 
 from cStringIO import StringIO
+import os.path
 import tempfile
 import textwrap
 import sys
@@ -317,7 +318,7 @@ class CGitScriptResource(twcgi.CGIScript):
     """HTTP resource to run cgit."""
 
     def __init__(self, root):
-        twcgi.CGIScript.__init__(self, '/usr/lib/cgit/cgit.cgi')
+        twcgi.CGIScript.__init__(self, root.cgit_exec_path)
         self.root = root
         self.cgit_config = None
 
@@ -403,7 +404,7 @@ class SmartHTTPFrontendResource(resource.Resource):
     allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
 
     def __init__(self, backend_host, backend_port, virtinfo_endpoint,
-                 repo_store):
+                 repo_store, cgit_exec_path=None, cgit_data_path=None):
         resource.Resource.__init__(self)
         self.backend_host = backend_host
         self.backend_port = backend_port
@@ -412,12 +413,15 @@ class SmartHTTPFrontendResource(resource.Resource):
         # violates turnip's layering and may cause scaling problems later,
         # but for now cgit needs direct filesystem access.
         self.repo_store = repo_store
+        self.cgit_exec_path = cgit_exec_path
         self.putChild('', SmartHTTPRootResource())
-        static_resource = DirectoryWithoutListings(
-            '/usr/share/cgit', defaultType='text/plain')
-        self.putChild('static', static_resource)
-        self.putChild(
-            'favicon.ico', static.File('/usr/share/cgit/favicon.ico'))
+        if cgit_data_path is not None:
+            static_resource = DirectoryWithoutListings(
+                cgit_data_path, defaultType='text/plain')
+            self.putChild('static', static_resource)
+            self.putChild(
+                'favicon.ico',
+                static.File(os.path.join(cgit_data_path, 'favicon.ico')))
 
     @staticmethod
     def _isGitRequest(request):
@@ -440,7 +444,6 @@ class SmartHTTPFrontendResource(resource.Resource):
                 service = None
             if service in self.allowed_services:
                 return SmartHTTPCommandResource(self, service, path)
-
-            return resource.NoResource(b'No such resource')
-        else:
+        elif self.cgit_exec_path is not None:
             return CGitScriptResource(self)
+        return resource.NoResource(b'No such resource')
