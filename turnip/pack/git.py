@@ -294,14 +294,14 @@ class PackBackendProtocol(PackServerProtocol):
         args.append(path)
 
         env = {}
-        if subcmd == b'receive-pack' and self.factory.hookmanager:
+        if subcmd == b'receive-pack' and self.factory.hookrpc_handler:
             # This is a write operation, so prepare hooks, the hook RPC
             # server, and the environment variables that link them up.
             self.hookrpc_key = str(uuid.uuid4())
-            self.factory.hookmanager.registerKey(
+            self.factory.hookrpc_handler.registerKey(
                 self.hookrpc_key, raw_pathname, [])
             ensure_hooks(path)
-            env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hook_sock_path
+            env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hookrpc_sock
             env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
 
         self.peer = GitProcessProtocol(self)
@@ -315,7 +315,7 @@ class PackBackendProtocol(PackServerProtocol):
 
     def connectionLost(self, reason):
         if self.hookrpc_key:
-            self.factory.hookmanager.unregisterKey(self.hookrpc_key)
+            self.factory.hookrpc_handler.unregisterKey(self.hookrpc_key)
         PackServerProtocol.connectionLost(self, reason)
 
 
@@ -323,10 +323,10 @@ class PackBackendFactory(protocol.Factory):
 
     protocol = PackBackendProtocol
 
-    def __init__(self, root, hookmanager=None, hook_sock_path=None):
+    def __init__(self, root, hookrpc_handler=None, hookrpc_sock=None):
         self.root = root
-        self.hookmanager = hookmanager
-        self.hook_sock_path = hook_sock_path
+        self.hookrpc_handler = hookrpc_handler
+        self.hookrpc_sock = hookrpc_sock
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):

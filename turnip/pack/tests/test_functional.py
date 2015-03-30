@@ -35,7 +35,7 @@ from turnip.pack.git import (
     PackVirtFactory,
     )
 from turnip.pack.hookrpc import (
-    HookHandler,
+    HookRPCHandler,
     HookRPCServerFactory,
     )
 from turnip.pack.http import SmartHTTPFrontendResource
@@ -115,14 +115,14 @@ class FunctionalTestMixin(object):
         self.addCleanup(self.virtinfo_listener.stopListening)
 
     def startHookRPC(self):
-        self.hook_handler = HookHandler(self.virtinfo_url)
+        self.hookrpc_handler = HookRPCHandler(self.virtinfo_url)
         dir = self.useFixture(TempDir()).path
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_listener = reactor.listenUNIX(
             self.hookrpc_path,
             HookRPCServerFactory({
-                'list_ref_rules': self.hook_handler.listRefRules,
-                'notify_push': self.hook_handler.notifyPush}))
+                'list_ref_rules': self.hookrpc_handler.listRefRules,
+                'notify_push': self.hookrpc_handler.notifyPush}))
         self.addCleanup(self.hookrpc_listener.stopListening)
 
     @defer.inlineCallbacks
@@ -215,7 +215,7 @@ class TestBackendFunctional(FunctionalTestMixin, TestCase):
         self.listener = reactor.listenTCP(
             0,
             PackBackendFactory(
-                self.root, self.hook_handler, self.hookrpc_path))
+                self.root, self.hookrpc_handler, self.hookrpc_path))
         self.port = self.listener.getHost().port
 
         yield self.assertCommandSuccess(
@@ -255,7 +255,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.backend_listener = reactor.listenTCP(
             0,
             PackBackendFactory(
-                self.root, self.hook_handler, self.hookrpc_path))
+                self.root, self.hookrpc_handler, self.hookrpc_path))
         self.backend_port = self.backend_listener.getHost().port
 
         self.virt_listener = reactor.listenTCP(

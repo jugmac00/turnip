@@ -42,10 +42,10 @@ class HookProcessProtocol(protocol.ProcessProtocol):
             (status.value.exitCode, self.stdout, self.stderr))
 
 
-class MockHookHandler(hookrpc.HookHandler):
+class MockHookRPCHandler(hookrpc.HookRPCHandler):
 
     def __init__(self):
-        super(MockHookHandler, self).__init__(None)
+        super(MockHookRPCHandler, self).__init__(None)
         self.notifications = []
 
     def notifyPush(self, proto, args):
@@ -68,10 +68,10 @@ class HookTestMixin(object):
 
     def setUp(self):
         super(HookTestMixin, self).setUp()
-        self.hook_handler = MockHookHandler()
+        self.hookrpc_handler = MockHookRPCHandler()
         self.hookrpc = hookrpc.HookRPCServerFactory({
-            'list_ref_rules': self.hook_handler.listRefRules,
-            'notify_push': self.hook_handler.notifyPush})
+            'list_ref_rules': self.hookrpc_handler.listRefRules,
+            'notify_push': self.hookrpc_handler.notifyPush})
         dir = self.useFixture(TempDir()).path
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_port = reactor.listenUNIX(
@@ -85,7 +85,7 @@ class HookTestMixin(object):
     @defer.inlineCallbacks
     def invokeHook(self, input, rules):
         key = str(uuid.uuid4())
-        self.hook_handler.registerKey(key, '/translated', list(rules))
+        self.hookrpc_handler.registerKey(key, '/translated', list(rules))
         try:
             d = defer.Deferred()
             reactor.spawnProcess(
@@ -96,7 +96,7 @@ class HookTestMixin(object):
                     b'TURNIP_HOOK_RPC_KEY': key})
             code, stdout, stderr = yield d
         finally:
-            self.hook_handler.unregisterKey(key)
+            self.hookrpc_handler.unregisterKey(key)
         defer.returnValue((code, stdout, stderr))
 
     @defer.inlineCallbacks
@@ -165,10 +165,10 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         # The notification callback is invoked with the storage path.
         yield self.assertAccepted(
             [(b'refs/heads/foo', self.old_sha1, self.new_sha1)], [])
-        self.assertEqual(['/translated'], self.hook_handler.notifications)
+        self.assertEqual(['/translated'], self.hookrpc_handler.notifications)
 
     @defer.inlineCallbacks
     def test_does_not_notify_on_empty_push(self):
         # No notification is sent for an empty push.
         yield self.assertAccepted([], [])
-        self.assertEqual([], self.hook_handler.notifications)
+        self.assertEqual([], self.hookrpc_handler.notifications)

@@ -71,7 +71,7 @@ class HookRPCServerFactory(protocol.ServerFactory):
         return self.protocol(self.methods)
 
 
-class HookHandler(object):
+class HookRPCHandler(object):
 
     def __init__(self, virtinfo_url):
         self.ref_paths = {}
