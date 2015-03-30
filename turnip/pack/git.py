@@ -295,12 +295,14 @@ class PackBackendProtocol(PackServerProtocol):
 
         env = {}
         if subcmd == b'receive-pack' and self.factory.hookmanager:
+            # This is a write operation, so prepare hooks, the hook RPC
+            # server, and the environment variables that link them up.
             self.hookrpc_key = str(uuid.uuid4())
             self.factory.hookmanager.registerKey(
                 self.hookrpc_key, raw_pathname, [])
+            ensure_hooks(path)
             env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hook_sock_path
             env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
-            ensure_hooks(path)
 
         self.peer = GitProcessProtocol(self)
         reactor.spawnProcess(self.peer, cmd, args, env=env)
