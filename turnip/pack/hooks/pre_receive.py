@@ -55,17 +55,16 @@ def rpc_invoke(sock, method, args):
     assert 'op' not in msg
     msg['op'] = method
     netstring_send(sock, json.dumps(msg))
-    return json.loads(netstring_recv(sock))
+    res = json.loads(netstring_recv(sock))
+    if 'error' in res:
+        raise Exception(res)
+    return res['result']
 
 
 if __name__ == '__main__':
-    with open(os.environ[b'TURNIP_HOOK_REF_RULES'], 'rb') as f:
-        rule_lines = f.readlines()
-
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(os.environ[b'TURNIP_HOOK_RPC_SOCK'])
-
-    assert rpc_invoke(sock, b'test', {}) == {'error': 'Unknown op: test'}
+    rule_lines = rpc_invoke(sock, b'list_ref_rules', {})
 
     errors = match_rules(rule_lines, sys.stdin.readlines())
     for error in errors:

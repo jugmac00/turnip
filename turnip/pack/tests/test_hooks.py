@@ -20,6 +20,15 @@ from turnip.pack import hookrpc
 import turnip.pack.hooks.pre_receive
 
 
+class HookHandler(object):
+
+    def __init__(self):
+        self.ref_rules = []
+
+    def list_ref_rules(self, proto, args):
+        return self.ref_rules
+
+
 class HookProcessProtocol(protocol.ProcessProtocol):
 
     def __init__(self, deferred, stdin):
@@ -54,7 +63,9 @@ class TestPreReceiveHook(TestCase):
 
     def setUp(self):
         super(TestPreReceiveHook, self).setUp()
-        self.hookrpc = hookrpc.HookRPCServerFactory({})
+        self.hook_handler = HookHandler()
+        self.hookrpc = hookrpc.HookRPCServerFactory({
+            'list_ref_rules': self.hook_handler.list_ref_rules})
         dir = self.useFixture(TempDir()).path
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_port = reactor.listenUNIX(
@@ -67,17 +78,13 @@ class TestPreReceiveHook(TestCase):
 
     @defer.inlineCallbacks
     def invokeHook(self, input, rules):
-        with tempfile.NamedTemporaryFile(mode='wb') as rulefile:
-            rulefile.writelines(rule + b'\n' for rule in rules)
-            rulefile.flush()
-            d = defer.Deferred()
-            reactor.spawnProcess(
-                HookProcessProtocol(d, input),
-                self.hook_path, [self.hook_path],
-                env={
-                    b'TURNIP_HOOK_REF_RULES': rulefile.name,
-                    b'TURNIP_HOOK_RPC_SOCK': self.hookrpc_path})
-            code, stdout, stderr = yield d
+        self.hook_handler.ref_rules = list(rules)
+        d = defer.Deferred()
+        reactor.spawnProcess(
+            HookProcessProtocol(d, input),
+            self.hook_path, [self.hook_path],
+            env={b'TURNIP_HOOK_RPC_SOCK': self.hookrpc_path})
+        code, stdout, stderr = yield d
         defer.returnValue((code, stdout, stderr))
 
     @defer.inlineCallbacks
