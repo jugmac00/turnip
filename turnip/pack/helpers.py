@@ -7,6 +7,7 @@ from __future__ import (
 import hashlib
 import os.path
 import shutil
+import stat
 from tempfile import (
     mktemp,
     NamedTemporaryFile,
@@ -111,15 +112,14 @@ def ensure_hooks(repo_root):
 
     if not os.path.exists(hook_path(target_name)):
         need_target = True
+    elif not os.stat(hook_path(target_name)).st_mode & stat.S_IXUSR:
+        need_target = True
     else:
         with open(turnip.pack.hooks.hook.__file__, 'rb') as f:
             wanted = hashlib.sha256(f.read()).hexdigest()
         with open(hook_path(target_name), 'rb') as f:
             have = hashlib.sha256(f.read()).hexdigest()
-        if wanted != have:
-            need_target = True
-        else:
-            need_target = False
+        need_target = wanted != have
 
     if need_target:
         with open(turnip.pack.hooks.hook.__file__, 'rb') as master:
@@ -137,4 +137,8 @@ def ensure_hooks(repo_root):
     for name in os.listdir(hook_path('.')):
         if (name != target_name and name not in wanted_hooks
                 and not name.startswith('tmp')):
-            os.unlink(hook_path(name))
+            try:
+                os.unlink(hook_path(name))
+            except OSError:
+                # May have raced with another invocation.
+                pass

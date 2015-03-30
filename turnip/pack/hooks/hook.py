@@ -63,9 +63,9 @@ def rpc_invoke(sock, method, args):
 
 if __name__ == '__main__':
     hook = os.path.basename(sys.argv[0])
-    rpc_key = os.environ[b'TURNIP_HOOK_RPC_KEY']
+    rpc_key = os.environ['TURNIP_HOOK_RPC_KEY']
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.connect(os.environ[b'TURNIP_HOOK_RPC_SOCK'])
+    sock.connect(os.environ['TURNIP_HOOK_RPC_SOCK'])
     if hook == 'pre-receive':
         rule_lines = rpc_invoke(sock, b'list_ref_rules', {'key': rpc_key})
         errors = match_rules(rule_lines, sys.stdin.readlines())
