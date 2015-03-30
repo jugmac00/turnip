@@ -44,7 +44,8 @@ reactor.listenTCP(config.get('pack_frontend_port'),
                   PackFrontendFactory('localhost',
                                       PACK_VIRT_PORT))
 smarthttp_site = server.Site(
-    SmartHTTPFrontendResource(b'localhost', PACK_VIRT_PORT, VIRTINFO_ENDPOINT))
+    SmartHTTPFrontendResource(
+        b'localhost', PACK_VIRT_PORT, VIRTINFO_ENDPOINT, REPO_STORE))
 reactor.listenTCP(config.get('smart_http_port'), smarthttp_site)
 smartssh_service = SmartSSHService(
     b'localhost', PACK_VIRT_PORT, config.get('authentication_endpoint'),
