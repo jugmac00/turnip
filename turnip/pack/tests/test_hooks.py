@@ -20,29 +20,6 @@ from turnip.pack import hookrpc
 import turnip.pack.hooks
 
 
-class HookHandler(object):
-
-    def __init__(self, notify_cb):
-        self.ref_paths = {}
-        self.ref_rules = {}
-        self.notify_cb = notify_cb
-
-    def register_key(self, key, path, ref_rules):
-        self.ref_paths[key] = path
-        self.ref_rules[key] = ref_rules
-
-    def unregister_key(self, key):
-        del self.ref_rules[key]
-        del self.ref_paths[key]
-
-    def list_ref_rules(self, proto, args):
-        return self.ref_rules[args['key']]
-
-    def notify_push(self, proto, args):
-        path = self.ref_paths[args['key']]
-        return self.notify_cb(path)
-
-
 class HookProcessProtocol(protocol.ProcessProtocol):
 
     def __init__(self, deferred, stdin):
@@ -81,10 +58,10 @@ class HookTestMixin(object):
 
     def setUp(self):
         super(HookTestMixin, self).setUp()
-        self.hook_handler = HookHandler(self.handlePushNotification)
+        self.hook_handler = hookrpc.HookHandler(self.handlePushNotification)
         self.hookrpc = hookrpc.HookRPCServerFactory({
-            'list_ref_rules': self.hook_handler.list_ref_rules,
-            'notify_push': self.hook_handler.notify_push})
+            'list_ref_rules': self.hook_handler.listRefRules,
+            'notify_push': self.hook_handler.notifyPush})
         dir = self.useFixture(TempDir()).path
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_port = reactor.listenUNIX(
@@ -100,7 +77,7 @@ class HookTestMixin(object):
     @defer.inlineCallbacks
     def invokeHook(self, input, rules):
         key = str(uuid.uuid4())
-        self.hook_handler.register_key(key, '/translated', list(rules))
+        self.hook_handler.registerKey(key, '/translated', list(rules))
         try:
             d = defer.Deferred()
             reactor.spawnProcess(
@@ -111,7 +88,7 @@ class HookTestMixin(object):
                     b'TURNIP_HOOK_RPC_KEY': key})
             code, stdout, stderr = yield d
         finally:
-            self.hook_handler.unregister_key(key)
+            self.hook_handler.unregisterKey(key)
         defer.returnValue((code, stdout, stderr))
 
     @defer.inlineCallbacks

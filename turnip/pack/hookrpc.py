@@ -68,3 +68,26 @@ class HookRPCServerFactory(protocol.ServerFactory):
 
     def buildProtocol(self, addr):
         return self.protocol(self.methods)
+
+
+class HookHandler(object):
+
+    def __init__(self, notify_cb):
+        self.ref_paths = {}
+        self.ref_rules = {}
+        self.notify_cb = notify_cb
+
+    def registerKey(self, key, path, ref_rules):
+        self.ref_paths[key] = path
+        self.ref_rules[key] = ref_rules
+
+    def unregisterKey(self, key):
+        del self.ref_rules[key]
+        del self.ref_paths[key]
+
+    def listRefRules(self, proto, args):
+        return self.ref_rules[args['key']]
+
+    def notifyPush(self, proto, args):
+        path = self.ref_paths[args['key']]
+        return self.notify_cb(path)
