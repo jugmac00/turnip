@@ -4,8 +4,6 @@ from __future__ import (
     unicode_literals,
     )
 
-import os
-import shutil
 import sys
 import uuid
 
@@ -21,13 +19,13 @@ if sys.version_info.major < 3:
     from twisted.web import xmlrpc
 from zope.interface import implementer
 
-import turnip.pack.hooks
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
     decode_packet,
     decode_request,
     encode_packet,
     encode_request,
+    ensure_hooks,
     INCOMPLETE_PKT,
     )
 
@@ -299,11 +297,7 @@ class PackBackendProtocol(PackServerProtocol):
             self.factory.hookmanager.registerKey(key, raw_pathname, [])
             env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hook_sock_path
             env[b'TURNIP_HOOK_RPC_KEY'] = key
-
-            hook_bin = os.path.join(
-                os.path.dirname(turnip.pack.hooks.__file__), 'hook.py')
-            shutil.copy(hook_bin, os.path.join(path, 'hooks', 'pre-receive'))
-            shutil.copy(hook_bin, os.path.join(path, 'hooks', 'post-receive'))
+            ensure_hooks(path)
 
         self.peer = GitProcessProtocol(self)
         reactor.spawnProcess(self.peer, cmd, args, env=env)
