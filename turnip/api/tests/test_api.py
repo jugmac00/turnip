@@ -14,7 +14,11 @@ from testtools import TestCase
 from webtest import TestApp
 
 from turnip import api
-from turnip.api.tests.test_helpers import RepoFactory
+from turnip.api.tests.test_helpers import (
+    get_revlist,
+    open_repo,
+    RepoFactory,
+    )
 
 
 class ApiTestCase(TestCase):
@@ -24,8 +28,9 @@ class ApiTestCase(TestCase):
         repo_store = self.useFixture(TempDir()).path
         self.useFixture(EnvironmentVariable("REPO_STORE", repo_store))
         self.app = TestApp(api.main({}))
-        self.repo_path = str(uuid.uuid1())
+        self.repo_path = uuid.uuid1().hex
         self.repo_store = os.path.join(repo_store, self.repo_path)
+        self.repo_root = repo_store
         self.commit = {'ref': 'refs/heads/master', 'message': 'test commit.'}
         self.tag = {'ref': 'refs/tags/tag0', 'message': 'tag message'}
 
@@ -33,9 +38,39 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}/{}'.format(self.repo_path, ref))
         return resp.json
 
-    def test_repo_create(self):
+    def test_repo_init(self):
         resp = self.app.post_json('/repo', {'repo_path': self.repo_path})
+        self.assertIn(self.repo_path, resp.json['repo_url'])
         self.assertEqual(resp.status_code, 200)
+
+    def test_repo_init_with_invalid_repo_path(self):
+        resp = self.app.post_json('/repo', {'repo_path': '../1234'},
+                                  expect_errors=True)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_repo_init_with_existing_repo(self):
+        """Repo can be not be initialised with existing path."""
+        factory = RepoFactory(self.repo_store)
+        repo_path = os.path.basename(os.path.normpath(factory.repo_path))
+        resp = self.app.post_json('/repo', {'repo_path': repo_path},
+                                  expect_errors=True)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_repo_init_with_clone(self):
+        """Repo can be initialised with optional clone."""
+        factory = RepoFactory(self.repo_store, num_commits=2)
+        factory.build()
+        new_repo_path = uuid.uuid1().hex
+        resp = self.app.post_json('/repo', {'repo_path': new_repo_path,
+                                            'clone_from': self.repo_path})
+        repo1_revlist = get_revlist(factory.repo)
+        clone_from = resp.json['repo_url'].split('/')[-1]
+        repo2 = open_repo(os.path.join(self.repo_root, clone_from))
+        repo2_revlist = get_revlist(repo2)
+
+        self.assertEqual(repo1_revlist, repo2_revlist)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(new_repo_path, resp.json['repo_url'])
 
     def test_repo_delete(self):
         self.app.post_json('/repo', {'repo_path': self.repo_path})

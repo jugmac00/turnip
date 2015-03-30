@@ -8,8 +8,19 @@ from pygit2 import (
     GIT_OBJ_COMMIT,
     GIT_SORT_TIME,
     IndexEntry,
+    Repository,
     Signature,
     )
+
+
+def get_revlist(repo):
+    """Return revlist for a given pygit2 repo object."""
+    return [commit.oid.hex for commit in repo.walk(repo.head.target)]
+
+
+def open_repo(repo_path):
+    """Return a pygit2 repo object for a given path."""
+    return Repository(repo_path)
 
 
 class RepoFactory():

@@ -18,15 +18,13 @@ from turnip.pack.ssh import SmartSSHService
 def getSmartSSHService():
 
     config = TurnipConfig()
-    data_dir = os.path.join(
-        os.path.dirname(__file__), "turnip", "pack", "tests", "data")
     log_path = config.get('turnip_log_dir')
 
     return SmartSSHService(
         b'localhost', config.get('pack_virt_port'),
         config.get('authentication_endpoint'),
-        private_key_path=os.path.join(data_dir, "ssh-host-key"),
-        public_key_path=os.path.join(data_dir, "ssh-host-key.pub"),
+        private_key_path=config.get('private_ssh_key_path'),
+        public_key_path=config.get('public_ssh_key_path'),
         main_log='turnip', access_log=os.path.join(log_path, 'turnip.access'),
         access_log_path=os.path.join(log_path, 'turnip-access.log'),
         strport=b'tcp:{}'.format(config.get('smart_ssh_port')))
