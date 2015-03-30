@@ -119,10 +119,7 @@ class FunctionalTestMixin(object):
         dir = self.useFixture(TempDir()).path
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_listener = reactor.listenUNIX(
-            self.hookrpc_path,
-            HookRPCServerFactory({
-                'list_ref_rules': self.hookrpc_handler.listRefRules,
-                'notify_push': self.hookrpc_handler.notifyPush}))
+            self.hookrpc_path, HookRPCServerFactory(self.hookrpc_handler))
         self.addCleanup(self.hookrpc_listener.stopListening)
 
     @defer.inlineCallbacks

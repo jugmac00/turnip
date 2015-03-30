@@ -80,12 +80,12 @@ def sync_rpc_method(proto, args):
     return list(args.items())
 
 
-class TestHookRPCServerProtocol(TestCase):
+class TestRPCServerProtocol(TestCase):
     """Test the socket server that handles git hook callbacks."""
 
     def setUp(self):
-        super(TestHookRPCServerProtocol, self).setUp()
-        self.proto = hookrpc.HookRPCServerProtocol({
+        super(TestRPCServerProtocol, self).setUp()
+        self.proto = hookrpc.RPCServerProtocol({
             'sync': sync_rpc_method,
             'async': async_rpc_method,
             })

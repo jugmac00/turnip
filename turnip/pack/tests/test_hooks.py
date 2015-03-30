@@ -69,9 +69,7 @@ class HookTestMixin(object):
     def setUp(self):
         super(HookTestMixin, self).setUp()
         self.hookrpc_handler = MockHookRPCHandler()
-        self.hookrpc = hookrpc.HookRPCServerFactory({
-            'list_ref_rules': self.hookrpc_handler.listRefRules,
-            'notify_push': self.hookrpc_handler.notifyPush})
+        self.hookrpc = hookrpc.HookRPCServerFactory(self.hookrpc_handler)
         dir = self.useFixture(TempDir()).path
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_port = reactor.listenUNIX(

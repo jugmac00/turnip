@@ -38,7 +38,7 @@ class JSONNetstringProtocol(basic.NetstringReceiver):
         self.sendString(json.dumps(value).encode('utf-8'))
 
 
-class HookRPCServerProtocol(JSONNetstringProtocol):
+class RPCServerProtocol(JSONNetstringProtocol):
 
     def __init__(self, methods):
         self.result_log = []
@@ -64,9 +64,9 @@ class HookRPCServerProtocol(JSONNetstringProtocol):
         self.sendValue({"error": "Command must be a JSON object"})
 
 
-class HookRPCServerFactory(protocol.ServerFactory):
+class RPCServerFactory(protocol.ServerFactory):
 
-    protocol = HookRPCServerProtocol
+    protocol = RPCServerProtocol
 
     def __init__(self, methods):
         self.methods = dict(methods)
@@ -98,3 +98,13 @@ class HookRPCHandler(object):
         path = self.ref_paths[args['key']]
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
         yield proxy.callRemote(b'notify', path)
+
+
+class HookRPCServerFactory(RPCServerFactory):
+
+    def __init__(self, hookrpc_handler):
+        self.hookrpc_handler = hookrpc_handler
+        self.methods = {
+            'list_ref_rules': self.hookrpc_handler.listRefRules,
+            'notify_push': self.hookrpc_handler.notifyPush,
+            }

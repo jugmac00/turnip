@@ -41,11 +41,7 @@ VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 
 hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT)
 hookrpc_path = os.path.join(REPO_STORE, 'hookrpc_sock')
-reactor.listenUNIX(
-    hookrpc_path,
-    HookRPCServerFactory({
-        'list_ref_rules': hookrpc_handler.listRefRules,
-        'notify_push': hookrpc_handler.notifyPush}))
+reactor.listenUNIX(hookrpc_path, HookRPCServerFactory(hookrpc_handler))
 
 reactor.listenTCP(
     PACK_BACKEND_PORT,
