@@ -125,6 +125,7 @@ def ensure_hooks(repo_root):
         with open(turnip.pack.hooks.hook.__file__, 'rb') as master:
             with NamedTemporaryFile(dir=hook_path('.'), delete=False) as this:
                 shutil.copyfileobj(master, this)
+        os.chmod(this.name, 0o755)
         os.rename(this.name, hook_path(target_name))
 
     for hook in wanted_hooks:

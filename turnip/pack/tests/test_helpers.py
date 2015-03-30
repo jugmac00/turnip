@@ -6,6 +6,7 @@ from __future__ import (
 
 import hashlib
 import os.path
+import stat
 
 from fixtures import TempDir
 from testtools import TestCase
@@ -205,3 +206,5 @@ class TestEnsureHooks(TestCase):
                 self.assertEqual(
                     hashlib.sha256(expected.read()).hexdigest(),
                     hashlib.sha256(actual.read()).hexdigest())
+        # The hook is executable.
+        self.assertTrue(os.stat(self.hook('hook.py')).st_mode & stat.S_IXUSR)
