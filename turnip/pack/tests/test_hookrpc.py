@@ -62,22 +62,22 @@ class TestJSONNetStringProtocol(TestCase):
         self.proto.dataReceived(b'3:"ga,')
         self.assertEqual([], self.proto.test_value_log)
         self.assertEqual(
-            ['{"foo": "bar', '"ga'], self.proto.test_invalid_log)
+            [b'{"foo": "bar', b'"ga'], self.proto.test_invalid_log)
 
     def test_sendValue(self):
         # sendValue serialises to JSON and encodes as a netstring.
         self.proto.sendValue({"yay": "it works"})
-        self.assertEqual('19:{"yay": "it works"},', self.transport.value())
+        self.assertEqual(b'19:{"yay": "it works"},', self.transport.value())
 
 
 def async_rpc_method(proto, args):
     d = defer.Deferred()
-    d.callback(args.items())
+    d.callback(list(args.items()))
     return d
 
 
 def sync_rpc_method(proto, args):
-    return args.items()
+    return list(args.items())
 
 
 class TestHookRPCServerProtocol(TestCase):
@@ -96,31 +96,31 @@ class TestHookRPCServerProtocol(TestCase):
     def test_call_sync(self):
         self.proto.dataReceived(b'28:{"op": "sync", "bar": "baz"},')
         self.assertEqual(
-            '28:{"result": [["bar", "baz"]]},', self.transport.value())
+            b'28:{"result": [["bar", "baz"]]},', self.transport.value())
 
     def test_call_async(self):
         self.proto.dataReceived(b'29:{"op": "async", "bar": "baz"},')
         self.assertEqual(
-            '28:{"result": [["bar", "baz"]]},', self.transport.value())
+            b'28:{"result": [["bar", "baz"]]},', self.transport.value())
 
     def test_bad_op(self):
         self.proto.dataReceived(b'27:{"op": "bar", "bar": "baz"},')
         self.assertEqual(
-            '28:{"error": "Unknown op: bar"},', self.transport.value())
+            b'28:{"error": "Unknown op: bar"},', self.transport.value())
 
     def test_no_op(self):
         self.proto.dataReceived(b'28:{"nop": "bar", "bar": "baz"},')
         self.assertEqual(
-            '28:{"error": "No op specified"},', self.transport.value())
+            b'28:{"error": "No op specified"},', self.transport.value())
 
     def test_bad_value(self):
         self.proto.dataReceived(b'14:["foo", "bar"],')
         self.assertEqual(
-            '42:{"error": "Command must be a JSON object"},',
+            b'42:{"error": "Command must be a JSON object"},',
             self.transport.value())
 
     def test_bad_json(self):
         self.proto.dataReceived(b'12:["nop", "bar,')
         self.assertEqual(
-            '42:{"error": "Command must be a JSON object"},',
+            b'42:{"error": "Command must be a JSON object"},',
             self.transport.value())

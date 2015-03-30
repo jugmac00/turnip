@@ -201,8 +201,8 @@ class TestEnsureHooks(TestCase):
         with open(self.hook('hook.py'), 'w') as f:
             f.write('nothing to see here')
         helpers.ensure_hooks(self.repo_dir)
-        with open(self.hook('hook.py'), 'r') as actual:
-            with open(turnip.pack.hooks.hook.__file__, 'r') as expected:
+        with open(self.hook('hook.py'), 'rb') as actual:
+            with open(turnip.pack.hooks.hook.__file__, 'rb') as expected:
                 self.assertEqual(
                     hashlib.sha256(expected.read()).hexdigest(),
                     hashlib.sha256(actual.read()).hexdigest())

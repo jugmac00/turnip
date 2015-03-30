@@ -5,21 +5,25 @@ from __future__ import (
     )
 
 import json
+import sys
 
 from twisted.internet import (
     defer,
     protocol,
     )
 from twisted.protocols import basic
-from twisted.web import xmlrpc
+# twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
+# bits of this module work.
+if sys.version_info.major < 3:
+    from twisted.web import xmlrpc
 
 
 class JSONNetstringProtocol(basic.NetstringReceiver):
 
     def stringReceived(self, string):
         try:
-            val = json.loads(string)
-        except ValueError:
+            val = json.loads(string.decode('utf-8'))
+        except (ValueError, UnicodeDecodeError):
             self.invalidValueReceived(string)
         else:
             self.valueReceived(val)
@@ -31,7 +35,7 @@ class JSONNetstringProtocol(basic.NetstringReceiver):
         raise NotImplementedError()
 
     def sendValue(self, value):
-        self.sendString(json.dumps(value))
+        self.sendString(json.dumps(value).encode('utf-8'))
 
 
 class HookRPCServerProtocol(JSONNetstringProtocol):
