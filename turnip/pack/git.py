@@ -323,7 +323,7 @@ class PackBackendFactory(protocol.Factory):
 
     protocol = PackBackendProtocol
 
-    def __init__(self, root, hookmanager, hook_sock_path):
+    def __init__(self, root, hookmanager=None, hook_sock_path=None):
         self.root = root
         self.hookmanager = hookmanager
         self.hook_sock_path = hook_sock_path

@@ -42,6 +42,16 @@ class HookProcessProtocol(protocol.ProcessProtocol):
             (status.value.exitCode, self.stdout, self.stderr))
 
 
+class MockHookHandler(hookrpc.HookHandler):
+
+    def __init__(self):
+        super(MockHookHandler, self).__init__(None)
+        self.notifications = []
+
+    def notifyPush(self, proto, args):
+        self.notifications.append(self.ref_paths[args['key']])
+
+
 class HookTestMixin(object):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
 
@@ -58,7 +68,7 @@ class HookTestMixin(object):
 
     def setUp(self):
         super(HookTestMixin, self).setUp()
-        self.hook_handler = hookrpc.HookHandler(self.handlePushNotification)
+        self.hook_handler = MockHookHandler()
         self.hookrpc = hookrpc.HookRPCServerFactory({
             'list_ref_rules': self.hook_handler.listRefRules,
             'notify_push': self.hook_handler.notifyPush})
@@ -67,8 +77,6 @@ class HookTestMixin(object):
         self.hookrpc_port = reactor.listenUNIX(
             self.hookrpc_path, self.hookrpc)
         self.addCleanup(self.hookrpc_port.stopListening)
-
-        self.notifications = []
 
     def encodeRefs(self, updates):
         return b'\n'.join(
@@ -157,10 +165,10 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         # The notification callback is invoked with the storage path.
         yield self.assertAccepted(
             [(b'refs/heads/foo', self.old_sha1, self.new_sha1)], [])
-        self.assertEqual(['/translated'], self.notifications)
+        self.assertEqual(['/translated'], self.hook_handler.notifications)
 
     @defer.inlineCallbacks
     def test_does_not_notify_on_empty_push(self):
         # No notification is sent for an empty push.
         yield self.assertAccepted([], [])
-        self.assertEqual([], self.notifications)
+        self.assertEqual([], self.hook_handler.notifications)

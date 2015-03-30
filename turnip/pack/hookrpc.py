@@ -11,6 +11,7 @@ from twisted.internet import (
     protocol,
     )
 from twisted.protocols import basic
+from twisted.web import xmlrpc
 
 
 class JSONNetstringProtocol(basic.NetstringReceiver):
@@ -72,10 +73,10 @@ class HookRPCServerFactory(protocol.ServerFactory):
 
 class HookHandler(object):
 
-    def __init__(self, notify_cb):
+    def __init__(self, virtinfo_url):
         self.ref_paths = {}
         self.ref_rules = {}
-        self.notify_cb = notify_cb
+        self.virtinfo_url = virtinfo_url
 
     def registerKey(self, key, path, ref_rules):
         self.ref_paths[key] = path
@@ -88,6 +89,8 @@ class HookHandler(object):
     def listRefRules(self, proto, args):
         return self.ref_rules[args['key']]
 
+    @defer.inlineCallbacks
     def notifyPush(self, proto, args):
         path = self.ref_paths[args['key']]
-        return self.notify_cb(path)
+        proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
+        yield proxy.callRemote(b'notify', path)
