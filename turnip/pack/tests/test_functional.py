@@ -104,17 +104,27 @@ class FunctionalTestMixin(object):
 
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
+    def startVirtInfo(self):
+        # Set up a fake virt information XML-RPC server which just
+        # maps paths to their SHA-256 hash.
+        self.virtinfo = FakeVirtInfoService(allowNone=True)
+        self.virtinfo_listener = reactor.listenTCP(
+            0, server.Site(self.virtinfo))
+        self.virtinfo_port = self.virtinfo_listener.getHost().port
+        self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
+        self.addCleanup(self.virtinfo_listener.stopListening)
+
     def startHookRPC(self):
         self.hook_handler = HookHandler(self.virtinfo.push_notifications.append)
 
         dir = self.useFixture(TempDir()).path
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
-        self.hookrpc_port = reactor.listenUNIX(
+        self.hookrpc_listener = reactor.listenUNIX(
             self.hookrpc_path,
             HookRPCServerFactory({
                 'list_ref_rules': self.hook_handler.listRefRules,
                 'notify_push': self.hook_handler.notifyPush}))
-        self.addCleanup(self.hookrpc_port.stopListening)
+        self.addCleanup(self.hookrpc_listener.stopListening)
 
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
@@ -200,6 +210,7 @@ class TestBackendFunctional(FunctionalTestMixin, TestCase):
         super(TestBackendFunctional, self).setUp()
 
         # Set up a PackBackendFactory on a free port in a clean repo root.
+        self.startVirtInfo()
         self.startHookRPC()
         self.root = self.useFixture(TempDir()).path
         self.listener = reactor.listenTCP(
@@ -234,16 +245,9 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.authserver_port = self.authserver_listener.getHost().port
         self.authserver_url = b'http://localhost:%d/' % self.authserver_port
 
-        # Set up a fake virt information XML-RPC server which just
-        # maps paths to their SHA-256 hash.
-        self.virtinfo = FakeVirtInfoService(allowNone=True)
-        self.virtinfo_listener = reactor.listenTCP(
-            0, server.Site(self.virtinfo))
-        self.virtinfo_port = self.virtinfo_listener.getHost().port
-        self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
-
         # Run a backend server in a repo root containing an empty repo
         # for the path '/test'.
+        self.startVirtInfo()
         self.startHookRPC()
         self.root = self.useFixture(TempDir()).path
         self.internal_name = hashlib.sha256(b'/test').hexdigest()
@@ -266,7 +270,6 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         super(FrontendFunctionalTestMixin, self).tearDown()
         yield self.virt_listener.stopListening()
         yield self.backend_listener.stopListening()
-        yield self.virtinfo_listener.stopListening()
         yield self.authserver_listener.stopListening()
 
     @defer.inlineCallbacks
