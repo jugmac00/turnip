@@ -273,6 +273,8 @@ class PackBackendProtocol(PackServerProtocol):
     Invokes the reference C Git implementation.
     """
 
+    hookrpc_key = None
+
     def requestReceived(self, command, raw_pathname, params):
         path = compose_path(self.factory.root, raw_pathname)
         if command == b'git-upload-pack':
@@ -293,10 +295,11 @@ class PackBackendProtocol(PackServerProtocol):
 
         env = {}
         if subcmd == b'receive-pack' and self.factory.hookmanager:
-            key = str(uuid.uuid4())
-            self.factory.hookmanager.registerKey(key, raw_pathname, [])
+            self.hookrpc_key = str(uuid.uuid4())
+            self.factory.hookmanager.registerKey(
+                self.hookrpc_key, raw_pathname, [])
             env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hook_sock_path
-            env[b'TURNIP_HOOK_RPC_KEY'] = key
+            env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
             ensure_hooks(path)
 
         self.peer = GitProcessProtocol(self)
@@ -307,6 +310,11 @@ class PackBackendProtocol(PackServerProtocol):
 
     def writeConnectionLost(self):
         self.peer.loseReadConnection()
+
+    def connectionLost(self, reason):
+        if self.hookrpc_key:
+            self.factory.hookmanager.unregisterKey(self.hookrpc_key)
+        PackServerProtocol.connectionLost(self, reason)
 
 
 class PackBackendFactory(protocol.Factory):
