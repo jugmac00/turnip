@@ -4,9 +4,14 @@ from __future__ import (
     unicode_literals,
     )
 
+import hashlib
+import os.path
+
+from fixtures import TempDir
 from testtools import TestCase
 
 from turnip.pack import helpers
+import turnip.pack.hooks.hook
 
 
 TEST_DATA = b'0123456789abcdef'
@@ -153,3 +158,50 @@ class TestEncodeRequest(TestCase):
         self.assertInvalid(
             b'git-do-stuff', b'/some/path', {b'host': b'exam\0le.com'},
             b'Metacharacter in arguments')
+
+
+class TestEnsureHooks(TestCase):
+    """Test repository hook maintenance."""
+
+    def setUp(self):
+        super(TestEnsureHooks, self).setUp()
+        self.repo_dir = self.useFixture(TempDir()).path
+        self.hooks_dir = os.path.join(self.repo_dir, 'hooks')
+        os.mkdir(self.hooks_dir)
+
+    def hook(self, hook):
+        return os.path.join(self.hooks_dir, hook)
+
+    def test_deletes_random(self):
+        # Unknown files are deleted.
+        os.symlink('foo', self.hook('bar'))
+        self.assertIn('bar', os.listdir(self.hooks_dir))
+        helpers.ensure_hooks(self.repo_dir)
+        self.assertNotIn('bar', os.listdir(self.hooks_dir))
+
+    def test_fixes_symlink(self):
+        # A symlink with a bad path is fixed.
+        os.symlink('foo', self.hook('pre-receive'))
+        self.assertEqual('foo', os.readlink(self.hook('pre-receive')))
+        helpers.ensure_hooks(self.repo_dir)
+        self.assertEqual('hook.py', os.readlink(self.hook('pre-receive')))
+
+    def test_replaces_regular_file(self):
+        # A regular file is replaced with a symlink.
+        with open(self.hook('pre-receive'), 'w') as f:
+            f.write('garbage')
+        self.assertRaises(OSError, os.readlink, self.hook('pre-receive'))
+        helpers.ensure_hooks(self.repo_dir)
+        self.assertEqual('hook.py', os.readlink(self.hook('pre-receive')))
+
+    def test_replaces_hook_py(self):
+        # The hooks themselves are symlinks to hook.py, which is always
+        # kept up to date.
+        with open(self.hook('hook.py'), 'w') as f:
+            f.write('nothing to see here')
+        helpers.ensure_hooks(self.repo_dir)
+        with open(self.hook('hook.py'), 'r') as actual:
+            with open(turnip.pack.hooks.hook.__file__, 'r') as expected:
+                self.assertEqual(
+                    hashlib.sha256(expected.read()).hexdigest(),
+                    hashlib.sha256(actual.read()).hexdigest())

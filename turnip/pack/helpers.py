@@ -4,6 +4,16 @@ from __future__ import (
     unicode_literals,
     )
 
+import hashlib
+import os.path
+import shutil
+from tempfile import (
+    mktemp,
+    NamedTemporaryFile,
+    )
+
+import turnip.pack.hooks.hook
+
 
 PKT_LEN_SIZE = 4
 PKT_PAYLOAD_MAX = 65520
@@ -83,3 +93,47 @@ def encode_request(command, pathname, params):
             raise ValueError('Metacharacter in arguments')
         bits.append(name + b'=' + value)
     return command + b' ' + b'\0'.join(bits) + b'\0'
+
+
+def ensure_hooks(repo_root):
+    """Put a repository's hooks into the desired state.
+
+    Consistency is maintained even if there are multiple invocations
+    running concurrently. Files starting with tmp* are ignored, and any
+    directories will cause an exception.
+    """
+
+    wanted_hooks = ('pre-receive', 'post-receive')
+    target_name = 'hook.py'
+
+    def hook_path(name):
+        return os.path.join(repo_root, 'hooks', name)
+
+    if not os.path.exists(hook_path(target_name)):
+        need_target = True
+    else:
+        with open(turnip.pack.hooks.hook.__file__, 'rb') as f:
+            wanted = hashlib.sha256(f.read()).hexdigest()
+        with open(hook_path(target_name), 'rb') as f:
+            have = hashlib.sha256(f.read()).hexdigest()
+        if wanted != have:
+            need_target = True
+        else:
+            need_target = False
+
+    if need_target:
+        with open(turnip.pack.hooks.hook.__file__, 'rb') as master:
+            with NamedTemporaryFile(dir=hook_path('.'), delete=False) as this:
+                shutil.copyfileobj(master, this)
+        os.rename(this.name, hook_path(target_name))
+
+    for hook in wanted_hooks:
+        # Not actually insecure, since os.symlink fails if the file exists.
+        path = mktemp(dir=hook_path('.'))
+        os.symlink(target_name, path)
+        os.rename(path, hook_path(hook))
+
+    for name in os.listdir(hook_path('.')):
+        if (name != target_name and name not in wanted_hooks
+                and not name.startswith('tmp')):
+            os.unlink(hook_path(name))
