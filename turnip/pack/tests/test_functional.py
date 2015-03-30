@@ -115,7 +115,12 @@ class FunctionalTestMixin(object):
         self.addCleanup(self.virtinfo_listener.stopListening)
 
     def startHookRPC(self):
-        self.hook_handler = HookHandler(self.virtinfo.push_notifications.append)
+        @defer.inlineCallbacks
+        def notify_cb(path):
+            proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
+            yield proxy.callRemote(b'notify', path)
+
+        self.hook_handler = HookHandler(notify_cb)
 
         dir = self.useFixture(TempDir()).path
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
