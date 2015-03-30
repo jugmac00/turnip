@@ -22,17 +22,25 @@ import turnip.pack.hooks
 
 class HookHandler(object):
 
-    def __init__(self):
+    def __init__(self, notify_cb):
+        self.ref_paths = {}
         self.ref_rules = {}
+        self.notify_cb = notify_cb
 
-    def register_key(self, key, ref_rules):
+    def register_key(self, key, path, ref_rules):
+        self.ref_paths[key] = path
         self.ref_rules[key] = ref_rules
 
     def unregister_key(self, key):
         del self.ref_rules[key]
+        del self.ref_paths[key]
 
     def list_ref_rules(self, proto, args):
         return self.ref_rules[args['key']]
+
+    def notify_push(self, proto, args):
+        path = self.ref_paths[args['key']]
+        return self.notify_cb(path)
 
 
 class HookProcessProtocol(protocol.ProcessProtocol):
@@ -68,16 +76,22 @@ class HookTestMixin(object):
         return os.path.join(
             os.path.dirname(turnip.pack.hooks.__file__), self.hook_name)
 
+    def handlePushNotification(self, path):
+        self.notifications.append(path)
+
     def setUp(self):
         super(HookTestMixin, self).setUp()
-        self.hook_handler = HookHandler()
+        self.hook_handler = HookHandler(self.handlePushNotification)
         self.hookrpc = hookrpc.HookRPCServerFactory({
-            'list_ref_rules': self.hook_handler.list_ref_rules})
+            'list_ref_rules': self.hook_handler.list_ref_rules,
+            'notify_push': self.hook_handler.notify_push})
         dir = self.useFixture(TempDir()).path
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_port = reactor.listenUNIX(
             self.hookrpc_path, self.hookrpc)
         self.addCleanup(self.hookrpc_port.stopListening)
+
+        self.notifications = []
 
     def encodeRefs(self, updates):
         return b'\n'.join(
@@ -86,7 +100,7 @@ class HookTestMixin(object):
     @defer.inlineCallbacks
     def invokeHook(self, input, rules):
         key = str(uuid.uuid4())
-        self.hook_handler.register_key(key, list(rules))
+        self.hook_handler.register_key(key, '/translated', list(rules))
         try:
             d = defer.Deferred()
             reactor.spawnProcess(
@@ -163,5 +177,13 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def test_notifies(self):
-        # A notification is sent with just the key as data.
-        yield self.assertAccepted([], [b'refs/heads/foo'])
+        # The notification callback is invoked with the storage path.
+        yield self.assertAccepted(
+            [(b'refs/heads/foo', self.old_sha1, self.new_sha1)], [])
+        self.assertEqual(['/translated'], self.notifications)
+
+    @defer.inlineCallbacks
+    def test_does_not_notify_on_empty_push(self):
+        # No notification is sent for an empty push.
+        yield self.assertAccepted([], [])
+        self.assertEqual([], self.notifications)
