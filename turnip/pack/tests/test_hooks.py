@@ -17,7 +17,7 @@ from twisted.internet import (
     )
 
 from turnip.pack import hookrpc
-import turnip.pack.hooks.pre_receive
+import turnip.pack.hooks
 
 
 class HookHandler(object):
@@ -63,7 +63,7 @@ class TestPreReceiveHook(TestCase):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
 
     hook_path = os.path.join(
-        os.path.dirname(turnip.pack.hooks.__file__), 'pre_receive.py')
+        os.path.dirname(turnip.pack.hooks.__file__), 'pre-receive')
     old_sha1 = b'a' * 40
     new_sha1 = b'b' * 40
 
