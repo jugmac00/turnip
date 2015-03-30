@@ -5,6 +5,7 @@ from __future__ import (
     )
 
 import sys
+import uuid
 
 from twisted.internet import (
     defer,
@@ -24,6 +25,7 @@ from turnip.pack.helpers import (
     decode_request,
     encode_packet,
     encode_request,
+    ensure_hooks,
     INCOMPLETE_PKT,
     )
 
@@ -271,6 +273,8 @@ class PackBackendProtocol(PackServerProtocol):
     Invokes the reference C Git implementation.
     """
 
+    hookrpc_key = None
+
     def requestReceived(self, command, raw_pathname, params):
         path = compose_path(self.factory.root, raw_pathname)
         if command == b'git-upload-pack':
@@ -289,8 +293,19 @@ class PackBackendProtocol(PackServerProtocol):
             args.append(b'--advertise-refs')
         args.append(path)
 
+        env = {}
+        if subcmd == b'receive-pack' and self.factory.hookrpc_handler:
+            # This is a write operation, so prepare hooks, the hook RPC
+            # server, and the environment variables that link them up.
+            self.hookrpc_key = str(uuid.uuid4())
+            self.factory.hookrpc_handler.registerKey(
+                self.hookrpc_key, raw_pathname, [])
+            ensure_hooks(path)
+            env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hookrpc_sock
+            env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
+
         self.peer = GitProcessProtocol(self)
-        reactor.spawnProcess(self.peer, cmd, args)
+        reactor.spawnProcess(self.peer, cmd, args, env=env)
 
     def readConnectionLost(self):
         self.peer.loseWriteConnection()
@@ -298,13 +313,20 @@ class PackBackendProtocol(PackServerProtocol):
     def writeConnectionLost(self):
         self.peer.loseReadConnection()
 
+    def connectionLost(self, reason):
+        if self.hookrpc_key:
+            self.factory.hookrpc_handler.unregisterKey(self.hookrpc_key)
+        PackServerProtocol.connectionLost(self, reason)
+
 
 class PackBackendFactory(protocol.Factory):
 
     protocol = PackBackendProtocol
 
-    def __init__(self, root):
+    def __init__(self, root, hookrpc_handler=None, hookrpc_sock=None):
         self.root = root
+        self.hookrpc_handler = hookrpc_handler
+        self.hookrpc_sock = hookrpc_sock
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):
