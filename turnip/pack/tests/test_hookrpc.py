@@ -5,12 +5,15 @@ from __future__ import (
     )
 
 from testtools import TestCase
+from twisted.internet import defer
 from twisted.test import proto_helpers
 
 from turnip.pack import hookrpc
 
 
 class DummyJSONNetstringProtocol(hookrpc.JSONNetstringProtocol):
+
+    response_deferred = None
 
     def __init__(self):
         self.test_value_log = []
@@ -21,6 +24,15 @@ class DummyJSONNetstringProtocol(hookrpc.JSONNetstringProtocol):
 
     def invalidValueReceived(self, string):
         self.test_invalid_log.append(string)
+
+    def sendValue(self, value):
+        # Hack to allow tests to block until a response is sent, since
+        # dataReceived can't return a Deferred without breaking things.
+        hookrpc.JSONNetstringProtocol.sendValue(self, value)
+        if self.response_deferred is not None:
+            d = self.response_deferred
+            self.response_deferred = None
+            d.callback()
 
 
 class TestJSONNetStringProtocol(TestCase):
@@ -58,19 +70,36 @@ class TestJSONNetStringProtocol(TestCase):
         self.assertEqual('19:{"yay": "it works"},', self.transport.value())
 
 
+def async_rpc_method(proto, args):
+    d = defer.Deferred()
+    d.callback(args.items())
+    return d
+
+
+def sync_rpc_method(proto, args):
+    return args.items()
+
+
 class TestHookRPCServerProtocol(TestCase):
     """Test the socket server that handles git hook callbacks."""
 
     def setUp(self):
         super(TestHookRPCServerProtocol, self).setUp()
-        self.proto = hookrpc.HookRPCServerProtocol(
-            {'foo': lambda proto, args: args.items()})
+        self.proto = hookrpc.HookRPCServerProtocol({
+            'sync': sync_rpc_method,
+            'async': async_rpc_method,
+            })
         self.transport = proto_helpers.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
 
-    def test_call(self):
-        self.proto.dataReceived(b'27:{"op": "foo", "bar": "baz"},')
+    def test_call_sync(self):
+        self.proto.dataReceived(b'28:{"op": "sync", "bar": "baz"},')
+        self.assertEqual(
+            '28:{"result": [["bar", "baz"]]},', self.transport.value())
+
+    def test_call_async(self):
+        self.proto.dataReceived(b'29:{"op": "async", "bar": "baz"},')
         self.assertEqual(
             '28:{"result": [["bar", "baz"]]},', self.transport.value())
 
