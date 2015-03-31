@@ -308,10 +308,12 @@ class PackBackendProtocol(PackServerProtocol):
         reactor.spawnProcess(self.peer, cmd, args, env=env)
 
     def readConnectionLost(self):
-        self.peer.loseWriteConnection()
+        if self.peer is not None:
+            self.peer.loseWriteConnection()
 
     def writeConnectionLost(self):
-        self.peer.loseReadConnection()
+        if self.peer is not None:
+            self.peer.loseReadConnection()
 
     def connectionLost(self, reason):
         if self.hookrpc_key:
