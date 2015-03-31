@@ -339,6 +339,12 @@ class CGitScriptResource(twcgi.CGIScript):
                 request, b'translatePath response did not include path')
             return
         repo_url = request.path.rstrip('/')
+        # cgit simply parses configuration values up to the end of a line
+        # following the first '=', so almost anything is safe, but
+        # double-check that there are no newlines to confuse things.
+        if '\n' in repo_url:
+            self._error(request, b'repository URL may not contain newlines')
+            return
         repo_path = '%s/%s' % (self.root.repo_store, translated['path'])
         trailing = translated.get('trailing')
         if trailing:
