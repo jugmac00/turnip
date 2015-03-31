@@ -24,6 +24,7 @@ from twisted.web import (
     twcgi,
     )
 
+from turnip.helpers import compose_path
 from turnip.pack.git import (
     ERROR_PREFIX,
     PackProtocol,
@@ -345,7 +346,11 @@ class CGitScriptResource(twcgi.CGIScript):
         if '\n' in repo_url:
             self._error(request, b'repository URL may not contain newlines')
             return
-        repo_path = '%s/%s' % (self.root.repo_store, translated['path'])
+        try:
+            repo_path = compose_path(self.root.repo_store, translated['path'])
+        except ValueError as e:
+            self._error(request, str(e).encode('UTF-8'))
+            return
         trailing = translated.get('trailing')
         if trailing:
             if not trailing.startswith('/'):
