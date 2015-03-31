@@ -404,9 +404,9 @@ class CGitScriptResource(twcgi.CGIScript):
         # XXX cjwatson 2015-03-30: authentication
         d = proxy.callRemote(
             b'translatePath', request.path, b'read', None, False)
-        d.addErrback(self._translatePathErrback, request)
         d.addCallback(
             self._translatePathCallback, env, request, *args, **kwargs)
+        d.addErrback(self._translatePathErrback, request)
         return server.NOT_DONE_YET
 
 
