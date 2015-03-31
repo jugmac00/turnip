@@ -1,5 +1,6 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import itertools
 import os
 
 from pygit2 import (
@@ -95,6 +96,14 @@ class RepoFactory():
         oid = repo.head.get_object().oid
         for i in xrange(num_tags):
             self.add_tag('tag{}'.format(i), 'tag message {}'.format(i), oid)
+
+    def nonexistent_oid(self):
+        """Return an arbitrary OID that does not exist in this repo."""
+        for oid_chars in itertools.product('0123456789abcdef', repeat=40):
+            oid = ''.join(oid_chars)
+            if oid not in self.repo:
+                return oid
+        raise Exception("repo appears to contain every possible OID!")
 
     def init_repo(self):
         return init_repository(self.repo_path)

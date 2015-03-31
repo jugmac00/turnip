@@ -141,6 +141,9 @@ def get_commit(repo_path, commit_oid, repo=None):
     if not repo:
         repo = open_repo(repo_path)
     git_object = repo.get(commit_oid)
+    if git_object is None:
+        raise GitError('Object {} does not exist in repository {}.'.format(
+            commit_oid, repo_path))
     commit = format_commit(git_object)
     return commit
 
@@ -148,5 +151,10 @@ def get_commit(repo_path, commit_oid, repo=None):
 def get_commits(repo_path, commit_oids):
     """Return a collection of commit objects from a list of oids."""
     repo = open_repo(repo_path)
-    commits = [get_commit(repo_path, commit, repo) for commit in commit_oids]
+    commits = []
+    for commit in commit_oids:
+        try:
+            commits.append(get_commit(repo_path, commit, repo))
+        except GitError:
+            pass
     return commits
