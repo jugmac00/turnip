@@ -348,6 +348,10 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                 b'translatePath', pathname, permission,
                 int(auth_uid) if auth_uid is not None else None,
                 can_authenticate)
+            if 'trailing' in translated and translated['trailing']:
+                self.die(
+                    VIRT_ERROR_PREFIX
+                    + b'NOT_FOUND Repository does not exist.')
             pathname = translated['path']
         except xmlrpc.Fault as e:
             if e.faultCode in (1, 290):
