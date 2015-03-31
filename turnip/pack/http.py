@@ -437,6 +437,10 @@ class SmartHTTPFrontendResource(resource.Resource):
 
     @staticmethod
     def _isGitRequest(request):
+        if request.path.endswith(b'/info/refs'):
+            service = request.args.get('service', [])
+            if service and service[0].startswith('git-'):
+                return True
         content_type = request.getHeader(b'Content-Type')
         if content_type is None:
             return False
