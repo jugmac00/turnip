@@ -282,7 +282,7 @@ class PackBackendProtocol(PackServerProtocol):
         elif command == b'git-receive-pack':
             subcmd = b'receive-pack'
         else:
-            self.die(b'Unsupport command in request')
+            self.die(b'Unsupported command in request')
             return
 
         cmd = b'git'
