@@ -191,7 +191,7 @@ class BaseSmartHTTPResource(resource.Resource):
                     b'authenticateWithPassword', request.getUser(),
                     request.getPassword())
             except xmlrpc.Fault as e:
-                if e.faultCode == 3:
+                if e.faultCode in (3, 410):
                     defer.returnValue((None, None))
                 else:
                     raise
