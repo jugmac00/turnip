@@ -374,7 +374,7 @@ class CGitScriptResource(twcgi.CGIScript):
             css=/static/cgit.css
             enable-http-clone=0
             enable-index-owner=0
-            logo=/static/cgit.png
+            logo=/static/launchpad-logo.png
 
             repo.url={repo_url}
             repo.path={repo_path}
@@ -430,10 +430,12 @@ class SmartHTTPFrontendResource(resource.Resource):
         if cgit_data_path is not None:
             static_resource = DirectoryWithoutListings(
                 cgit_data_path, defaultType='text/plain')
+            top = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            logo = os.path.join(top, 'images', 'launchpad-logo.png')
+            static_resource.putChild('launchpad-logo.png', static.File(logo))
             self.putChild('static', static_resource)
-            self.putChild(
-                'favicon.ico',
-                static.File(os.path.join(cgit_data_path, 'favicon.ico')))
+            favicon = os.path.join(top, 'images', 'launchpad.png')
+            self.putChild('favicon.ico', static.File(favicon))
 
     @staticmethod
     def _isGitRequest(request):
