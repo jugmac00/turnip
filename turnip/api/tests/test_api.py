@@ -250,7 +250,6 @@ class ApiTestCase(TestCase):
         self.assertEqual(message.decode('utf-8', 'replace'),
                          resp.json[1]['message'])
 
-
     def test_repo_get_non_unicode_log(self):
         """Ensure that non-unicode data is discarded."""
         factory = RepoFactory(self.repo_store)
@@ -259,7 +258,6 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid))
         self.assertEqual(message.decode('utf-8', 'replace'),
                          resp.json[0]['message'])
-
 
     def test_repo_get_log_with_limit(self):
         """Ensure the commit log can filtered by limit."""
