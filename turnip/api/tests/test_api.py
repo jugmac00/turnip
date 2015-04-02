@@ -41,12 +41,12 @@ class ApiTestCase(TestCase):
     def test_repo_init(self):
         resp = self.app.post_json('/repo', {'repo_path': self.repo_path})
         self.assertIn(self.repo_path, resp.json['repo_url'])
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(200, resp.status_code)
 
     def test_repo_init_with_invalid_repo_path(self):
         resp = self.app.post_json('/repo', {'repo_path': '../1234'},
                                   expect_errors=True)
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(404, resp.status_code)
 
     def test_repo_init_with_existing_repo(self):
         """Repo can be not be initialised with existing path."""
@@ -54,7 +54,7 @@ class ApiTestCase(TestCase):
         repo_path = os.path.basename(os.path.normpath(factory.repo_path))
         resp = self.app.post_json('/repo', {'repo_path': repo_path},
                                   expect_errors=True)
-        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(409, resp.status_code)
 
     def test_repo_init_with_clone(self):
         """Repo can be initialised with optional clone."""
@@ -69,13 +69,13 @@ class ApiTestCase(TestCase):
         repo2_revlist = get_revlist(repo2)
 
         self.assertEqual(repo1_revlist, repo2_revlist)
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(200, resp.status_code)
         self.assertIn(new_repo_path, resp.json['repo_url'])
 
     def test_repo_delete(self):
         self.app.post_json('/repo', {'repo_path': self.repo_path})
         resp = self.app.delete('/repo/{}'.format(self.repo_path))
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(200, resp.status_code)
         self.assertFalse(os.path.exists(self.repo_store))
 
     def test_repo_get_refs(self):
@@ -95,7 +95,7 @@ class ApiTestCase(TestCase):
     def test_repo_get_refs_nonexistent(self):
         """get_refs on a non-existent repository returns HTTP 404."""
         resp = self.app.get('/repo/1/refs', expect_errors=True)
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(404, resp.status_code)
 
     def test_ignore_non_unicode_refs(self):
         """Ensure non-unicode refs are dropped from ref collection."""
@@ -107,7 +107,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         refs = resp.json
-        self.assertEqual(len(refs.keys()), 1)
+        self.assertEqual(1, len(refs.keys()))
 
     def test_allow_unicode_refs(self):
         """Ensure unicode refs are included in ref collection."""
@@ -119,7 +119,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         refs = resp.json
-        self.assertEqual(len(refs.keys()), 2)
+        self.assertEqual(2, len(refs.keys()))
 
     def test_repo_get_ref(self):
         RepoFactory(self.repo_store, num_commits=1).build()
@@ -130,18 +130,18 @@ class ApiTestCase(TestCase):
     def test_repo_get_ref_nonexistent_repository(self):
         """get_ref on a non-existent repository returns HTTP 404."""
         resp = self.app.get('/repo/1/refs/heads/master', expect_errors=True)
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(404, resp.status_code)
 
     def test_repo_get_ref_nonexistent_ref(self):
         """get_ref on a non-existent ref in a repository returns HTTP 404."""
         RepoFactory(self.repo_store, num_commits=1).build()
         resp = self.app.get(
             '/repo/{}/refs/heads/master'.format(self.repo_path))
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(200, resp.status_code)
         resp = self.app.get(
             '/repo/{}/refs/heads/nonexistent'.format(self.repo_path),
             expect_errors=True)
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(404, resp.status_code)
 
     def test_repo_get_unicode_ref(self):
         factory = RepoFactory(self.repo_store)
@@ -176,7 +176,7 @@ class ApiTestCase(TestCase):
         factory = RepoFactory(self.repo_store)
         resp = self.app.get('/repo/{}/commits/{}'.format(
             self.repo_path, factory.nonexistent_oid()), expect_errors=True)
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(404, resp.status_code)
 
     def test_repo_get_non_commit(self):
         """Trying to get a non-commit returns HTTP 404."""
@@ -185,7 +185,7 @@ class ApiTestCase(TestCase):
         tree_oid = factory.repo[factory.commits[0]].tree.hex
         resp = self.app.get('/repo/{}/commits/{}'.format(
             self.repo_path, tree_oid), expect_errors=True)
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(404, resp.status_code)
 
     def test_repo_get_commit_collection(self):
         """Ensure commits can be returned in bulk."""
@@ -195,7 +195,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.post_json('/repo/{}/commits'.format(
             self.repo_path), bulk_commits)
-        self.assertEqual(len(resp.json), 5)
+        self.assertEqual(5, len(resp.json))
         self.assertEqual(bulk_commits['commits'][0], resp.json[0]['sha1'])
 
     def test_repo_get_commit_collection_ignores_errors(self):
@@ -212,7 +212,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.post_json(
             '/repo/{}/commits'.format(self.repo_path), bulk_commits)
-        self.assertEqual(len(resp.json), 1)
+        self.assertEqual(1, len(resp.json))
         self.assertEqual(bulk_commits['commits'][0], resp.json[0]['sha1'])
 
     def test_repo_get_log_signatures(self):
@@ -227,7 +227,7 @@ class ApiTestCase(TestCase):
         oid = factory.add_commit('Obfuscate colophon.', 'path.foo',
                                  author=author, committer=committer)
         resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid))
-        self.assertEqual(resp.json[0]['author']['name'], author.name)
+        self.assertEqual(author.name, resp.json[0]['author']['name'])
 
     def test_repo_get_log(self):
         factory = RepoFactory(self.repo_store, num_commits=4)
@@ -235,7 +235,7 @@ class ApiTestCase(TestCase):
         commits_from = factory.commits[2].hex
         resp = self.app.get('/repo/{}/log/{}'.format(
             self.repo_path, commits_from))
-        self.assertEqual(len(resp.json), 3)
+        self.assertEqual(3, len(resp.json))
 
     def test_repo_get_unicode_log(self):
         factory = RepoFactory(self.repo_store)
@@ -245,10 +245,10 @@ class ApiTestCase(TestCase):
         oid2 = factory.add_commit(message2, '엄마야!.js', [oid])
 
         resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid2))
-        self.assertEqual(resp.json[0]['message'],
-                         message2.decode('utf-8', 'replace'))
-        self.assertEqual(resp.json[1]['message'],
-                         message.decode('utf-8', 'replace'))
+        self.assertEqual(message2.decode('utf-8', 'replace'),
+                         resp.json[0]['message'])
+        self.assertEqual(message.decode('utf-8', 'replace'),
+                         resp.json[1]['message'])
 
     def test_repo_get_non_unicode_log(self):
         """Ensure that non-unicode data is discarded."""
@@ -256,8 +256,8 @@ class ApiTestCase(TestCase):
         message = '\xe9\xe9\xe9'  # latin-1
         oid = factory.add_commit(message, 'foo.py')
         resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid))
-        self.assertEqual(resp.json[0]['message'],
-                         message.decode('utf-8', 'replace'))
+        self.assertEqual(message.decode('utf-8', 'replace'),
+                         resp.json[0]['message'])
 
     def test_repo_get_log_with_limit(self):
         """Ensure the commit log can filtered by limit."""
@@ -266,7 +266,7 @@ class ApiTestCase(TestCase):
         head = repo.head.target
         resp = self.app.get('/repo/{}/log/{}?limit=5'.format(
             self.repo_path, head))
-        self.assertEqual(len(resp.json), 5)
+        self.assertEqual(5, len(resp.json))
 
     def test_repo_get_log_with_stop(self):
         """Ensure the commit log can be filtered by a stop commit."""
@@ -277,8 +277,8 @@ class ApiTestCase(TestCase):
         head = repo.head.target
         resp = self.app.get('/repo/{}/log/{}?stop={}'.format(
             self.repo_path, head, stop_commit))
-        self.assertEqual(len(resp.json), 5)
-        self.assertNotIn(resp.json, excluded_commit)
+        self.assertEqual(5, len(resp.json))
+        self.assertNotIn(excluded_commit, resp.json)
 
 
 if __name__ == '__main__':
