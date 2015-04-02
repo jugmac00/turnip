@@ -112,7 +112,7 @@ def get_refs(repo_path):
 def get_ref(repo_path, ref):
     """Return a specific ref for a git repository."""
     repo = open_repo(repo_path)
-    git_object = repo.lookup_reference(ref).peel()
+    git_object = repo.lookup_reference(ref.encode('utf-8')).peel()
     ref_obj = format_ref(ref, git_object)
     return ref_obj
 
