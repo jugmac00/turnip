@@ -65,7 +65,7 @@ class FakeAuthServerService(xmlrpc.XMLRPC):
         if username not in self.keys:
             raise NoSuchPersonWithName(username)
         return {
-            "id": hash(username),
+            "id": hash(username) % (2L ** 31),
             "name": username,
             "keys": self.keys[username],
             }
