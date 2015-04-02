@@ -12,3 +12,4 @@ turnip_log_dir: ./
 virtinfo_endpoint: http://xmlrpc-private.launchpad.dev:8087/git
 cgit_exec_path: /usr/lib/cgit/cgit.cgi
 cgit_data_path: /usr/share/cgit
+site_name: git.launchpad.dev

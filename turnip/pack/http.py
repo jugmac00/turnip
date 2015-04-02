@@ -369,8 +369,12 @@ class CGitScriptResource(twcgi.CGIScript):
             mode='w+', prefix='turnip-cgit-')
         os.chmod(self.cgit_config.name, 0o644)
         fmt = {'repo_url': repo_url, 'repo_path': repo_path}
+        if self.root.site_name is not None:
+            prefixes = " ".join(
+                "{}://{}".format(scheme, self.root.site_name)
+                for scheme in ("git", "git+ssh", "https"))
+            print("clone-prefix={}".format(prefixes), file=self.cgit_config)
         print(textwrap.dedent("""\
-            # XXX clone-prefix
             css=/static/cgit.css
             enable-http-clone=0
             enable-index-owner=0
@@ -416,7 +420,8 @@ class SmartHTTPFrontendResource(resource.Resource):
     allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
 
     def __init__(self, backend_host, backend_port, virtinfo_endpoint,
-                 repo_store, cgit_exec_path=None, cgit_data_path=None):
+                 repo_store, cgit_exec_path=None, cgit_data_path=None,
+                 site_name=None):
         resource.Resource.__init__(self)
         self.backend_host = backend_host
         self.backend_port = backend_port
@@ -426,6 +431,7 @@ class SmartHTTPFrontendResource(resource.Resource):
         # but for now cgit needs direct filesystem access.
         self.repo_store = repo_store
         self.cgit_exec_path = cgit_exec_path
+        self.site_name = site_name
         self.putChild('', SmartHTTPRootResource())
         if cgit_data_path is not None:
             static_resource = DirectoryWithoutListings(
