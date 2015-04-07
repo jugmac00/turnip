@@ -36,6 +36,26 @@ VIRT_ERROR_PREFIX = b'turnip virt error: '
 SAFE_PARAMS = frozenset(['host'])
 
 
+class UnstoppableProducerWrapper(object):
+    """An `IPushProducer` that won't be stopped.
+
+    Used to avoid closing TCP connections just because one direction has
+    been closed.
+    """
+
+    def __init__(self, producer):
+        self.producer = producer
+
+    def pauseProducing(self):
+        self.producer.pauseProducing()
+
+    def resumeProducing(self):
+        self.producer.resumeProducing()
+
+    def stopProducing(self):
+        pass
+
+
 class PackProtocol(protocol.Protocol):
 
     paused = False
@@ -104,6 +124,10 @@ class PackProxyProtocol(PackProtocol):
 
     def setPeer(self, peer):
         self.peer = peer
+        self.peer.registerProducer(self.transport, True)
+
+    def registerProducer(self, producer, streaming):
+        self.transport.registerProducer(producer, streaming)
 
     def die(self, message):
         raise NotImplementedError()
@@ -170,6 +194,7 @@ class GitProcessProtocol(protocol.ProcessProtocol):
 
     def connectionMade(self):
         self.peer.setPeer(self)
+        self.peer.registerProducer(self, True)
         self.peer.resumeProducing()
 
     def outReceived(self, data):
@@ -200,12 +225,31 @@ class GitProcessProtocol(protocol.ProcessProtocol):
     def processEnded(self, status):
         self.peer.transport.loseConnection()
 
+    def registerProducer(self, producer, streaming):
+        # stopProducing will be invoked once the stdin is closed, but we
+        # expect to run half-closed for some time. Just ignore the
+        # stopProducing rather than killing the connection.
+        self.transport.registerProducer(
+            UnstoppableProducerWrapper(producer), streaming)
+
+    def pauseProducing(self):
+        self.transport.pauseProducing()
+
+    def resumeProducing(self):
+        self.transport.resumeProducing()
+
+    def stopProducing(self):
+        # Don't want to kill git immediately just because the client's gone.
+        # XXX: Don't we?
+        pass
+
 
 class PackClientProtocol(PackProxyProtocol):
     """Dumb protocol which just forwards between two others."""
 
     def connectionMade(self):
         self.peer.setPeer(self)
+        self.peer.registerProducer(self.transport, True)
         self.peer.resumeProducing()
 
     def packetReceived(self, data):
