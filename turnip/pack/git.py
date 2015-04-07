@@ -124,10 +124,6 @@ class PackProxyProtocol(PackProtocol):
 
     def setPeer(self, peer):
         self.peer = peer
-        self.peer.registerProducer(self.transport, True)
-
-    def registerProducer(self, producer, streaming):
-        self.transport.registerProducer(producer, streaming)
 
     def die(self, message):
         raise NotImplementedError()
@@ -194,7 +190,9 @@ class GitProcessProtocol(protocol.ProcessProtocol):
 
     def connectionMade(self):
         self.peer.setPeer(self)
-        self.peer.registerProducer(self, True)
+        self.peer.transport.registerProducer(self, True)
+        self.transport.registerProducer(
+            UnstoppableProducerWrapper(self.peer.transport), True)
         self.peer.resumeProducing()
 
     def outReceived(self, data):
@@ -225,13 +223,6 @@ class GitProcessProtocol(protocol.ProcessProtocol):
     def processEnded(self, status):
         self.peer.transport.loseConnection()
 
-    def registerProducer(self, producer, streaming):
-        # stopProducing will be invoked once the stdin is closed, but we
-        # expect to run half-closed for some time. Just ignore the
-        # stopProducing rather than killing the connection.
-        self.transport.registerProducer(
-            UnstoppableProducerWrapper(producer), streaming)
-
     def pauseProducing(self):
         self.transport.pauseProducing()
 
@@ -249,7 +240,8 @@ class PackClientProtocol(PackProxyProtocol):
 
     def connectionMade(self):
         self.peer.setPeer(self)
-        self.peer.registerProducer(self.transport, True)
+        self.peer.transport.registerProducer(self.transport, True)
+        self.transport.registerProducer(self.peer.transport, True)
         self.peer.resumeProducing()
 
     def packetReceived(self, data):
