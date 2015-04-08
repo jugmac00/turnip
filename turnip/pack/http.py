@@ -56,6 +56,7 @@ class HTTPPackClientProtocol(PackProtocol):
     """
 
     user_error_possible = True
+    finished = False
 
     def backendConnected(self):
         """Called when the backend is connected and has sent a good packet."""
@@ -97,8 +98,15 @@ class HTTPPackClientProtocol(PackProtocol):
             # regardless.
             self.rawDataReceived(encode_packet(ERROR_PREFIX + msg))
 
+    def _finish(self, result):
+        # Ensure the backend dies if the client disconnects.
+        self.finished = True
+        if self.transport is not None:
+            self.transport.stopProducing()
+
     def connectionMade(self):
         """Forward the request and the client's payload to the backend."""
+        self.factory.http_request.notifyFinish().addBoth(self._finish)
         self.sendPacket(
             encode_request(
                 self.factory.command, self.factory.pathname,
@@ -122,7 +130,8 @@ class HTTPPackClientProtocol(PackProtocol):
         self.factory.http_request.write(data)
 
     def connectionLost(self, reason):
-        self.factory.http_request.finish()
+        if not self.finished:
+            self.factory.http_request.finish()
 
 
 class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
@@ -178,6 +187,8 @@ class BaseSmartHTTPResource(resource.Resource):
 
     def errback(self, failure, request):
         """Handle a Twisted failure by returning an HTTP error."""
+        if self.finished:
+            return
         request.write(self.error(request, repr(failure)))
         request.finish()
 
