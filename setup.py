@@ -17,7 +17,7 @@ with open(os.path.join(here, 'README')) as f:
 requires = [
     'cornice',
     'lazr.sshserver',
-    'pygit2>=0.21.0,<0.22.0',
+    'pygit2>=0.22.0,<0.23.0',
     'PyYAML',
     'Twisted',
     'waitress',
