@@ -230,9 +230,8 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.transport.resumeProducing()
 
     def stopProducing(self):
-        # Don't want to kill git immediately just because the client's gone.
-        # XXX: Don't we?
-        pass
+        # XXX: On a push we possibly don't want to just kill it.
+        self.transport.loseConnection()
 
 
 class PackClientProtocol(PackProxyProtocol):
