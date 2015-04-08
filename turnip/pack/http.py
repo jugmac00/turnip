@@ -103,10 +103,13 @@ class HTTPPackClientProtocol(PackProtocol):
         self.finished = True
         if self.transport is not None:
             self.transport.stopProducing()
+            self.factory.http_request.transport.unregisterProducer()
 
     def connectionMade(self):
         """Forward the request and the client's payload to the backend."""
         self.factory.http_request.notifyFinish().addBoth(self._finish)
+        self.factory.http_request.transport.registerProducer(
+            self.transport, True)
         self.sendPacket(
             encode_request(
                 self.factory.command, self.factory.pathname,
