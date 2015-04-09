@@ -5,6 +5,7 @@ from __future__ import (
     )
 
 import sys
+import uuid
 
 from twisted.internet import (
     defer,
@@ -24,6 +25,7 @@ from turnip.pack.helpers import (
     decode_request,
     encode_packet,
     encode_request,
+    ensure_hooks,
     INCOMPLETE_PKT,
     )
 
@@ -32,6 +34,26 @@ ERROR_PREFIX = b'ERR '
 VIRT_ERROR_PREFIX = b'turnip virt error: '
 
 SAFE_PARAMS = frozenset(['host'])
+
+
+class UnstoppableProducerWrapper(object):
+    """An `IPushProducer` that won't be stopped.
+
+    Used to avoid closing TCP connections just because one direction has
+    been closed.
+    """
+
+    def __init__(self, producer):
+        self.producer = producer
+
+    def pauseProducing(self):
+        self.producer.pauseProducing()
+
+    def resumeProducing(self):
+        self.producer.resumeProducing()
+
+    def stopProducing(self):
+        pass
 
 
 class PackProtocol(protocol.Protocol):
@@ -168,6 +190,9 @@ class GitProcessProtocol(protocol.ProcessProtocol):
 
     def connectionMade(self):
         self.peer.setPeer(self)
+        self.peer.transport.registerProducer(self, True)
+        self.transport.registerProducer(
+            UnstoppableProducerWrapper(self.peer.transport), True)
         self.peer.resumeProducing()
 
     def outReceived(self, data):
@@ -198,12 +223,24 @@ class GitProcessProtocol(protocol.ProcessProtocol):
     def processEnded(self, status):
         self.peer.transport.loseConnection()
 
+    def pauseProducing(self):
+        self.transport.pauseProducing()
+
+    def resumeProducing(self):
+        self.transport.resumeProducing()
+
+    def stopProducing(self):
+        # XXX: On a push we possibly don't want to just kill it.
+        self.transport.loseConnection()
+
 
 class PackClientProtocol(PackProxyProtocol):
     """Dumb protocol which just forwards between two others."""
 
     def connectionMade(self):
         self.peer.setPeer(self)
+        self.peer.transport.registerProducer(self.transport, True)
+        self.transport.registerProducer(self.peer.transport, True)
         self.peer.resumeProducing()
 
     def packetReceived(self, data):
@@ -271,6 +308,8 @@ class PackBackendProtocol(PackServerProtocol):
     Invokes the reference C Git implementation.
     """
 
+    hookrpc_key = None
+
     def requestReceived(self, command, raw_pathname, params):
         path = compose_path(self.factory.root, raw_pathname)
         if command == b'git-upload-pack':
@@ -278,7 +317,7 @@ class PackBackendProtocol(PackServerProtocol):
         elif command == b'git-receive-pack':
             subcmd = b'receive-pack'
         else:
-            self.die(b'Unsupport command in request')
+            self.die(b'Unsupported command in request')
             return
 
         cmd = b'git'
@@ -289,22 +328,42 @@ class PackBackendProtocol(PackServerProtocol):
             args.append(b'--advertise-refs')
         args.append(path)
 
+        env = {}
+        if subcmd == b'receive-pack' and self.factory.hookrpc_handler:
+            # This is a write operation, so prepare hooks, the hook RPC
+            # server, and the environment variables that link them up.
+            self.hookrpc_key = str(uuid.uuid4())
+            self.factory.hookrpc_handler.registerKey(
+                self.hookrpc_key, raw_pathname, [])
+            ensure_hooks(path)
+            env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hookrpc_sock
+            env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
+
         self.peer = GitProcessProtocol(self)
-        reactor.spawnProcess(self.peer, cmd, args)
+        reactor.spawnProcess(self.peer, cmd, args, env=env)
 
     def readConnectionLost(self):
-        self.peer.loseWriteConnection()
+        if self.peer is not None:
+            self.peer.loseWriteConnection()
 
     def writeConnectionLost(self):
-        self.peer.loseReadConnection()
+        if self.peer is not None:
+            self.peer.loseReadConnection()
+
+    def connectionLost(self, reason):
+        if self.hookrpc_key:
+            self.factory.hookrpc_handler.unregisterKey(self.hookrpc_key)
+        PackServerProtocol.connectionLost(self, reason)
 
 
 class PackBackendFactory(protocol.Factory):
 
     protocol = PackBackendProtocol
 
-    def __init__(self, root):
+    def __init__(self, root, hookrpc_handler=None, hookrpc_sock=None):
         self.root = root
+        self.hookrpc_handler = hookrpc_handler
+        self.hookrpc_sock = hookrpc_sock
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):
@@ -326,6 +385,10 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                 b'translatePath', pathname, permission,
                 int(auth_uid) if auth_uid is not None else None,
                 can_authenticate)
+            if 'trailing' in translated and translated['trailing']:
+                self.die(
+                    VIRT_ERROR_PREFIX
+                    + b'NOT_FOUND Repository does not exist.')
             pathname = translated['path']
         except xmlrpc.Fault as e:
             if e.faultCode in (1, 290):

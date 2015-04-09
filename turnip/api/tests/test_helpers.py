@@ -1,5 +1,6 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import itertools
 import os
 
 from pygit2 import (
@@ -8,8 +9,19 @@ from pygit2 import (
     GIT_OBJ_COMMIT,
     GIT_SORT_TIME,
     IndexEntry,
+    Repository,
     Signature,
     )
+
+
+def get_revlist(repo):
+    """Return revlist for a given pygit2 repo object."""
+    return [commit.oid.hex for commit in repo.walk(repo.head.target)]
+
+
+def open_repo(repo_path):
+    """Return a pygit2 repo object for a given path."""
+    return Repository(repo_path)
 
 
 class RepoFactory():
@@ -82,6 +94,14 @@ class RepoFactory():
         oid = repo.head.get_object().oid
         for i in xrange(num_tags):
             self.add_tag('tag{}'.format(i), 'tag message {}'.format(i), oid)
+
+    def nonexistent_oid(self):
+        """Return an arbitrary OID that does not exist in this repo."""
+        for oid_chars in itertools.product('0123456789abcdef', repeat=40):
+            oid = ''.join(oid_chars)
+            if oid not in self.repo:
+                return oid
+        raise Exception("repo appears to contain every possible OID!")
 
     def init_repo(self):
         return init_repository(self.repo_path)

@@ -182,8 +182,13 @@ class SmartSSHSession(DoNothingSession):
         except Exception as e:
             self.errorWithMessage(protocol, str(e).encode("UTF-8"))
 
+    def closed(self):
+        if self.pack_protocol is not None:
+            self.pack_protocol.transport.loseConnection()
+
     def eofReceived(self):
-        self.pack_protocol.transport.loseWriteConnection()
+        if self.pack_protocol is not None:
+            self.pack_protocol.transport.loseWriteConnection()
 
 
 class SmartSSHAvatar(LaunchpadAvatar):

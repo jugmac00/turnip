@@ -5,6 +5,9 @@ from __future__ import (
     )
 
 from cStringIO import StringIO
+import os.path
+import tempfile
+import textwrap
 import sys
 import zlib
 
@@ -17,8 +20,11 @@ from twisted.web import (
     http,
     resource,
     server,
+    static,
+    twcgi,
     )
 
+from turnip.helpers import compose_path
 from turnip.pack.git import (
     ERROR_PREFIX,
     PackProtocol,
@@ -50,6 +56,7 @@ class HTTPPackClientProtocol(PackProtocol):
     """
 
     user_error_possible = True
+    finished = False
 
     def backendConnected(self):
         """Called when the backend is connected and has sent a good packet."""
@@ -91,8 +98,18 @@ class HTTPPackClientProtocol(PackProtocol):
             # regardless.
             self.rawDataReceived(encode_packet(ERROR_PREFIX + msg))
 
+    def _finish(self, result):
+        # Ensure the backend dies if the client disconnects.
+        self.finished = True
+        if self.transport is not None:
+            self.transport.stopProducing()
+            self.factory.http_request.transport.unregisterProducer()
+
     def connectionMade(self):
         """Forward the request and the client's payload to the backend."""
+        self.factory.http_request.notifyFinish().addBoth(self._finish)
+        self.factory.http_request.transport.registerProducer(
+            self.transport, True)
         self.sendPacket(
             encode_request(
                 self.factory.command, self.factory.pathname,
@@ -116,7 +133,8 @@ class HTTPPackClientProtocol(PackProtocol):
         self.factory.http_request.write(data)
 
     def connectionLost(self, reason):
-        self.factory.http_request.finish()
+        if not self.finished:
+            self.factory.http_request.finish()
 
 
 class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
@@ -172,6 +190,8 @@ class BaseSmartHTTPResource(resource.Resource):
 
     def errback(self, failure, request):
         """Handle a Twisted failure by returning an HTTP error."""
+        if self.finished:
+            return
         request.write(self.error(request, repr(failure)))
         request.finish()
 
@@ -191,7 +211,7 @@ class BaseSmartHTTPResource(resource.Resource):
                     b'authenticateWithPassword', request.getUser(),
                     request.getPassword())
             except xmlrpc.Fault as e:
-                if e.faultCode == 3:
+                if e.faultCode in (3, 410):
                     defer.returnValue((None, None))
                 else:
                     raise
@@ -282,29 +302,186 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
         return server.NOT_DONE_YET
 
 
+class SmartHTTPRootResource(resource.Resource):
+    """HTTP resource to handle operations on the root path."""
+
+    def render_OPTIONS(self, request):
+        # Trivially respond to OPTIONS / for the sake of haproxy.
+        return b''
+
+
+class DirectoryWithoutListings(static.File):
+    """A static directory resource without support for directory listings."""
+
+    def directoryListing(self):
+        return self.childNotFound
+
+
+class RobotsResource(static.Data):
+    """HTTP resource to serve our robots.txt."""
+
+    robots_txt = textwrap.dedent("""\
+        User-agent: *
+        Disallow: /
+        """).encode('US-ASCII')
+
+    def __init__(self):
+        static.Data.__init__(self, self.robots_txt, 'text/plain')
+
+
+class CGitScriptResource(twcgi.CGIScript):
+    """HTTP resource to run cgit."""
+
+    def __init__(self, root):
+        twcgi.CGIScript.__init__(self, root.cgit_exec_path)
+        self.root = root
+        self.cgit_config = None
+
+    def _error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
+        request.setResponseCode(code)
+        request.setHeader(b'Content-Type', b'text/plain')
+        request.write(message)
+        request.finish()
+
+    def _finished(self, ignored):
+        if self.cgit_config is not None:
+            self.cgit_config.close()
+
+    def _translatePathCallback(self, translated, env, request,
+                               *args, **kwargs):
+        if 'path' not in translated:
+            self._error(
+                request, b'translatePath response did not include path')
+            return
+        repo_url = request.path.rstrip('/')
+        # cgit simply parses configuration values up to the end of a line
+        # following the first '=', so almost anything is safe, but
+        # double-check that there are no newlines to confuse things.
+        if '\n' in repo_url:
+            self._error(request, b'repository URL may not contain newlines')
+            return
+        try:
+            repo_path = compose_path(self.root.repo_store, translated['path'])
+        except ValueError as e:
+            self._error(request, str(e).encode('UTF-8'))
+            return
+        trailing = translated.get('trailing')
+        if trailing:
+            if not trailing.startswith('/'):
+                trailing = '/' + trailing
+            if not repo_url.endswith(trailing):
+                self._error(
+                    request,
+                    b'translatePath returned inconsistent response: '
+                    b'"%s" does not end with "%s"' % (
+                        repo_url.encode('UTF-8'), trailing.encode('UTF-8')))
+                return
+            repo_url = repo_url[:-len(trailing)]
+        repo_url = repo_url.strip('/')
+        request.notifyFinish().addBoth(self._finished)
+        self.cgit_config = tempfile.NamedTemporaryFile(
+            mode='w+', prefix='turnip-cgit-')
+        os.chmod(self.cgit_config.name, 0o644)
+        fmt = {'repo_url': repo_url, 'repo_path': repo_path}
+        if self.root.site_name is not None:
+            prefixes = " ".join(
+                "{}://{}".format(scheme, self.root.site_name)
+                for scheme in ("git", "git+ssh", "https"))
+            print("clone-prefix={}".format(prefixes), file=self.cgit_config)
+        print(textwrap.dedent("""\
+            css=/static/cgit.css
+            enable-http-clone=0
+            enable-index-owner=0
+            logo=/static/launchpad-logo.png
+
+            repo.url={repo_url}
+            repo.path={repo_path}
+            """).format(**fmt), file=self.cgit_config)
+        self.cgit_config.flush()
+        env["CGIT_CONFIG"] = self.cgit_config.name
+        env["PATH_INFO"] = "/%s%s" % (repo_url, trailing)
+        env["SCRIPT_NAME"] = "/"
+        twcgi.CGIScript.runProcess(self, env, request, *args, **kwargs)
+
+    def _translatePathErrback(self, failure, request):
+        e = failure.value
+        if e.faultCode in (1, 290):
+            error_code = http.NOT_FOUND
+        elif e.faultCode in (2, 310):
+            error_code = http.FORBIDDEN
+        elif e.faultCode in (3, 410):
+            # XXX cjwatson 2015-03-30: should be UNAUTHORIZED, but we
+            # don't implement that yet
+            error_code = http.FORBIDDEN
+        else:
+            error_code = http.INTERNAL_SERVER_ERROR
+        self._error(request, e.faultString, code=error_code)
+
+    def runProcess(self, env, request, *args, **kwargs):
+        proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint, allowNone=True)
+        # XXX cjwatson 2015-03-30: authentication
+        d = proxy.callRemote(
+            b'translatePath', request.path, b'read', None, False)
+        d.addCallback(
+            self._translatePathCallback, env, request, *args, **kwargs)
+        d.addErrback(self._translatePathErrback, request)
+        return server.NOT_DONE_YET
+
+
 class SmartHTTPFrontendResource(resource.Resource):
     """HTTP resource to translate Git smart HTTP requests to pack protocol."""
 
     allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
 
-    def __init__(self, backend_host, backend_port, virtinfo_endpoint):
+    def __init__(self, backend_host, backend_port, virtinfo_endpoint,
+                 repo_store, cgit_exec_path=None, cgit_data_path=None,
+                 site_name=None):
         resource.Resource.__init__(self)
         self.backend_host = backend_host
         self.backend_port = backend_port
         self.virtinfo_endpoint = virtinfo_endpoint
+        # XXX cjwatson 2015-03-30: Knowing about the store path here
+        # violates turnip's layering and may cause scaling problems later,
+        # but for now cgit needs direct filesystem access.
+        self.repo_store = repo_store
+        self.cgit_exec_path = cgit_exec_path
+        self.site_name = site_name
+        self.putChild('', SmartHTTPRootResource())
+        if cgit_data_path is not None:
+            static_resource = DirectoryWithoutListings(
+                cgit_data_path, defaultType='text/plain')
+            top = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            logo = os.path.join(top, 'images', 'launchpad-logo.png')
+            static_resource.putChild('launchpad-logo.png', static.File(logo))
+            self.putChild('static', static_resource)
+            favicon = os.path.join(top, 'images', 'launchpad.png')
+            self.putChild('favicon.ico', static.File(favicon))
+
+    @staticmethod
+    def _isGitRequest(request):
+        if request.path.endswith(b'/info/refs'):
+            service = request.args.get('service', [])
+            if service and service[0].startswith('git-'):
+                return True
+        content_type = request.getHeader(b'Content-Type')
+        if content_type is None:
+            return False
+        return content_type.startswith(b'application/x-git-')
 
     def getChild(self, path, request):
-        if request.path.endswith(b'/info/refs'):
-            # /PATH/TO/REPO/info/refs
-            return SmartHTTPRefsResource(
-                self, request.path[:-len(b'/info/refs')])
-        try:
-            # /PATH/TO/REPO/SERVICE
-            path, service = request.path.rsplit(b'/', 1)
-        except ValueError:
-            path = request.path
-            service = None
-        if service in self.allowed_services:
-            return SmartHTTPCommandResource(self, service, path)
-
+        if self._isGitRequest(request):
+            if request.path.endswith(b'/info/refs'):
+                # /PATH/TO/REPO/info/refs
+                return SmartHTTPRefsResource(
+                    self, request.path[:-len(b'/info/refs')])
+            try:
+                # /PATH/TO/REPO/SERVICE
+                path, service = request.path.rsplit(b'/', 1)
+            except ValueError:
+                path = request.path
+                service = None
+            if service in self.allowed_services:
+                return SmartHTTPCommandResource(self, service, path)
+        elif self.cgit_exec_path is not None:
+            return CGitScriptResource(self)
         return resource.NoResource(b'No such resource')
