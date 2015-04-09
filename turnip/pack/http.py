@@ -205,17 +205,9 @@ class BaseSmartHTTPResource(resource.Resource):
     def authenticateUser(self, request):
         """Attempt authentication of the request with the virt service."""
         if request.getUser():
-            proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint)
-            try:
-                translated = yield proxy.callRemote(
-                    b'authenticateWithPassword', request.getUser(),
-                    request.getPassword())
-            except xmlrpc.Fault as e:
-                if e.faultCode in (3, 410):
-                    defer.returnValue((None, None))
-                else:
-                    raise
-            defer.returnValue((translated['user'], translated['uid']))
+            user, uid = yield self.root.authenticateWithPassword(
+                request.getUser(), request.getPassword())
+            defer.returnValue((user, uid))
         defer.returnValue((None, None))
 
     @defer.inlineCallbacks
@@ -233,8 +225,7 @@ class BaseSmartHTTPResource(resource.Resource):
             params[b'turnip-authenticated-uid'] = str(authenticated_uid)
         params.update(self.extra_params)
         client_factory = factory(service, path, params, content, request)
-        reactor.connectTCP(
-            self.root.backend_host, self.root.backend_port, client_factory)
+        self.root.connectToBackend(client_factory)
 
 
 class SmartHTTPRefsResource(BaseSmartHTTPResource):
@@ -485,3 +476,20 @@ class SmartHTTPFrontendResource(resource.Resource):
         elif self.cgit_exec_path is not None:
             return CGitScriptResource(self)
         return resource.NoResource(b'No such resource')
+
+    def connectToBackend(self, client_factory):
+        reactor.connectTCP(
+            self.backend_host, self.backend_port, client_factory)
+
+    @defer.inlineCallbacks
+    def authenticateWithPassword(self, user, password):
+        proxy = xmlrpc.Proxy(self.virtinfo_endpoint)
+        try:
+            translated = yield proxy.callRemote(
+                b'authenticateWithPassword', user, password)
+        except xmlrpc.Fault as e:
+            if e.faultCode in (3, 410):
+                defer.returnValue((None, None))
+            else:
+                raise
+        defer.returnValue((translated['user'], translated['uid']))
