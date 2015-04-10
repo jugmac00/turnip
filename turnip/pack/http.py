@@ -56,7 +56,6 @@ class HTTPPackClientProtocol(PackProtocol):
     """
 
     user_error_possible = True
-    finished = False
 
     def backendConnected(self):
         """Called when the backend is connected and has sent a good packet."""
@@ -100,7 +99,6 @@ class HTTPPackClientProtocol(PackProtocol):
 
     def _finish(self, result):
         # Ensure the backend dies if the client disconnects.
-        self.finished = True
         if self.transport is not None:
             self.transport.stopProducing()
             self.factory.http_request.transport.unregisterProducer()
@@ -133,7 +131,7 @@ class HTTPPackClientProtocol(PackProtocol):
         self.factory.http_request.write(data)
 
     def connectionLost(self, reason):
-        if not self.finished:
+        if not self.factory.http_request.finished:
             self.factory.http_request.finish()
 
 
@@ -190,7 +188,7 @@ class BaseSmartHTTPResource(resource.Resource):
 
     def errback(self, failure, request):
         """Handle a Twisted failure by returning an HTTP error."""
-        if self.finished:
+        if request.finished:
             return
         request.write(self.error(request, repr(failure)))
         request.finish()
