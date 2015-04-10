@@ -90,6 +90,7 @@ class HTTPPackClientProtocol(PackProtocol):
             self.factory.http_request.setResponseCode(error_code)
             self.factory.http_request.setHeader(b'Content-Type', b'text/plain')
             self.factory.http_request.write(msg)
+            self.factory.http_request.unregisterProducer()
             self.factory.http_request.finish()
         else:
             # We don't know it was a system error, so just send it back to the
@@ -127,7 +128,8 @@ class HTTPPackClientProtocol(PackProtocol):
             self.rawDataReceived(encode_packet(data))
 
     def rawDataReceived(self, data):
-        self.factory.http_request.write(data)
+        if not self.factory.http_request.finished:
+            self.factory.http_request.write(data)
 
     def connectionLost(self, reason):
         self.factory.http_request.unregisterProducer()
