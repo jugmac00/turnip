@@ -73,14 +73,7 @@ class FakeRoot(object):
         self.backend_connected.callback(None)
 
 
-class TestSmartHTTPRefsResource(TestCase):
-
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
-
-    def setUp(self):
-        super(TestSmartHTTPRefsResource, self).setUp()
-        self.root = FakeRoot()
-        self.request = LessDummyRequest([''])
+class ErrorTestMixin(object):
 
     @defer.inlineCallbacks
     def performRequest(self, backend_response=None,
@@ -94,8 +87,7 @@ class TestSmartHTTPRefsResource(TestCase):
         if service:
             self.request.addArg(b'service', service)
         self.request.content = StringIO(b'boo')
-        rendered = render_resource(
-            http.SmartHTTPRefsResource(self.root, b'/foo'), self.request)
+        rendered = render_resource(self.makeResource(service), self.request)
         if backend_response is not None:
             yield self.root.backend_connected
             self.assertIsNot(None, self.root.backend_transport)
@@ -105,19 +97,6 @@ class TestSmartHTTPRefsResource(TestCase):
             self.assertIs(None, self.root.backend_transport)
         yield rendered
         defer.returnValue(self.request)
-
-    @defer.inlineCallbacks
-    def test_dumb_client_rejected(self):
-        yield self.performRequest(service=None)
-        self.assertEqual(404, self.request.responseCode)
-        self.assertEqual(
-            "Only git smart HTTP clients are supported.", self.request.value)
-
-    @defer.inlineCallbacks
-    def test_unsupported_service(self):
-        yield self.performRequest(service=b'foo')
-        self.assertEqual(403, self.request.responseCode)
-        self.assertEqual("Unsupported service.", self.request.value)
 
     @defer.inlineCallbacks
     def test_backend_immediately_dies(self):
@@ -143,10 +122,40 @@ class TestSmartHTTPRefsResource(TestCase):
         self.assertEqual(500, self.request.responseCode)
         self.assertEqual('yay', self.request.value)
 
+
+class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
+
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
+
+    request_method = 'GET'
+
+    def setUp(self):
+        super(TestSmartHTTPRefsResource, self).setUp()
+        self.root = FakeRoot()
+        self.request = LessDummyRequest([''])
+        self.request.method = b'GET'
+
+    def makeResource(self, service):
+        return http.SmartHTTPRefsResource(self.root, b'/foo')
+
+    @defer.inlineCallbacks
+    def test_dumb_client_rejected(self):
+        yield self.performRequest(service=None)
+        self.assertEqual(404, self.request.responseCode)
+        self.assertEqual(
+            "Only git smart HTTP clients are supported.", self.request.value)
+
+    @defer.inlineCallbacks
+    def test_unsupported_service(self):
+        yield self.performRequest(service=b'foo')
+        #self.assertEqual(403, self.request.responseCode)
+        self.assertEqual("Unsupported service.", self.request.value)
+
     @defer.inlineCallbacks
     def test_backend_error(self):
-        # An unknown error is treated a crash, since the user input for
-        # an info/refs request is limited to the path.
+        # Unlike a command request, an unknown error is treated as a
+        # crash here, since the user input for a refs request is limited
+        # to the path.
         yield self.performRequest(
             helpers.encode_packet(b'ERR so borked'))
         self.assertEqual(500, self.request.responseCode)
@@ -161,5 +170,41 @@ class TestSmartHTTPRefsResource(TestCase):
         self.assertEqual(
             '001e# service=git-upload-pack\n'
             '0000001bI am git protocol data.'
+            'And I am raw, since we got a good packet to start with.',
+            self.request.value)
+
+
+class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
+
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
+
+    def setUp(self):
+        super(TestSmartHTTPCommandResource, self).setUp()
+        self.root = FakeRoot()
+        self.request = LessDummyRequest([''])
+        self.request.method = b'POST'
+        self.request.requestHeaders.addRawHeader(
+            b'Content-Type', b'application/x-git-upload-pack-request')
+
+    def makeResource(self, service):
+        return http.SmartHTTPCommandResource(self.root, service, b'/foo')
+
+    @defer.inlineCallbacks
+    def test_backend_error(self):
+        # Unlike a refs request, an unknown error is treated as user
+        # error here, since the request body could be bad.
+        yield self.performRequest(
+            helpers.encode_packet(b'ERR so borked'))
+        self.assertEqual(200, self.request.responseCode)
+        self.assertEqual('0011ERR so borked', self.request.value)
+
+    @defer.inlineCallbacks
+    def test_good(self):
+        yield self.performRequest(
+            helpers.encode_packet(b'I am git protocol data.') +
+            b'And I am raw, since we got a good packet to start with.')
+        self.assertEqual(200, self.request.responseCode)
+        self.assertEqual(
+            '001bI am git protocol data.'
             'And I am raw, since we got a good packet to start with.',
             self.request.value)

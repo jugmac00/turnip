@@ -92,11 +92,11 @@ class HTTPPackClientProtocol(PackProtocol):
             self.factory.http_request.write(msg)
             self.factory.http_request.unregisterProducer()
             self.factory.http_request.finish()
-        else:
-            # We don't know it was a system error, so just send it back to the
-            # client as a remote error and proceed to forward data
-            # regardless.
-            self.rawDataReceived(encode_packet(ERROR_PREFIX + msg))
+            return True
+        # We don't know it was a system error, so just send it back to
+        # the client as a remote error and proceed to forward data
+        # regardless.
+        return False
 
     def _finish(self, result):
         # Ensure the backend dies if the client disconnects.
@@ -122,8 +122,13 @@ class HTTPPackClientProtocol(PackProtocol):
         """
         self.raw = True
         if data is not None and data.startswith(ERROR_PREFIX):
-            self.backendConnectionFailed(data[len(ERROR_PREFIX):])
+            # Handle the error nicely if it's known (eg. 404 on
+            # nonexistent repo). If it's unknown, just forward the error
+            # along to the client and forward as normal.
+            virt_error = self.backendConnectionFailed(data[len(ERROR_PREFIX):])
         else:
+            virt_error = False
+        if not virt_error:
             self.backendConnected()
             self.rawDataReceived(encode_packet(data))
 
