@@ -90,7 +90,7 @@ class HTTPPackClientProtocol(PackProtocol):
             self.factory.http_request.setResponseCode(error_code)
             self.factory.http_request.setHeader(b'Content-Type', b'text/plain')
             self.factory.http_request.write(msg)
-            self.transport.loseConnection()
+            self.factory.http_request.finish()
         else:
             # We don't know it was a system error, so just send it back to the
             # client as a remote error and proceed to forward data
@@ -132,6 +132,12 @@ class HTTPPackClientProtocol(PackProtocol):
     def connectionLost(self, reason):
         self.factory.http_request.unregisterProducer()
         if not self.factory.http_request.finished:
+            if not self.raw:
+                self.factory.http_request.setResponseCode(
+                    http.INTERNAL_SERVER_ERROR)
+                self.factory.http_request.setHeader(
+                    b'Content-Type', b'text/plain')
+                self.factory.http_request.write(b'Backend connection lost.')
             self.factory.http_request.finish()
 
 
@@ -144,6 +150,7 @@ class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
 
     def backendConnected(self):
         """Prepare the HTTP response for forwarding from the backend."""
+        self.factory.http_request.setResponseCode(http.OK)
         self.factory.http_request.setHeader(
             b'Content-Type',
             b'application/x-%s-advertisement' % self.factory.command)
@@ -156,6 +163,7 @@ class HTTPPackClientCommandProtocol(HTTPPackClientProtocol):
 
     def backendConnected(self):
         """Prepare the HTTP response for forwarding from the backend."""
+        self.factory.http_request.setResponseCode(http.OK)
         self.factory.http_request.setHeader(
             b'Content-Type',
             b'application/x-%s-result' % self.factory.command)
