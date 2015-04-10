@@ -101,12 +101,11 @@ class HTTPPackClientProtocol(PackProtocol):
         # Ensure the backend dies if the client disconnects.
         if self.transport is not None:
             self.transport.stopProducing()
-            self.factory.http_request.transport.unregisterProducer()
 
     def connectionMade(self):
         """Forward the request and the client's payload to the backend."""
         self.factory.http_request.notifyFinish().addBoth(self._finish)
-        self.factory.http_request.transport.registerProducer(
+        self.factory.http_request.registerProducer(
             self.transport, True)
         self.sendPacket(
             encode_request(
@@ -131,6 +130,7 @@ class HTTPPackClientProtocol(PackProtocol):
         self.factory.http_request.write(data)
 
     def connectionLost(self, reason):
+        self.factory.http_request.unregisterProducer()
         if not self.factory.http_request.finished:
             self.factory.http_request.finish()
 
@@ -191,6 +191,7 @@ class BaseSmartHTTPResource(resource.Resource):
         if request.finished:
             return
         request.write(self.error(request, repr(failure)))
+        request.unregisterProducer()
         request.finish()
 
     def error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
