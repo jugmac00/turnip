@@ -128,12 +128,11 @@ class DiffAPI(BaseAPI):
             return exc.HTTPBadRequest()
         try:
             diff_type = commits[1]
+            args = (repo_path, commits[0], commits[2], context_lines)
             if diff_type == '..':
-                patch = store.get_diff(
-                    repo_path, commits[0], commits[2], context_lines)
+                patch = store.get_diff(*args)
             elif diff_type == '...':
-                patch = store.get_common_ancestor_diff(
-                    repo_path, commits[0], commits[2], context_lines)
+                patch = store.get_common_ancestor_diff(*args)
         except (ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()

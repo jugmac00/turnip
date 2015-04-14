@@ -119,7 +119,12 @@ def get_ref(repo_path, ref):
 
 def get_common_ancestor_diff(repo_path, sha1_target, sha1_source,
                              context_lines=3):
-    """Get diff of common ancestor and source diff."""
+    """Get diff of common ancestor and source diff.
+
+    :param sha1_target: target sha1 for merge base.
+    :param sha1_source: source sha1 for merge base.
+    :param context_lines: num unchanged lines that define a hunk boundary.
+    """
     repo = open_repo(repo_path)
     common_ancestor = repo.merge_base(sha1_target, sha1_source)
     return get_diff(repo_path, common_ancestor, sha1_source)
@@ -128,8 +133,8 @@ def get_common_ancestor_diff(repo_path, sha1_target, sha1_source,
 def get_diff(repo_path, sha1_from, sha1_to, context_lines=3):
     """Get patch and associated commits of two sha1s.
 
-    :param sha1_fron: diff from sha1.
-    :param sha2_to: diff to sha1.
+    :param sha1_from: diff from sha1.
+    :param sha1_to: diff to sha1.
     :param context_lines: num unchanged lines that define a hunk boundary.
     """
     repo = open_repo(repo_path)
