@@ -221,7 +221,7 @@ class ApiTestCase(TestCase):
         RepoFactory(self.repo_store).build()
         resp = self.app.get('/repo/{}/compare/1++2'.format(
             self.repo_path), expect_errors=True)
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(400, resp.status_code)
 
     def test_repo_common_ancestor_diff(self):
         """Ensure expected changes exist in diff patch."""
