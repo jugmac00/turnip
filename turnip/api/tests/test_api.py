@@ -234,9 +234,9 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/compare/{}...{}'.format(
             self.repo_path, c3_left, c3_right))
-        self.assertIn('-foo', resp.body)
-        self.assertIn('+baz', resp.body)
-        self.assertNotIn('+corge', resp.body)
+        self.assertIn('-foo', resp.json_body['patch'])
+        self.assertIn('+baz', resp.json_body['patch'])
+        self.assertNotIn('+corge', resp.json_body['patch'])
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
