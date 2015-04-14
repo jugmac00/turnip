@@ -1,6 +1,7 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
 import os
+import re
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
@@ -110,23 +111,29 @@ class RefAPI(BaseAPI):
             return exc.HTTPNotFound()
 
 
-@resource(path='/repo/{name}/compare/{c1}..{c2}')
-class DiffAPI(object):
-    """Provides HTTP API for git references."""
+@resource(path='/repo/{name}/compare/{commits}')
+class DiffAPI(BaseAPI):
+    """Provides HTTP API for rev-rev 'double' and 'tripple dot' diff."""
 
     def __init__(self, request):
-        config = TurnipConfig()
+        super(DiffAPI, self).__init__()
         self.request = request
-        self.repo_store = config.get('repo_store')
 
     @repo_path
     def get(self, repo_path):
         """Returns diff of two commits."""
-        c1 = self.request.matchdict['c1']
-        c2 = self.request.matchdict['c2']
+        commits = re.split('(\.{2,3})', self.request.matchdict['commits'])
         context_lines = int(self.request.params.get('context_lines', 3))
+        if not len(commits) == 3:
+            return exc.HTTPBadRequest()
         try:
-            patch = store.get_diff(repo_path, c1, c2, context_lines)
+            diff_type = commits[1]
+            if diff_type == '..':
+                patch = store.get_diff(
+                    repo_path, commits[0], commits[2], context_lines)
+            elif diff_type == '...':
+                patch = store.get_common_ancestor_diff(
+                    repo_path, commits[0], commits[2], context_lines)
         except (ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()

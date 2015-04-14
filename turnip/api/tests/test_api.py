@@ -107,7 +107,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         refs = resp.json
-        self.assertEqual(1, len(refs.keys()))
+        self.assertEqual(0, len(refs.keys()))
 
     def test_allow_unicode_refs(self):
         """Ensure unicode refs are included in ref collection."""
@@ -119,7 +119,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         refs = resp.json
-        self.assertEqual(2, len(refs.keys()))
+        self.assertEqual(1, len(refs.keys()))
 
     def test_repo_get_ref(self):
         RepoFactory(self.repo_store, num_commits=1).build()
@@ -214,7 +214,29 @@ class ApiTestCase(TestCase):
         RepoFactory(self.repo_store).build()
         resp = self.app.get('/repo/{}/compare/1..2'.format(
             self.repo_path), expect_errors=True)
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(404, resp.status_code)
+
+    def test_repo_get_diff_invalid_separator(self):
+        """get_diff with an invalid separator (not ../...) returns HTTP 404."""
+        RepoFactory(self.repo_store).build()
+        resp = self.app.get('/repo/{}/compare/1++2'.format(
+            self.repo_path), expect_errors=True)
+        self.assertEqual(resp.status_code, 400)
+
+    def test_repo_common_ancestor_diff(self):
+        """Ensure expected changes exist in diff patch."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo', 'foobar.txt')
+        c2_right = repo.add_commit('bar', 'foobar.txt', parents=[c1])
+        c3_right = repo.add_commit('baz', 'foobar.txt', parents=[c2_right])
+        c2_left = repo.add_commit('qux', 'foobar.txt', parents=[c1])
+        c3_left = repo.add_commit('corge', 'foobar.txt', parents=[c2_left])
+
+        resp = self.app.get('/repo/{}/compare/{}...{}'.format(
+            self.repo_path, c3_left, c3_right))
+        self.assertIn('-foo', resp.body)
+        self.assertIn('+baz', resp.body)
+        self.assertNotIn('+corge', resp.body)
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)

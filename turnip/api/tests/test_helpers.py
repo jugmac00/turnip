@@ -2,6 +2,7 @@
 
 import itertools
 import os
+import uuid
 
 from pygit2 import (
     init_repository,
@@ -27,10 +28,13 @@ def open_repo(repo_path):
 class RepoFactory():
     """Builds a git repository in a user defined state."""
 
-    def __init__(self, repo_path=None, num_commits=None, num_tags=None):
+    def __init__(self, repo_path=None, num_commits=None,
+                 num_branches=None, num_tags=None):
         self.author = Signature('Test Author', 'author@bar.com')
+        self.branches = []
         self.committer = Signature('Test Commiter', 'committer@bar.com')
         self.commits = []
+        self.num_branches = num_branches
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_path = repo_path
@@ -43,7 +47,7 @@ class RepoFactory():
         return list(self.repo.walk(last.id, GIT_SORT_TIME))
 
     def add_commit(self, blob_content, file_path, parents=[],
-                   ref='refs/heads/master', author=None, committer=None):
+                   ref=None, author=None, committer=None):
         """Create a commit from blob_content and file_path."""
         repo = self.repo
         if not author:
@@ -57,6 +61,12 @@ class RepoFactory():
         oid = repo.create_commit(ref, author, committer,
                                  blob_content, tree_id, parents)
         return oid
+
+    def add_branch(self, name, oid):
+        commit = self.repo.get(oid)
+        branch = self.repo.create_branch('branch-{}'.format(name), commit)
+        self.branches.append(branch)
+        return branch
 
     def add_tag(self, tag_name, tag_message, oid):
         """Create a tag from tag_name and oid."""
@@ -75,11 +85,10 @@ class RepoFactory():
         repo.index.write()
         return repo.index.write_tree()
 
-    def generate_commits(self, num_commits):
+    def generate_commits(self, num_commits, parents=[]):
         """Generate n number of commits."""
-        parents = []
         for i in xrange(num_commits):
-            blob_content = b'commit {}'.format(i)
+            blob_content = b'commit {} - {}'.format(i, uuid.uuid1())
             test_file = 'test.txt'
             with open(os.path.join(self.repo_path, test_file), 'w') as f:
                 f.write(blob_content)
@@ -87,6 +96,13 @@ class RepoFactory():
             commit_oid = self.add_commit(blob_content, test_file, parents)
             self.commits.append(commit_oid)
             parents = [commit_oid]
+            if i == num_commits - 1:
+                ref = 'refs/heads/master'
+                try:
+                    self.repo.lookup_reference(ref)
+                except KeyError:
+                    self.repo.create_reference(ref, commit_oid)
+                self.repo.set_head(commit_oid)
 
     def generate_tags(self, num_tags):
         """Generate n number of tags."""
@@ -94,6 +110,17 @@ class RepoFactory():
         oid = repo.head.get_object().oid
         for i in xrange(num_tags):
             self.add_tag('tag{}'.format(i), 'tag message {}'.format(i), oid)
+
+    def generate_branches(self, num_branches, num_commits):
+        """Generate n number of branches with n commits."""
+        repo = self.repo
+        parents = []
+        for i in xrange(num_branches):
+            self.generate_commits(num_commits, parents)
+            oid = repo.revparse_single('HEAD')
+            branch = repo.create_branch('branch-{}'.format(i), oid)
+            self.branches.append(branch)
+            parents.append(self.commits[0])
 
     def nonexistent_oid(self):
         """Return an arbitrary OID that does not exist in this repo."""
@@ -108,7 +135,9 @@ class RepoFactory():
 
     def build(self):
         """Return a repo, optionally with generated commits and tags."""
-        if self.num_commits:
+        if self.num_branches:
+            self.generate_branches(self.num_branches, self.num_commits)
+        if not self.num_branches and self.num_commits:
             self.generate_commits(self.num_commits)
         if self.num_tags:
             self.generate_tags(self.num_tags)

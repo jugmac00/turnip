@@ -117,6 +117,14 @@ def get_ref(repo_path, ref):
     return ref_obj
 
 
+def get_common_ancestor_diff(repo_path, sha1_target, sha1_source,
+                             context_lines=3):
+    """Get diff of common ancestor and source diff."""
+    repo = open_repo(repo_path)
+    common_ancestor = repo.merge_base(sha1_target, sha1_source)
+    return get_diff(repo_path, common_ancestor, sha1_source)
+
+
 def get_diff(repo_path, sha1_from, sha1_to, context_lines=3):
     """Get patch and associated commits of two sha1s.
 
