@@ -56,7 +56,6 @@ class HTTPPackClientProtocol(PackProtocol):
     """
 
     user_error_possible = True
-    finished = False
 
     def backendConnected(self):
         """Called when the backend is connected and has sent a good packet."""
@@ -91,24 +90,23 @@ class HTTPPackClientProtocol(PackProtocol):
             self.factory.http_request.setResponseCode(error_code)
             self.factory.http_request.setHeader(b'Content-Type', b'text/plain')
             self.factory.http_request.write(msg)
-            self.transport.loseConnection()
-        else:
-            # We don't know it was a system error, so just send it back to the
-            # client as a remote error and proceed to forward data
-            # regardless.
-            self.rawDataReceived(encode_packet(ERROR_PREFIX + msg))
+            self.factory.http_request.unregisterProducer()
+            self.factory.http_request.finish()
+            return True
+        # We don't know it was a system error, so just send it back to
+        # the client as a remote error and proceed to forward data
+        # regardless.
+        return False
 
     def _finish(self, result):
         # Ensure the backend dies if the client disconnects.
-        self.finished = True
         if self.transport is not None:
             self.transport.stopProducing()
-            self.factory.http_request.transport.unregisterProducer()
 
     def connectionMade(self):
         """Forward the request and the client's payload to the backend."""
         self.factory.http_request.notifyFinish().addBoth(self._finish)
-        self.factory.http_request.transport.registerProducer(
+        self.factory.http_request.registerProducer(
             self.transport, True)
         self.sendPacket(
             encode_request(
@@ -124,16 +122,29 @@ class HTTPPackClientProtocol(PackProtocol):
         """
         self.raw = True
         if data is not None and data.startswith(ERROR_PREFIX):
-            self.backendConnectionFailed(data[len(ERROR_PREFIX):])
+            # Handle the error nicely if it's known (eg. 404 on
+            # nonexistent repo). If it's unknown, just forward the error
+            # along to the client and forward as normal.
+            virt_error = self.backendConnectionFailed(data[len(ERROR_PREFIX):])
         else:
+            virt_error = False
+        if not virt_error:
             self.backendConnected()
             self.rawDataReceived(encode_packet(data))
 
     def rawDataReceived(self, data):
-        self.factory.http_request.write(data)
+        if not self.factory.http_request.finished:
+            self.factory.http_request.write(data)
 
     def connectionLost(self, reason):
-        if not self.finished:
+        self.factory.http_request.unregisterProducer()
+        if not self.factory.http_request.finished:
+            if not self.raw:
+                self.factory.http_request.setResponseCode(
+                    http.INTERNAL_SERVER_ERROR)
+                self.factory.http_request.setHeader(
+                    b'Content-Type', b'text/plain')
+                self.factory.http_request.write(b'Backend connection lost.')
             self.factory.http_request.finish()
 
 
@@ -146,6 +157,7 @@ class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
 
     def backendConnected(self):
         """Prepare the HTTP response for forwarding from the backend."""
+        self.factory.http_request.setResponseCode(http.OK)
         self.factory.http_request.setHeader(
             b'Content-Type',
             b'application/x-%s-advertisement' % self.factory.command)
@@ -158,6 +170,7 @@ class HTTPPackClientCommandProtocol(HTTPPackClientProtocol):
 
     def backendConnected(self):
         """Prepare the HTTP response for forwarding from the backend."""
+        self.factory.http_request.setResponseCode(http.OK)
         self.factory.http_request.setHeader(
             b'Content-Type',
             b'application/x-%s-result' % self.factory.command)
@@ -190,9 +203,10 @@ class BaseSmartHTTPResource(resource.Resource):
 
     def errback(self, failure, request):
         """Handle a Twisted failure by returning an HTTP error."""
-        if self.finished:
+        if request.finished:
             return
         request.write(self.error(request, repr(failure)))
+        request.unregisterProducer()
         request.finish()
 
     def error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
@@ -205,17 +219,9 @@ class BaseSmartHTTPResource(resource.Resource):
     def authenticateUser(self, request):
         """Attempt authentication of the request with the virt service."""
         if request.getUser():
-            proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint)
-            try:
-                translated = yield proxy.callRemote(
-                    b'authenticateWithPassword', request.getUser(),
-                    request.getPassword())
-            except xmlrpc.Fault as e:
-                if e.faultCode in (3, 410):
-                    defer.returnValue((None, None))
-                else:
-                    raise
-            defer.returnValue((translated['user'], translated['uid']))
+            user, uid = yield self.root.authenticateWithPassword(
+                request.getUser(), request.getPassword())
+            defer.returnValue((user, uid))
         defer.returnValue((None, None))
 
     @defer.inlineCallbacks
@@ -233,8 +239,7 @@ class BaseSmartHTTPResource(resource.Resource):
             params[b'turnip-authenticated-uid'] = str(authenticated_uid)
         params.update(self.extra_params)
         client_factory = factory(service, path, params, content, request)
-        reactor.connectTCP(
-            self.root.backend_host, self.root.backend_port, client_factory)
+        self.root.connectToBackend(client_factory)
 
 
 class SmartHTTPRefsResource(BaseSmartHTTPResource):
@@ -485,3 +490,20 @@ class SmartHTTPFrontendResource(resource.Resource):
         elif self.cgit_exec_path is not None:
             return CGitScriptResource(self)
         return resource.NoResource(b'No such resource')
+
+    def connectToBackend(self, client_factory):
+        reactor.connectTCP(
+            self.backend_host, self.backend_port, client_factory)
+
+    @defer.inlineCallbacks
+    def authenticateWithPassword(self, user, password):
+        proxy = xmlrpc.Proxy(self.virtinfo_endpoint)
+        try:
+            translated = yield proxy.callRemote(
+                b'authenticateWithPassword', user, password)
+        except xmlrpc.Fault as e:
+            if e.faultCode in (3, 410):
+                defer.returnValue((None, None))
+            else:
+                raise
+        defer.returnValue((translated['user'], translated['uid']))
