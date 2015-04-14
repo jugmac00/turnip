@@ -148,7 +148,7 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
     @defer.inlineCallbacks
     def test_unsupported_service(self):
         yield self.performRequest(service=b'foo')
-        #self.assertEqual(403, self.request.responseCode)
+        # self.assertEqual(403, self.request.responseCode)
         self.assertEqual("Unsupported service.", self.request.value)
 
     @defer.inlineCallbacks
