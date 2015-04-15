@@ -7,9 +7,9 @@ import unittest
 import uuid
 
 from fixtures import (
-      EnvironmentVariable,
-      TempDir,
-      )
+    EnvironmentVariable,
+    TempDir,
+    )
 from testtools import TestCase
 from webtest import TestApp
 
