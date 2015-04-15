@@ -15,7 +15,7 @@ from twisted.internet import (
 from twisted.internet.interfaces import IHalfCloseableProtocol
 # twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
 # bits of this module work.
-if sys.version_info.major < 3:
+if sys.version_info.major < 3:  # noqa
     from twisted.web import xmlrpc
 from zope.interface import implementer
 
@@ -387,8 +387,8 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                 can_authenticate)
             if 'trailing' in translated and translated['trailing']:
                 self.die(
-                    VIRT_ERROR_PREFIX
-                    + b'NOT_FOUND Repository does not exist.')
+                    VIRT_ERROR_PREFIX +
+                    b'NOT_FOUND Repository does not exist.')
             pathname = translated['path']
         except xmlrpc.Fault as e:
             if e.faultCode in (1, 290):

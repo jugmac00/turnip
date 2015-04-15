@@ -4,10 +4,6 @@ from __future__ import (
     unicode_literals,
     )
 
-__all__ = [
-    "SmartSSHSession",
-    ]
-
 import shlex
 
 from lazr.sshserver.auth import (
@@ -47,6 +43,10 @@ from turnip.pack.helpers import (
     encode_packet,
     encode_request,
     )
+
+__all__ = [
+    "SmartSSHSession",
+    ]
 
 
 class SSHPackClientProtocol(PackProtocol):
