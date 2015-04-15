@@ -135,8 +135,8 @@ def ensure_hooks(repo_root):
         os.rename(path, hook_path(hook))
 
     for name in os.listdir(hook_path('.')):
-        if (name != target_name and name not in wanted_hooks and not
-                name.startswith('tmp')):
+        if (name != target_name and name not in wanted_hooks and
+                not name.startswith('tmp')):
             try:
                 os.unlink(hook_path(name))
             except OSError:
