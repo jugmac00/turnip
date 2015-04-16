@@ -144,6 +144,30 @@ class DiffAPI(BaseAPI):
         return patch
 
 
+@resource(path='/repo/{name}/compare-merge/{base}/{head}')
+class DiffMergeAPI(BaseAPI):
+    """Provides an HTTP API for merge previews.
+
+    {head} will be merged into {base} and the diff from {base} returned.
+    """
+    def __init__(self, request):
+        super(DiffMergeAPI, self).__init__()
+        self.request = request
+
+    @repo_path
+    def get(self, repo_path):
+        """Returns diff of two commits."""
+        context_lines = int(self.request.params.get('context_lines', 3))
+        try:
+            patch = store.get_merge_diff(
+                repo_path, self.request.matchdict['base'],
+                self.request.matchdict['head'], context_lines)
+        except (ValueError, GitError):
+            # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
+            return exc.HTTPNotFound()
+        return patch
+
+
 @resource(collection_path='/repo/{name}/commits',
           path='/repo/{name}/commits/{sha1}')
 class CommitAPI(BaseAPI):

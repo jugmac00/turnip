@@ -238,6 +238,22 @@ class ApiTestCase(TestCase):
         self.assertIn('+baz', resp.json_body['patch'])
         self.assertNotIn('+corge', resp.json_body['patch'])
 
+    def test_repo_diff_merge(self):
+        """Ensure expected changes exist in diff patch."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\nbar\nbaz\n', 'blah.txt')
+        c2_right = repo.add_commit('quux\nbar\nbaz\n', 'blah.txt', parents=[c1])
+        c3_right = repo.add_commit('quux\nbar\nbaz\n', 'blah.txt', parents=[c2_right])
+        c2_left = repo.add_commit('foo\nbar\nbar\n', 'blah.txt', parents=[c1])
+        c3_left = repo.add_commit('foo\nbar\nbar\n', 'blah.txt', parents=[c2_left])
+
+        resp = self.app.get('/repo/{}/compare-merge/{}/{}'.format(
+            self.repo_path, c3_right, c3_left))
+        self.assertIn(' quux', resp.json_body['patch'])
+        self.assertIn('-baz', resp.json_body['patch'])
+        self.assertIn('+bar', resp.json_body['patch'])
+        self.assertNotIn('foo', resp.json_body['patch'])
+
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
         message = 'Computers make me angry.'
