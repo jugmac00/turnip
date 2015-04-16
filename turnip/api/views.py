@@ -1,6 +1,7 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
 import os
+import re
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
@@ -108,6 +109,39 @@ class RefAPI(BaseAPI):
             return store.get_ref(repo_path, ref)
         except (KeyError, GitError):
             return exc.HTTPNotFound()
+
+
+@resource(path='/repo/{name}/compare/{commits}')
+class DiffAPI(BaseAPI):
+    """Provides HTTP API for rev-rev 'double' and 'triple dot' diff.
+
+    {commits} can be in the form sha1..sha1 or sha1...sha1.
+    Two dots provides a simple diff, equivalent to `git diff A B`.
+    Three dots provides the symmetric or common ancestor diff, equivalent
+    to `git diff $(git-merge-base A B) B`.
+    """
+    def __init__(self, request):
+        super(DiffAPI, self).__init__()
+        self.request = request
+
+    @repo_path
+    def get(self, repo_path):
+        """Returns diff of two commits."""
+        commits = re.split('(\.{2,3})', self.request.matchdict['commits'])
+        context_lines = int(self.request.params.get('context_lines', 3))
+        if not len(commits) == 3:
+            return exc.HTTPBadRequest()
+        try:
+            diff_type = commits[1]
+            args = (repo_path, commits[0], commits[2], context_lines)
+            if diff_type == '..':
+                patch = store.get_diff(*args)
+            elif diff_type == '...':
+                patch = store.get_common_ancestor_diff(*args)
+        except (ValueError, GitError):
+            # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
+            return exc.HTTPNotFound()
+        return patch
 
 
 @resource(collection_path='/repo/{name}/commits',

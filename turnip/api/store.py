@@ -117,6 +117,37 @@ def get_ref(repo_path, ref):
     return ref_obj
 
 
+def get_common_ancestor_diff(repo_path, sha1_target, sha1_source,
+                             context_lines=3):
+    """Get diff of common ancestor and source diff.
+
+    :param sha1_target: target sha1 for merge base.
+    :param sha1_source: source sha1 for merge base.
+    :param context_lines: num unchanged lines that define a hunk boundary.
+    """
+    repo = open_repo(repo_path)
+    common_ancestor = repo.merge_base(sha1_target, sha1_source)
+    return get_diff(repo_path, common_ancestor, sha1_source, context_lines)
+
+
+def get_diff(repo_path, sha1_from, sha1_to, context_lines=3):
+    """Get patch and associated commits of two sha1s.
+
+    :param sha1_from: diff from sha1.
+    :param sha1_to: diff to sha1.
+    :param context_lines: num unchanged lines that define a hunk boundary.
+    """
+    repo = open_repo(repo_path)
+    shas = [sha1_from, sha1_to]
+    commits = [get_commit(repo_path, sha, repo) for sha in shas]
+    diff = {
+        'commits': commits,
+        'patch': repo.diff(commits[0]['sha1'], commits[1]['sha1'],
+                           False, 0, context_lines).patch
+        }
+    return diff
+
+
 def get_log(repo_path, start=None, limit=None, stop=None):
     """Return a commit collection from HEAD or optionally a start oid.
 

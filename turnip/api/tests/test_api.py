@@ -107,7 +107,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         refs = resp.json
-        self.assertEqual(1, len(refs.keys()))
+        self.assertEqual(0, len(refs.keys()))
 
     def test_allow_unicode_refs(self):
         """Ensure unicode refs are included in ref collection."""
@@ -119,7 +119,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         refs = resp.json
-        self.assertEqual(2, len(refs.keys()))
+        self.assertEqual(1, len(refs.keys()))
 
     def test_repo_get_ref(self):
         RepoFactory(self.repo_store, num_commits=1).build()
@@ -159,6 +159,84 @@ class ApiTestCase(TestCase):
         tag = self.tag.get('ref')
         resp = self.get_ref(tag)
         self.assertTrue(tag in resp)
+
+    def test_repo_compare_commits(self):
+        """Ensure expected changes exist in diff patch."""
+        repo = RepoFactory(self.repo_store)
+        c1_oid = repo.add_commit('foo', 'foobar.txt')
+        c2_oid = repo.add_commit('bar', 'foobar.txt', parents=[c1_oid])
+
+        path = '/repo/{}/compare/{}..{}'.format(self.repo_path, c1_oid, c2_oid)
+        resp = self.app.get(path)
+        self.assertIn('-foo', resp.body)
+        self.assertIn('+bar', resp.body)
+
+    def test_repo_diff_commits(self):
+        """Ensure expected commits objects are returned in diff."""
+        repo = RepoFactory(self.repo_store)
+        c1_oid = repo.add_commit('foo', 'foobar.txt')
+        c2_oid = repo.add_commit('bar', 'foobar.txt', parents=[c1_oid])
+
+        path = '/repo/{}/compare/{}..{}'.format(self.repo_path, c1_oid, c2_oid)
+        resp = self.app.get(path)
+        self.assertIn(c1_oid.hex, resp.json['commits'][0]['sha1'])
+        self.assertIn(c2_oid.hex, resp.json['commits'][1]['sha1'])
+
+    def test_repo_diff_unicode_commits(self):
+        """Ensure expected utf-8 commits objects are returned in diff."""
+        factory = RepoFactory(self.repo_store)
+        message = u'屋漏偏逢连夜雨'.encode('utf-8')
+        message2 = u'说曹操，曹操到'.encode('utf-8')
+        oid = factory.add_commit(message, 'foo.py')
+        oid2 = factory.add_commit(message2, 'bar.py', [oid])
+
+        resp = self.app.get('/repo/{}/compare/{}..{}'.format(
+            self.repo_path, oid, oid2))
+        self.assertEqual(resp.json['commits'][0]['message'],
+                         message.decode('utf-8'))
+        self.assertEqual(resp.json['commits'][1]['message'],
+                         message2.decode('utf-8'))
+
+    def test_repo_diff_non_unicode_commits(self):
+        """Ensure non utf-8 chars are handled but stripped from diff."""
+        factory = RepoFactory(self.repo_store)
+        message = 'not particularly sensible latin-1: \xe9\xe9\xe9.'
+        oid = factory.add_commit(message, 'foo.py')
+        oid2 = factory.add_commit('a sensible commit message', 'foo.py', [oid])
+
+        resp = self.app.get('/repo/{}/compare/{}..{}'.format(
+            self.repo_path, oid, oid2))
+        self.assertEqual(resp.json['commits'][0]['message'],
+                         message.decode('utf-8', 'replace'))
+
+    def test_repo_get_diff_nonexistent_sha1(self):
+        """get_diff on a non-existent sha1 returns HTTP 404."""
+        RepoFactory(self.repo_store).build()
+        resp = self.app.get('/repo/{}/compare/1..2'.format(
+            self.repo_path), expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
+    def test_repo_get_diff_invalid_separator(self):
+        """get_diff with an invalid separator (not ../...) returns HTTP 404."""
+        RepoFactory(self.repo_store).build()
+        resp = self.app.get('/repo/{}/compare/1++2'.format(
+            self.repo_path), expect_errors=True)
+        self.assertEqual(400, resp.status_code)
+
+    def test_repo_common_ancestor_diff(self):
+        """Ensure expected changes exist in diff patch."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo', 'foobar.txt')
+        c2_right = repo.add_commit('bar', 'foobar.txt', parents=[c1])
+        c3_right = repo.add_commit('baz', 'foobar.txt', parents=[c2_right])
+        c2_left = repo.add_commit('qux', 'foobar.txt', parents=[c1])
+        c3_left = repo.add_commit('corge', 'foobar.txt', parents=[c2_left])
+
+        resp = self.app.get('/repo/{}/compare/{}...{}'.format(
+            self.repo_path, c3_left, c3_right))
+        self.assertIn('-foo', resp.json_body['patch'])
+        self.assertIn('+baz', resp.json_body['patch'])
+        self.assertNotIn('+corge', resp.json_body['patch'])
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
