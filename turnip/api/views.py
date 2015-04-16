@@ -113,8 +113,13 @@ class RefAPI(BaseAPI):
 
 @resource(path='/repo/{name}/compare/{commits}')
 class DiffAPI(BaseAPI):
-    """Provides HTTP API for rev-rev 'double' and 'tripple dot' diff."""
+    """Provides HTTP API for rev-rev 'double' and 'triple dot' diff.
 
+    {commits} can be in the form sha1..sha1 or sha1...sha1.
+    Two dots provides a simple diff, equivalent to `git diff A B`.
+    Three dots provides the symmetric or common ancestor diff, equivalent
+    to `git diff $(git-merge-base A B) B`.
+    """
     def __init__(self, request):
         super(DiffAPI, self).__init__()
         self.request = request
