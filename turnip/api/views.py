@@ -55,6 +55,8 @@ class RepoAPI(BaseAPI):
         """Initialise a new git repository, or clone from an existing repo."""
         repo_path = extract_json_data(self.request).get('repo_path')
         clone_path = extract_json_data(self.request).get('clone_from')
+        alternate_repo_paths = extract_json_data(self.request).get(
+            'alternate_repo_paths')
 
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
@@ -71,7 +73,8 @@ class RepoAPI(BaseAPI):
             repo_clone = None
 
         try:
-            new_repo_path = store.init_repo(repo, repo_clone)
+            new_repo_path = store.init_repo(
+                repo, repo_clone, alternate_repo_paths=alternate_repo_paths)
             repo_name = os.path.basename(os.path.normpath(new_repo_path))
             return {'repo_url': '/'.join([self.request.url, repo_name])}
         except GitError:

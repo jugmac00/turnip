@@ -72,6 +72,19 @@ class ApiTestCase(TestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn(new_repo_path, resp.json['repo_url'])
 
+    def test_repo_init_with_alternate(self):
+        """Repo can be initialised with alternate."""
+        factory = RepoFactory(self.repo_store)
+        commit_oid = factory.add_commit('foo', 'foobar.txt')
+        new_repo_path = uuid.uuid4().hex
+        json = {'repo_path': new_repo_path,
+                'alternate_repo_paths': [self.repo_store]}
+        resp = self.app.post_json('/repo', json)
+        self.assertEqual(200, resp.status_code)
+        resp_commit = self.app.get('/repo/{}/commits/{}'.format(
+            new_repo_path, commit_oid))
+        self.assertEqual(200, resp_commit.status_code)
+
     def test_repo_delete(self):
         self.app.post_json('/repo', {'repo_path': self.repo_path})
         resp = self.app.delete('/repo/{}'.format(self.repo_path))
