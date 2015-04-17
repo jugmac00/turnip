@@ -31,16 +31,16 @@ class StoreTestCase(TestCase):
         self.repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
 
     def test_repo_with_alternates(self):
-        """Ensure object path is defined correctly in repo alternates."""
+        """Ensure objects path is defined correctly in repo alternates."""
         factory = RepoFactory(self.repo_path)
         new_repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
         repo_path_with_alt = init_repo(
             new_repo_path, alternate_repo_paths=[factory.repo.path])
-        object_path = '{}\n'.format(
+        objects_path = '{}\n'.format(
             os.path.join(factory.repo.path, 'objects'))
         with open(alternates_path(repo_path_with_alt), 'r') as alts:
             alts_content = alts.read()
-            self.assertEquals(object_path, alts_content)
+            self.assertEquals(objects_path, alts_content)
 
     def test_repo_alternates_objects_shared(self):
         """Ensure objects are shared from alternate repo."""
