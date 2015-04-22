@@ -184,13 +184,13 @@ class RepoDiffAPI(BaseAPI):
         commit = self.request.matchdict['commit']
         other_commit = self.request.matchdict['other_commit']
 
-        alternate_repo_path = os.path.join(self.repo_store, other_name)
+        other_repo_path = os.path.join(self.repo_store, other_name)
         tmp_repo_path = os.path.join(self.repo_store, uuid.uuid4().hex)
         # create a new ephemeral repo with alternates set from {name}
         # and {other_name}
         store.init_repo(
             tmp_repo_path,
-            alternate_repo_paths=[repo_path, alternate_repo_path])
+            alternate_repo_paths=[repo_path, other_repo_path])
         try:
             patch = store.get_diff(
                 tmp_repo_path, commit, other_commit, context_lines)
