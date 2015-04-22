@@ -185,24 +185,25 @@ class RepoDiffAPI(BaseAPI):
         other_commit = self.request.matchdict['other_commit']
 
         other_repo_path = os.path.join(self.repo_store, other_name)
-        tmp_repo_path = os.path.join(self.repo_store, uuid.uuid4().hex)
-        # create a new ephemeral repo with alternates set from {name}
-        # and {other_name}
-        store.init_repo(
-            tmp_repo_path,
-            alternate_repo_paths=[repo_path, other_repo_path])
+        if not is_valid_path(self.repo_store, other_repo_path):
+            raise exc.HTTPInternalServerError()
+        tmp_repo_path = os.path.join(self.repo_store,
+                                     'ephemeral-' + uuid.uuid4().hex)
         try:
+            # create a new ephemeral repo with alternates set from {name}
+            # and {other_name}
+            store.init_repo(
+                tmp_repo_path,
+                alternate_repo_paths=[repo_path, other_repo_path])
             patch = store.get_diff(
                 tmp_repo_path, commit, other_commit, context_lines)
         except (ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()
-        # delete ephemeral repo
-        try:
+        finally:
+            # delete ephemeral repo
             if is_valid_path(self.repo_store, tmp_repo_path):
                 store.delete_repo(tmp_repo_path)
-        except (IOError, OSError):
-            return exc.HTTPNotFound()  # 404
         return patch
 
 

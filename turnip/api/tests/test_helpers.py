@@ -68,6 +68,9 @@ class RepoFactory():
                                  blob_content, tree_id, parents)
         return oid
 
+    def set_head(self, oid):
+        self.repo.create_reference('refs/heads/master', oid)
+
     def add_branch(self, name, oid):
         commit = self.repo.get(oid)
         branch = self.repo.create_branch('branch-{}'.format(name), commit)

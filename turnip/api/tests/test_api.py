@@ -74,19 +74,40 @@ class ApiTestCase(TestCase):
 
     def test_cross_repo_diff(self):
         """Diff can be requested across 2 repositories."""
-        repo = RepoFactory(self.repo_store)
-        c1 = repo.add_commit('foo', 'foobar.txt')
-        c2 = repo.add_commit('bar', 'foobar.txt', parents=[c1])
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('foo', 'foobar.txt')
+        factory.set_head(c1)
 
         repo2_name = uuid.uuid4().hex
-        repo2 = RepoFactory(
-            os.path.join(self.repo_root, repo2_name), clone_from=repo)
-        c3 = repo2.add_commit('baz', 'foobar.txt')
+        factory2 = RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=factory)
+        c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
+        c3 = factory2.add_commit('baz', 'foobar.txt', parents=[c1])
 
         resp = self.app.get('/repo/{}:{}/diff/{}:{}'.format(
             self.repo_path, repo2_name, c2, c3))
         self.assertIn('-bar', resp.body)
         self.assertIn('+baz', resp.body)
+
+    def test_cross_repo_diff_invalid_repo(self):
+        """Cross repo diff with invalid repo returns HTTP 404."""
+        resp = self.app.get('/repo/1:2/diff/3:4', expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
+    def test_cross_repo_diff_invalid_commit(self):
+        """Cross repo diff with an invalid commit returns HTTP 404."""
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('foo', 'foobar.txt')
+        factory.set_head(c1)
+
+        repo2_name = uuid.uuid4().hex
+        factory2 = RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=factory)
+        c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}:{}/diff/{}:{}'.format(
+            self.repo_path, repo2_name, c2, 'invalid'), expect_errors=True)
+        self.assertEqual(404, resp.status_code)
 
     def test_repo_delete(self):
         self.app.post_json('/repo', {'repo_path': self.repo_path})
