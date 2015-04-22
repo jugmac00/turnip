@@ -72,18 +72,21 @@ class ApiTestCase(TestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn(new_repo_path, resp.json['repo_url'])
 
-    def test_repo_init_with_alternate(self):
-        """Repo can be initialised with alternate."""
-        factory = RepoFactory(self.repo_store)
-        commit_oid = factory.add_commit('foo', 'foobar.txt')
-        new_repo_path = uuid.uuid4().hex
-        json = {'repo_path': new_repo_path,
-                'alternate_repo_paths': [self.repo_store]}
-        resp = self.app.post_json('/repo', json)
-        self.assertEqual(200, resp.status_code)
-        resp_commit = self.app.get('/repo/{}/commits/{}'.format(
-            new_repo_path, commit_oid))
-        self.assertEqual(200, resp_commit.status_code)
+    def test_cross_repo_diff(self):
+        """Diff can be requested across 2 repositories."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo', 'foobar.txt')
+        c2 = repo.add_commit('bar', 'foobar.txt', parents=[c1])
+
+        repo2_name = uuid.uuid4().hex
+        repo2 = RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=repo)
+        c3 = repo2.add_commit('baz', 'foobar.txt')
+
+        resp = self.app.get('/repo/{}:{}/diff/{}:{}'.format(
+            self.repo_path, repo2_name, c2, c3))
+        self.assertIn('-bar', resp.body)
+        self.assertIn('+baz', resp.body)
 
     def test_repo_delete(self):
         self.app.post_json('/repo', {'repo_path': self.repo_path})
@@ -250,6 +253,25 @@ class ApiTestCase(TestCase):
         self.assertIn('-foo', resp.json_body['patch'])
         self.assertIn('+baz', resp.json_body['patch'])
         self.assertNotIn('+corge', resp.json_body['patch'])
+
+    def test_repo_diff_merge(self):
+        """Ensure expected changes exist in diff patch."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\nbar\nbaz\n', 'blah.txt')
+        c2_right = repo.add_commit('quux\nbar\nbaz\n', 'blah.txt',
+                                   parents=[c1])
+        c3_right = repo.add_commit('quux\nbar\nbaz\n', 'blah.txt',
+                                   parents=[c2_right])
+        c2_left = repo.add_commit('foo\nbar\nbar\n', 'blah.txt', parents=[c1])
+        c3_left = repo.add_commit('foo\nbar\nbar\n', 'blah.txt',
+                                  parents=[c2_left])
+
+        resp = self.app.get('/repo/{}/compare-merge/{}/{}'.format(
+            self.repo_path, c3_right, c3_left))
+        self.assertIn(' quux', resp.json_body['patch'])
+        self.assertIn('-baz', resp.json_body['patch'])
+        self.assertIn('+bar', resp.json_body['patch'])
+        self.assertNotIn('foo', resp.json_body['patch'])
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)

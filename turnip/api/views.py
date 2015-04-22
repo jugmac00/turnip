@@ -2,6 +2,7 @@
 
 import os
 import re
+import uuid
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
@@ -55,8 +56,6 @@ class RepoAPI(BaseAPI):
         """Initialise a new git repository, or clone from an existing repo."""
         repo_path = extract_json_data(self.request).get('repo_path')
         clone_path = extract_json_data(self.request).get('clone_from')
-        alternate_repo_paths = extract_json_data(self.request).get(
-            'alternate_repo_paths')
 
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
@@ -73,8 +72,7 @@ class RepoAPI(BaseAPI):
             repo_clone = None
 
         try:
-            new_repo_path = store.init_repo(
-                repo, repo_clone, alternate_repo_paths=alternate_repo_paths)
+            new_repo_path = store.init_repo(repo, clone_from=repo_clone)
             repo_name = os.path.basename(os.path.normpath(new_repo_path))
             return {'repo_url': '/'.join([self.request.url, repo_name])}
         except GitError:
@@ -144,6 +142,67 @@ class DiffAPI(BaseAPI):
         except (ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()
+        return patch
+
+
+@resource(path='/repo/{name}/compare-merge/{base}/{head}')
+class DiffMergeAPI(BaseAPI):
+    """Provides an HTTP API for merge previews.
+
+    {head} will be merged into {base} and the diff from {base} returned.
+    """
+    def __init__(self, request):
+        super(DiffMergeAPI, self).__init__()
+        self.request = request
+
+    @repo_path
+    def get(self, repo_path):
+        """Returns diff of two commits."""
+        context_lines = int(self.request.params.get('context_lines', 3))
+        try:
+            patch = store.get_merge_diff(
+                repo_path, self.request.matchdict['base'],
+                self.request.matchdict['head'], context_lines)
+        except (ValueError, GitError):
+            # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
+            return exc.HTTPNotFound()
+        return patch
+
+
+@resource(path='/repo/{name}:{other_name}/diff/{commit}:{other_commit}')
+class RepoDiffAPI(BaseAPI):
+    """Provides HTTP API for cross repository diffs."""
+
+    def __init__(self, request):
+        super(RepoDiffAPI, self).__init__()
+        self.request = request
+
+    @repo_path
+    def get(self, repo_path):
+        context_lines = int(self.request.params.get('context_lines', 3))
+        other_name = self.request.matchdict['other_name']
+        commit = self.request.matchdict['commit']
+        other_commit = self.request.matchdict['other_commit']
+
+        alternate_repo_path = os.path.join(self.repo_store, other_name)
+        tmp_repo_path = os.path.join(self.repo_store, uuid.uuid4().hex)
+        # create a new ephemeral repo with alternates set from {name}
+        # and {other_name}
+        store.init_repo(
+            tmp_repo_path,
+            alternate_repo_paths=[repo_path, alternate_repo_path])
+        try:
+            patch = store.get_diff(
+                tmp_repo_path, commit, other_commit, context_lines)
+        except (ValueError, GitError):
+            # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
+            return exc.HTTPNotFound()
+        # delete ephemeral repo
+        try:
+            if is_valid_path(self.repo_store, tmp_repo_path):
+                store.delete_repo(tmp_repo_path)
+        except (IOError, OSError):
+            return exc.HTTPNotFound()  # 404
         return patch
 
 
