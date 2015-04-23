@@ -63,6 +63,10 @@ def format_signature(signature):
         }
 
 
+def is_bare(repo_path):
+    return not os.path.exists(os.path.join(repo_path, '.git'))
+
+
 def is_valid_new_path(path):
     """Verify repo path is new, or raise Exception."""
     if os.path.exists(path):
@@ -70,7 +74,25 @@ def is_valid_new_path(path):
     return True
 
 
-def init_repo(repo_path, clone_from=None, is_bare=True):
+def alternates_path(repo_path):
+    """Git object alternates path.
+    See http://git-scm.com/docs/gitrepository-layout
+    """
+    return os.path.join(repo_path, 'objects', 'info', 'alternates')
+
+
+def write_alternates(repo_path, alternate_repo_paths):
+    with open(alternates_path(repo_path), "w") as f:
+        for path in alternate_repo_paths:
+            if is_bare(path):
+                objects_path = os.path.join(path, 'objects')
+            else:
+                objects_path = os.path.join(path, '.git', 'objects')
+            f.write("{}\n".format(objects_path))
+
+
+def init_repo(repo_path, clone_from=None, alternate_repo_paths=None,
+              is_bare=True):
     """Initialise a new git repository or clone from existing."""
     assert is_valid_new_path(repo_path)
     if clone_from:
@@ -79,6 +101,8 @@ def init_repo(repo_path, clone_from=None, is_bare=True):
         repo = clone_repository(clone_from_url, repo_path, is_bare)
     else:
         repo = init_repository(repo_path, is_bare)
+    if alternate_repo_paths:
+        write_alternates(repo_path, alternate_repo_paths)
     return repo.path
 
 
