@@ -135,7 +135,8 @@ def repack(repo_path, single=False, prune=False):
     if single:
         # Pack everything referenced into a single pack.
         repack_args.append('-a')
-    return subprocess.check_call(repack_args, cwd=repo_path)
+    return subprocess.check_call(repack_args, cwd=repo_path,
+                                 stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 
 
 def get_refs(repo_path):
