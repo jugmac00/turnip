@@ -7,12 +7,14 @@ import urllib
 import urlparse
 
 from pygit2 import (
+    clone_repository,
     GitError,
+    GIT_FILEMODE_BLOB,
     GIT_OBJ_BLOB,
     GIT_OBJ_COMMIT,
     GIT_OBJ_TREE,
     GIT_OBJ_TAG,
-    clone_repository,
+    IndexEntry,
     init_repository,
     Repository,
     )
@@ -139,11 +141,23 @@ def get_merge_diff(repo_path, sha1_base, sha1_head, context_lines=3):
     """
     repo = open_repo(repo_path)
     merged_index = repo.merge_commits(sha1_base, sha1_head)
+    conflicts = set()
+    if merged_index.conflicts is not None:
+        for conflict in list(merged_index.conflicts):
+            path = [entry for entry in conflict if entry is not None][0].path
+            conflicts.add(path)
+            try:
+                merged_file = repo.merge_file_from_index(*conflict)
+            except Exception:
+                continue
+            blob_oid = repo.create_blob(merged_file)
+            merged_index.add(IndexEntry(path, blob_oid, GIT_FILEMODE_BLOB))
+            del merged_index.conflicts[path]
     diff = merged_index.diff_to_tree(
         repo[sha1_base].tree, context_lines=context_lines).patch
     shas = [sha1_base, sha1_head]
     commits = [get_commit(repo_path, sha, repo) for sha in shas]
-    diff = {'commits': commits, 'patch': diff}
+    diff = {'commits': commits, 'patch': diff, 'conflicts': sorted(conflicts)}
     return diff
 
 
