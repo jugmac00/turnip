@@ -3,6 +3,7 @@
 import itertools
 import os
 import shutil
+import subprocess
 import urllib
 import urlparse
 
@@ -16,6 +17,8 @@ from pygit2 import (
     init_repository,
     Repository,
     )
+
+from turnip.config import TurnipConfig
 
 
 REF_TYPE_NAME = {
@@ -114,6 +117,25 @@ def open_repo(repo_path):
 def delete_repo(repo_path):
     """Permanently delete a git repository from repo store."""
     shutil.rmtree(repo_path)
+
+
+def repack(repo_path, single=False, prune=False):
+    """Repack a repository with git-repack."""
+    config = TurnipConfig()
+    repack_args = [
+        'git', 'repack',
+        '--window', config.get('git_repack_window'),
+        '--depth', config.get('git_repack_depth'),
+        '--window-memory', config.get('git_repack_window_memory'),
+        '--max-pack-size', config.get('git_repack_max_pack_size'),
+        ]
+    if prune:
+        # Remove redundant packs after packing.
+        repack_args.append('-d')
+    if single:
+        # Pack everything referenced into a single pack.
+        repack_args.append('-a')
+    return subprocess.check_call(repack_args, cwd=repo_path)
 
 
 def get_refs(repo_path):

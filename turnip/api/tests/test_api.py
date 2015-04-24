@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import fnmatch
 import os
+import subprocess
 import unittest
 import uuid
 
@@ -413,6 +415,20 @@ class ApiTestCase(TestCase):
             self.repo_path, head, stop_commit))
         self.assertEqual(5, len(resp.json))
         self.assertNotIn(excluded_commit, resp.json)
+
+    def test_repo_repack_verify_pack(self):
+        """Ensure commit exists in pack."""
+        factory = RepoFactory(self.repo_store)
+        oid = factory.add_commit('foo', 'foobar.txt')
+        factory.set_head(oid)
+        resp = self.app.post_json('/repo/{}/repack'.format(self.repo_path),
+                                  {'prune': True, 'single': True})
+        for root, dirnames, filenames in os.walk(factory.repo_path):
+            for filename in fnmatch.filter(filenames, '*.pack'):
+                pack = os.path.join(root, filename)
+        out = subprocess.check_output(['git', 'verify-pack', pack, '-v'])
+        self.assertEqual(200, resp.status_code)
+        self.assertIn(oid.hex, out)
 
 
 if __name__ == '__main__':

@@ -3,6 +3,7 @@
 import os
 import re
 import uuid
+from subprocess import CalledProcessError
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
@@ -85,6 +86,26 @@ class RepoAPI(BaseAPI):
             store.delete_repo(repo_path)
         except (IOError, OSError):
             return exc.HTTPNotFound()  # 404
+
+
+@resource(path='/repo/{name}/repack')
+class RepoRepackAPI(BaseAPI):
+    """Provides HTTP API for repository repacking."""
+
+    def __init__(self, request):
+        super(RepoRepackAPI, self).__init__()
+        self.request = request
+
+    @repo_path
+    def post(self, repo_path):
+        prune = extract_json_data(self.request).get('prune')
+        single = extract_json_data(self.request).get('single')
+
+        try:
+            store.repack(repo_path, single=single, prune=prune)
+        except (CalledProcessError):
+            return exc.HTTPInternalServerError()
+        return
 
 
 @resource(collection_path='/repo/{name}/refs',
