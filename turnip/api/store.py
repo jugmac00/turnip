@@ -146,10 +146,7 @@ def get_merge_diff(repo_path, sha1_base, sha1_head, context_lines=3):
         for conflict in list(merged_index.conflicts):
             path = [entry for entry in conflict if entry is not None][0].path
             conflicts.add(path)
-            try:
-                merged_file = repo.merge_file_from_index(*conflict)
-            except Exception:
-                continue
+            merged_file = repo.merge_file_from_index(*conflict)
             blob_oid = repo.create_blob(merged_file)
             merged_index.add(IndexEntry(path, blob_oid, GIT_FILEMODE_BLOB))
             del merged_index.conflicts[path]
