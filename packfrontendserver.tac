@@ -26,5 +26,4 @@ def getPackFrontendService():
                             config.get('pack_virt_port')))
 
 application = service.Application("Turnip Pack Frontend Service")
-service = getPackFrontendService()
-service.setServiceParent(application)
+getPackFrontendService().setServiceParent(application)

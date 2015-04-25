@@ -31,5 +31,4 @@ def getSmartSSHService():
 
 
 application = service.Application("Turnip SmartSSH Service")
-service = getSmartSSHService()
-service.setServiceParent(application)
+getSmartSSHService().setServiceParent(application)

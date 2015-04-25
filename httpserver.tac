@@ -27,5 +27,4 @@ def getSmartHTTPService():
     return internet.TCPServer(config.get('smart_http_port'), smarthttp_site)
 
 application = service.Application("Turnip SmartHTTP Service")
-service = getSmartHTTPService()
-service.setServiceParent(application)
+getSmartHTTPService().setServiceParent(application)

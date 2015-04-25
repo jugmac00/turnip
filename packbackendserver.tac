@@ -24,5 +24,4 @@ def getPackBackendService():
                               PackBackendFactory(config.get('repo_store')))
 
 application = service.Application("Turnip Pack Backend Service")
-service = getPackBackendService()
-service.setServiceParent(application)
+getPackBackendService().setServiceParent(application)

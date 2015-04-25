@@ -24,5 +24,4 @@ def getPackVirtService():
                         config.get('virtinfo_endpoint')))
 
 application = service.Application("Turnip Pack Virt Service")
-service = getPackVirtService()
-service.setServiceParent(application)
+getPackVirtService().setServiceParent(application)
