@@ -68,7 +68,7 @@ def is_valid_new_path(path):
     return True
 
 
-def init_repo(repo_path, clone_from=None, is_bare=True):
+def init_repo(repo_path, clone_from=None, clone_refs=False, is_bare=True):
     """Initialise a new git repository or clone from existing."""
     assert is_valid_new_path(repo_path)
     init_repository(repo_path, is_bare)
@@ -85,15 +85,16 @@ def init_repo(repo_path, clone_from=None, is_bare=True):
         with open(alt_path, 'w') as f:
             f.write('../turnip-subordinate/objects\n')
 
-        # With the objects all accessible via the subordinate, copy all
-        # refs from the origin. Unlike pygit2.clone_repository, this
-        # won't set up a remote.
-        # TODO: Filter out internal (eg. MP) refs.
-        from_repo = Repository(clone_from)
-        to_repo = Repository(repo_path)
-        for ref in from_repo.listall_references():
-            to_repo.create_reference(
-                ref, from_repo.lookup_reference(ref).target)
+        if clone_refs:
+            # With the objects all accessible via the subordinate, we
+            # can just copy all refs from the origin. Unlike
+            # pygit2.clone_repository, this won't set up a remote.
+            # TODO: Filter out internal (eg. MP) refs.
+            from_repo = Repository(clone_from)
+            to_repo = Repository(repo_path)
+            for ref in from_repo.listall_references():
+                to_repo.create_reference(
+                    ref, from_repo.lookup_reference(ref).target)
     return repo_path
 
 
