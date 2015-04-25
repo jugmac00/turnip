@@ -3,8 +3,6 @@
 import itertools
 import os
 import shutil
-import urllib
-import urlparse
 
 from pygit2 import (
     GitError,
@@ -73,13 +71,30 @@ def is_valid_new_path(path):
 def init_repo(repo_path, clone_from=None, is_bare=True):
     """Initialise a new git repository or clone from existing."""
     assert is_valid_new_path(repo_path)
+    init_repository(repo_path, is_bare)
+
     if clone_from:
-        clone_from_url = urlparse.urljoin('file:',
-                                          urllib.pathname2url(clone_from))
-        repo = clone_repository(clone_from_url, repo_path, is_bare)
-    else:
-        repo = init_repository(repo_path, is_bare)
-    return repo.path
+        # The clone_from's objects and refs are in fact cloned into a
+        # subordinate tree that's then set as an alternate for the real
+        # repo. This lets git-receive-pack expose available commits as
+        # extra haves without polluting refs in the real repo.
+        sub_path = os.path.join(repo_path, 'turnip-subordinate')
+        clone_repository(clone_from, sub_path, True)
+        assert is_bare
+        alt_path = os.path.join(repo_path, 'objects/info/alternates')
+        with open(alt_path, 'w') as f:
+            f.write('../turnip-subordinate/objects\n')
+
+        # With the objects all accessible via the subordinate, copy all
+        # refs from the origin. Unlike pygit2.clone_repository, this
+        # won't set up a remote.
+        # TODO: Filter out internal (eg. MP) refs.
+        from_repo = Repository(clone_from)
+        to_repo = Repository(repo_path)
+        for ref in from_repo.listall_references():
+            to_repo.create_reference(
+                ref, from_repo.lookup_reference(ref).target)
+    return repo_path
 
 
 def open_repo(repo_path):
