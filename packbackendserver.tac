@@ -7,6 +7,8 @@ from __future__ import (
     unicode_literals,
     )
 
+import os.path
+
 from twisted.application import (
     service,
     internet,
@@ -14,14 +16,32 @@ from twisted.application import (
 
 from turnip.config import TurnipConfig
 from turnip.pack.git import PackBackendFactory
+from turnip.pack.hookrpc import (
+    HookRPCHandler,
+    HookRPCServerFactory,
+    )
 
 
-def getPackBackendService():
-    """Return a PackBackendFactory service."""
+def getPackBackendServices():
+    """Return PackBackendFactory and HookRPC services."""
 
     config = TurnipConfig()
-    return internet.TCPServer(config.get('pack_backend_port'),
-                              PackBackendFactory(config.get('repo_store')))
+    repo_store = config.get('repo_store')
+    pack_backend_port = config.get('pack_backend_port')
+    hookrpc_handler = HookRPCHandler(config.get('virtinfo_endpoint'))
+    hookrpc_path = os.path.join(
+        repo_store, 'hookrpc_sock_%d' % pack_backend_port)
+    pack_backend_service = internet.TCPServer(
+        pack_backend_port,
+        PackBackendFactory(repo_store, hookrpc_handler, hookrpc_path))
+    if os.path.exists(hookrpc_path):
+        os.unlink(hookrpc_path)
+    hookrpc_service = internet.UNIXServer(
+        hookrpc_path, HookRPCServerFactory(hookrpc_handler))
+    return pack_backend_service, hookrpc_service
+
 
 application = service.Application("Turnip Pack Backend Service")
-getPackBackendService().setServiceParent(application)
+pack_backend_service, hookrpc_service = getPackBackendServices()
+pack_backend_service.setServiceParent(application)
+hookrpc_service.setServiceParent(application)
