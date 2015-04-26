@@ -203,6 +203,7 @@ class BaseSmartHTTPResource(resource.Resource):
 
     def errback(self, failure, request):
         """Handle a Twisted failure by returning an HTTP error."""
+        failure.printTraceback()
         if request.finished:
             return
         request.write(self.error(request, repr(failure)))
