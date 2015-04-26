@@ -10,8 +10,10 @@ from __future__ import (
 import os
 
 from twisted.application import service
+from twisted.scripts.twistd import ServerOptions
 
 from turnip.config import TurnipConfig
+from turnip.log import RotatableFileLogObserver
 from turnip.pack.ssh import SmartSSHService
 
 
@@ -25,10 +27,17 @@ def getSmartSSHService():
         config.get('authentication_endpoint'),
         private_key_path=config.get('private_ssh_key_path'),
         public_key_path=config.get('public_ssh_key_path'),
+        # XXX cjwatson 2015-04-25: Should we just send access log
+        # information to the main log?  Requires lazr.sshserver changes.
         main_log='turnip', access_log=os.path.join(log_path, 'turnip.access'),
         access_log_path=os.path.join(log_path, 'turnip-access.log'),
         strport=b'tcp:{}'.format(config.get('smart_ssh_port')))
 
 
+options = ServerOptions()
+options.parseOptions()
+
 application = service.Application("Turnip SmartSSH Service")
+application.addComponent(
+    RotatableFileLogObserver(options.get('logfile')), ignoreClass=1)
 getSmartSSHService().setServiceParent(application)

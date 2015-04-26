@@ -8,8 +8,10 @@ from twisted.application import (
     service,
     internet,
     )
+from twisted.scripts.twistd import ServerOptions
 
 from turnip.config import TurnipConfig
+from turnip.log import RotatableFileLogObserver
 from turnip.pack.git import PackVirtFactory
 
 
@@ -23,5 +25,11 @@ def getPackVirtService():
                         config.get('pack_backend_port'),
                         config.get('virtinfo_endpoint')))
 
+
+options = ServerOptions()
+options.parseOptions()
+
 application = service.Application("Turnip Pack Virt Service")
+application.addComponent(
+    RotatableFileLogObserver(options.get('logfile')), ignoreClass=1)
 getPackVirtService().setServiceParent(application)

@@ -13,8 +13,10 @@ from twisted.application import (
     service,
     internet,
     )
+from twisted.scripts.twistd import ServerOptions
 
 from turnip.config import TurnipConfig
+from turnip.log import RotatableFileLogObserver
 from turnip.pack.git import PackBackendFactory
 from turnip.pack.hookrpc import (
     HookRPCHandler,
@@ -41,7 +43,12 @@ def getPackBackendServices():
     return pack_backend_service, hookrpc_service
 
 
+options = ServerOptions()
+options.parseOptions()
+
 application = service.Application("Turnip Pack Backend Service")
+application.addComponent(
+    RotatableFileLogObserver(options.get('logfile')), ignoreClass=1)
 pack_backend_service, hookrpc_service = getPackBackendServices()
 pack_backend_service.setServiceParent(application)
 hookrpc_service.setServiceParent(application)
