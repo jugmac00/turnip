@@ -12,7 +12,7 @@ from fixtures import TempDir
 from testtools import TestCase
 
 from turnip.pack import helpers
-import turnip.pack.hooks.hook
+import turnip.pack.hooks
 
 
 TEST_DATA = b'0123456789abcdef'
@@ -202,7 +202,9 @@ class TestEnsureHooks(TestCase):
             f.write('nothing to see here')
         helpers.ensure_hooks(self.repo_dir)
         with open(self.hook('hook.py'), 'rb') as actual:
-            with open(turnip.pack.hooks.hook.__file__, 'rb') as expected:
+            expected_path = os.path.join(
+                os.path.dirname(turnip.pack.hooks.__file__), 'hook.py')
+            with open(expected_path, 'rb') as expected:
                 self.assertEqual(
                     hashlib.sha256(expected.read()).hexdigest(),
                     hashlib.sha256(actual.read()).hexdigest())
