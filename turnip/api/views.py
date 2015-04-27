@@ -145,7 +145,7 @@ class DiffAPI(BaseAPI):
         return patch
 
 
-@resource(path='/repo/{name}/compare-merge/{base}/{head}')
+@resource(path='/repo/{name}/compare-merge/{base}:{head}')
 class DiffMergeAPI(BaseAPI):
     """Provides an HTTP API for merge previews.
 

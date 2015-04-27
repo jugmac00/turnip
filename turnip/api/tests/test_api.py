@@ -287,7 +287,7 @@ class ApiTestCase(TestCase):
         c3_left = repo.add_commit('foo\nbar\nbar\n', 'blah.txt',
                                   parents=[c2_left])
 
-        resp = self.app.get('/repo/{}/compare-merge/{}/{}'.format(
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, c3_right, c3_left))
         self.assertIn(' quux', resp.json_body['patch'])
         self.assertIn('-baz', resp.json_body['patch'])
