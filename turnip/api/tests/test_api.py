@@ -63,7 +63,8 @@ class ApiTestCase(TestCase):
         factory.build()
         new_repo_path = uuid.uuid1().hex
         resp = self.app.post_json('/repo', {'repo_path': new_repo_path,
-                                            'clone_from': self.repo_path})
+                                            'clone_from': self.repo_path,
+                                            'clone_refs': 'true'})
         repo1_revlist = get_revlist(factory.repo)
         clone_from = resp.json['repo_url'].split('/')[-1]
         repo2 = open_repo(os.path.join(self.repo_root, clone_from))
