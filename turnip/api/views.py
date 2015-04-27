@@ -55,7 +55,7 @@ class RepoAPI(BaseAPI):
         """Initialise a new git repository, or clone from an existing repo."""
         repo_path = extract_json_data(self.request).get('repo_path')
         clone_path = extract_json_data(self.request).get('clone_from')
-        clone_refs = extract_json_data(self.request).get('clone_refs', 'false')
+        clone_refs = extract_json_data(self.request).get('clone_refs', False)
 
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
@@ -65,13 +65,6 @@ class RepoAPI(BaseAPI):
         if not is_valid_path(self.repo_store, repo):
             self.request.errors.add('body', 'name', 'invalid path.')
             raise exc.HTTPNotFound()
-
-        if clone_refs.lower() not in ('true', 'false'):
-            self.request.errors.add(
-                'body', 'clone_refs', 'clone_refs must be true or false.')
-            return
-
-        clone_refs = clone_refs == 'true'
 
         if clone_path:
             repo_clone = os.path.join(self.repo_store, clone_path)
