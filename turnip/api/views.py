@@ -121,6 +121,7 @@ class DiffAPI(BaseAPI):
     Two dots provides a simple diff, equivalent to `git diff A B`.
     Three dots provides the symmetric or common ancestor diff, equivalent
     to `git diff $(git-merge-base A B) B`.
+    {name} can be two : separated repositories, for a cross repository diff.
     """
     def __init__(self, request):
         super(DiffAPI, self).__init__()
