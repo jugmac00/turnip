@@ -3,8 +3,6 @@
 import itertools
 import os
 import shutil
-import urllib
-import urlparse
 import uuid
 
 from pygit2 import (
