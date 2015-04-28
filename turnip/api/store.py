@@ -144,18 +144,11 @@ def open_repo(repo_path):
                 tmp_repo_path,
                 alternate_repo_paths=repos)
             repo = Repository(ephemeral_repo_path)
-            repo.ephemeral = True
             yield repo
         finally:
-            cleanup_repo(repo)
+            delete_repo(repo.path)
     else:
         yield Repository(repo_path)
-
-
-def cleanup_repo(repo):
-    """Remove ephemeral repo."""
-    if hasattr(repo, 'ephemeral'):
-        delete_repo(repo.path)
 
 
 def delete_repo(repo_path):

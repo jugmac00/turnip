@@ -84,7 +84,6 @@ class InitTestCase(TestCase):
         alt_path = os.path.join(self.repo_store, repos[0])
         with store.open_repo(repo_path) as repo:
             self.assert_alternate_exists(alt_path, repo.path)
-            self.assertTrue(repo.ephemeral)
 
     def test_repo_with_alternates(self):
         """Ensure objects path is defined correctly in repo alternates."""
