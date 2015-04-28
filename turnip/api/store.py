@@ -1,6 +1,9 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
-from contextlib import contextmanager
+from contextlib2 import (
+    contextmanager,
+    ExitStack,
+    )
 import itertools
 import os
 import shutil
@@ -260,7 +263,9 @@ def get_log(repo_path, start=None, limit=None, stop=None):
 
 def get_commit(repo_path, commit_oid, repo=None):
     """Return a single commit object from an oid."""
-    with open_repo(repo_path) as repo:
+    with ExitStack() as stack:
+        if not repo:
+            repo = stack.enter_context(open_repo(repo_path))
         git_object = repo.get(commit_oid)
         if git_object is None:
             raise GitError('Object {} does not exist in repository {}.'.format(
