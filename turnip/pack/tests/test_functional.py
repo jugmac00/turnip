@@ -9,6 +9,7 @@ import hashlib
 import os
 import shutil
 import stat
+import tempfile
 
 from fixtures import (
     EnvironmentVariable,
@@ -116,11 +117,23 @@ class FunctionalTestMixin(object):
 
     def startHookRPC(self):
         self.hookrpc_handler = HookRPCHandler(self.virtinfo_url)
-        dir = self.useFixture(TempDir()).path
+        dir = tempfile.mkdtemp(prefix='turnip-test-hook-')
+        self.addCleanup(shutil.rmtree, dir, ignore_errors=True)
+
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_listener = reactor.listenUNIX(
             self.hookrpc_path, HookRPCServerFactory(self.hookrpc_handler))
         self.addCleanup(self.hookrpc_listener.stopListening)
+
+    def startPackBackend(self):
+        self.root = tempfile.mkdtemp(prefix='turnip-test-root-')
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.backend_listener = reactor.listenTCP(
+            0,
+            PackBackendFactory(
+                self.root, self.hookrpc_handler, self.hookrpc_path))
+        self.backend_port = self.backend_listener.getHost().port
+        self.addCleanup(self.backend_listener.stopListening)
 
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
@@ -208,21 +221,12 @@ class TestBackendFunctional(FunctionalTestMixin, TestCase):
         # Set up a PackBackendFactory on a free port in a clean repo root.
         self.startVirtInfo()
         self.startHookRPC()
-        self.root = self.useFixture(TempDir()).path
-        self.listener = reactor.listenTCP(
-            0,
-            PackBackendFactory(
-                self.root, self.hookrpc_handler, self.hookrpc_path))
-        self.port = self.listener.getHost().port
+        self.startPackBackend()
+        self.port = self.backend_port
 
         yield self.assertCommandSuccess(
             (b'git', b'init', b'--bare', b'test'), path=self.root)
         self.url = b'git://localhost:%d/test' % self.port
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        super(TestBackendFunctional, self).tearDown()
-        yield self.listener.stopListening()
 
 
 class FrontendFunctionalTestMixin(FunctionalTestMixin):
@@ -245,15 +249,10 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         # for the path '/test'.
         self.startVirtInfo()
         self.startHookRPC()
-        self.root = self.useFixture(TempDir()).path
+        self.startPackBackend()
         self.internal_name = hashlib.sha256(b'/test').hexdigest()
         yield self.assertCommandSuccess(
             (b'git', b'init', b'--bare', self.internal_name), path=self.root)
-        self.backend_listener = reactor.listenTCP(
-            0,
-            PackBackendFactory(
-                self.root, self.hookrpc_handler, self.hookrpc_path))
-        self.backend_port = self.backend_listener.getHost().port
 
         self.virt_listener = reactor.listenTCP(
             0,
@@ -265,7 +264,6 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
     def tearDown(self):
         super(FrontendFunctionalTestMixin, self).tearDown()
         yield self.virt_listener.stopListening()
-        yield self.backend_listener.stopListening()
         yield self.authserver_listener.stopListening()
 
     @defer.inlineCallbacks

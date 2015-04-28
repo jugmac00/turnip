@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import os
+from textwrap import dedent
 import unittest
 import uuid
 
@@ -62,7 +63,8 @@ class ApiTestCase(TestCase):
         factory.build()
         new_repo_path = uuid.uuid1().hex
         resp = self.app.post_json('/repo', {'repo_path': new_repo_path,
-                                            'clone_from': self.repo_path})
+                                            'clone_from': self.repo_path,
+                                            'clone_refs': True})
         repo1_revlist = get_revlist(factory.repo)
         clone_from = resp.json['repo_url'].split('/')[-1]
         repo2 = open_repo(os.path.join(self.repo_root, clone_from))
@@ -292,6 +294,25 @@ class ApiTestCase(TestCase):
         self.assertIn('-baz', resp.json_body['patch'])
         self.assertIn('+bar', resp.json_body['patch'])
         self.assertNotIn('foo', resp.json_body['patch'])
+        self.assertEqual([], resp.json_body['conflicts'])
+
+    def test_repo_diff_merge_with_conflicts(self):
+        """Ensure that compare-merge returns conflicts information."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'blah.txt')
+        c2_left = repo.add_commit('foo\nbar\n', 'blah.txt', parents=[c1])
+        c2_right = repo.add_commit('foo\nbaz\n', 'blah.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
+            self.repo_path, c2_left, c2_right))
+        self.assertIn(dedent("""\
+            +<<<<<<< blah.txt
+             bar
+            +=======
+            +baz
+            +>>>>>>> blah.txt
+            """), resp.json_body['patch'])
+        self.assertEqual(['blah.txt'], resp.json_body['conflicts'])
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)

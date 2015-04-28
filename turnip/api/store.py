@@ -8,12 +8,14 @@ import urlparse
 import uuid
 
 from pygit2 import (
+    clone_repository,
     GitError,
+    GIT_FILEMODE_BLOB,
     GIT_OBJ_BLOB,
     GIT_OBJ_COMMIT,
     GIT_OBJ_TREE,
     GIT_OBJ_TAG,
-    clone_repository,
+    IndexEntry,
     init_repository,
     Repository,
     )
@@ -64,7 +66,7 @@ def format_signature(signature):
         }
 
 
-def is_bare(repo_path):
+def is_bare_repo(repo_path):
     return not os.path.exists(os.path.join(repo_path, '.git'))
 
 
@@ -85,26 +87,45 @@ def alternates_path(repo_path):
 def write_alternates(repo_path, alternate_repo_paths):
     with open(alternates_path(repo_path), "w") as f:
         for path in alternate_repo_paths:
-            if is_bare(path):
+            if is_bare_repo(path):
                 objects_path = os.path.join(path, 'objects')
             else:
                 objects_path = os.path.join(path, '.git', 'objects')
             f.write("{}\n".format(objects_path))
 
 
-def init_repo(repo_path, clone_from=None, alternate_repo_paths=None,
-              is_bare=True):
+def init_repo(repo_path, clone_from=None, clone_refs=False,
+              alternate_repo_paths=None, is_bare=True):
     """Initialise a new git repository or clone from existing."""
     assert is_valid_new_path(repo_path)
+    init_repository(repo_path, is_bare)
+
     if clone_from:
-        clone_from_url = urlparse.urljoin('file:',
-                                          urllib.pathname2url(clone_from))
-        repo = clone_repository(clone_from_url, repo_path, is_bare)
-    else:
-        repo = init_repository(repo_path, is_bare)
+        # The clone_from's objects and refs are in fact cloned into a
+        # subordinate tree that's then set as an alternate for the real
+        # repo. This lets git-receive-pack expose available commits as
+        # extra haves without polluting refs in the real repo.
+        sub_path = os.path.join(repo_path, 'turnip-subordinate')
+        clone_repository(clone_from, sub_path, True)
+        assert is_bare
+        alt_path = os.path.join(repo_path, 'objects/info/alternates')
+        with open(alt_path, 'w') as f:
+            f.write('../turnip-subordinate/objects\n')
+
+        if clone_refs:
+            # With the objects all accessible via the subordinate, we
+            # can just copy all refs from the origin. Unlike
+            # pygit2.clone_repository, this won't set up a remote.
+            # TODO: Filter out internal (eg. MP) refs.
+            from_repo = Repository(clone_from)
+            to_repo = Repository(repo_path)
+            for ref in from_repo.listall_references():
+                to_repo.create_reference(
+                    ref, from_repo.lookup_reference(ref).target)
+
     if alternate_repo_paths:
         write_alternates(repo_path, alternate_repo_paths)
-    return repo.path
+    return repo_path
 
 
 def open_repo(repo_path):
@@ -179,11 +200,20 @@ def get_merge_diff(repo_path, sha1_base, sha1_head, context_lines=3):
     """
     repo = open_repo(repo_path)
     merged_index = repo.merge_commits(sha1_base, sha1_head)
+    conflicts = set()
+    if merged_index.conflicts is not None:
+        for conflict in list(merged_index.conflicts):
+            path = [entry for entry in conflict if entry is not None][0].path
+            conflicts.add(path)
+            merged_file = repo.merge_file_from_index(*conflict)
+            blob_oid = repo.create_blob(merged_file)
+            merged_index.add(IndexEntry(path, blob_oid, GIT_FILEMODE_BLOB))
+            del merged_index.conflicts[path]
     diff = merged_index.diff_to_tree(
         repo[sha1_base].tree, context_lines=context_lines).patch
     shas = [sha1_base, sha1_head]
     commits = [get_commit(repo_path, sha, repo) for sha in shas]
-    diff = {'commits': commits, 'patch': diff}
+    diff = {'commits': commits, 'patch': diff, 'conflicts': sorted(conflicts)}
     # remove ephemeral repo if created for this merge diff
     if hasattr(repo, 'ephemeral'):
         delete_repo(repo.path)
