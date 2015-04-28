@@ -74,7 +74,6 @@ class RepoAPI(BaseAPI):
         try:
             new_repo_path = store.init_repo(
                 repo, clone_from=repo_clone, clone_refs=clone_refs)
-
             repo_name = os.path.basename(os.path.normpath(new_repo_path))
             return {'repo_url': '/'.join([self.request.url, repo_name])}
         except GitError:
