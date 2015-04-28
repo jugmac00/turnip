@@ -1,5 +1,6 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+from contextlib import contextmanager
 import itertools
 import os
 import shutil
@@ -126,24 +127,29 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
     return repo_path
 
 
+@contextmanager
 def open_repo(repo_path):
     """Open an existing git repository. Optionally create an
     ephemeral repository with alternates if repo_path contains ':'.
     """
     (repo_store, name) = os.path.split(repo_path)
     if ':' in name:
-        # create ephemeral repo with alternates set from both
-        repos = [os.path.join(repo_store, repo) for repo in name.split(':')]
-        tmp_repo_path = os.path.join(repo_store,
-                                     'ephemeral-' + uuid.uuid4().hex)
-        ephemeral_repo_path = init_repo(
-            tmp_repo_path,
-            alternate_repo_paths=repos)
-        repo = Repository(ephemeral_repo_path)
-        repo.ephemeral = True
-        return repo
+        try:
+            # create ephemeral repo with alternates set from both
+            repos = [os.path.join(repo_store, repo)
+                     for repo in name.split(':')]
+            tmp_repo_path = os.path.join(repo_store,
+                                         'ephemeral-' + uuid.uuid4().hex)
+            ephemeral_repo_path = init_repo(
+                tmp_repo_path,
+                alternate_repo_paths=repos)
+            repo = Repository(ephemeral_repo_path)
+            repo.ephemeral = True
+            yield repo
+        finally:
+            cleanup_repo(repo)
     else:
-        return Repository(repo_path)
+        yield Repository(repo_path)
 
 
 def cleanup_repo(repo):
@@ -159,27 +165,27 @@ def delete_repo(repo_path):
 
 def get_refs(repo_path):
     """Return all refs for a git repository."""
-    repo = open_repo(repo_path)
-    refs = {}
-    for ref in repo.listall_references():
-        git_object = repo.lookup_reference(ref).peel()
-        # Filter non-unicode refs, as refs are treated as unicode
-        # given json is unable to represent arbitrary byte strings.
-        try:
-            ref.decode('utf-8')
-        except UnicodeDecodeError:
-            pass
-        else:
-            refs.update(format_ref(ref, git_object))
-    return refs
+    with open_repo(repo_path) as repo:
+        refs = {}
+        for ref in repo.listall_references():
+            git_object = repo.lookup_reference(ref).peel()
+            # Filter non-unicode refs, as refs are treated as unicode
+            # given json is unable to represent arbitrary byte strings.
+            try:
+                ref.decode('utf-8')
+            except UnicodeDecodeError:
+                pass
+            else:
+                refs.update(format_ref(ref, git_object))
+        return refs
 
 
 def get_ref(repo_path, ref):
     """Return a specific ref for a git repository."""
-    repo = open_repo(repo_path)
-    git_object = repo.lookup_reference(ref.encode('utf-8')).peel()
-    ref_obj = format_ref(ref, git_object)
-    return ref_obj
+    with open_repo(repo_path) as repo:
+        git_object = repo.lookup_reference(ref.encode('utf-8')).peel()
+        ref_obj = format_ref(ref, git_object)
+        return ref_obj
 
 
 def get_common_ancestor_diff(repo_path, sha1_target, sha1_source,
@@ -190,9 +196,9 @@ def get_common_ancestor_diff(repo_path, sha1_target, sha1_source,
     :param sha1_source: source sha1 for merge base.
     :param context_lines: num unchanged lines that define a hunk boundary.
     """
-    repo = open_repo(repo_path)
-    common_ancestor = repo.merge_base(sha1_target, sha1_source)
-    return get_diff(repo_path, common_ancestor, sha1_source, context_lines)
+    with open_repo(repo_path) as repo:
+        common_ancestor = repo.merge_base(sha1_target, sha1_source)
+        return get_diff(repo_path, common_ancestor, sha1_source, context_lines)
 
 
 def get_merge_diff(repo_path, sha1_base, sha1_head, context_lines=3):
@@ -202,24 +208,25 @@ def get_merge_diff(repo_path, sha1_base, sha1_head, context_lines=3):
     :param sha1_head: source sha1 for merge.
     :param context_lines: num unchanged lines that define a hunk boundary.
     """
-    repo = open_repo(repo_path)
-    merged_index = repo.merge_commits(sha1_base, sha1_head)
-    conflicts = set()
-    if merged_index.conflicts is not None:
-        for conflict in list(merged_index.conflicts):
-            path = [entry for entry in conflict if entry is not None][0].path
-            conflicts.add(path)
-            merged_file = repo.merge_file_from_index(*conflict)
-            blob_oid = repo.create_blob(merged_file)
-            merged_index.add(IndexEntry(path, blob_oid, GIT_FILEMODE_BLOB))
-            del merged_index.conflicts[path]
-    diff = merged_index.diff_to_tree(
-        repo[sha1_base].tree, context_lines=context_lines).patch
-    shas = [sha1_base, sha1_head]
-    commits = [get_commit(repo_path, sha, repo) for sha in shas]
-    diff = {'commits': commits, 'patch': diff, 'conflicts': sorted(conflicts)}
-    cleanup_repo(repo)
-    return diff
+    with open_repo(repo_path) as repo:
+        merged_index = repo.merge_commits(sha1_base, sha1_head)
+        conflicts = set()
+        if merged_index.conflicts is not None:
+            for conflict in list(merged_index.conflicts):
+                path = [entry for entry in conflict
+                        if entry is not None][0].path
+                conflicts.add(path)
+                merged_file = repo.merge_file_from_index(*conflict)
+                blob_oid = repo.create_blob(merged_file)
+                merged_index.add(IndexEntry(path, blob_oid, GIT_FILEMODE_BLOB))
+                del merged_index.conflicts[path]
+        diff = merged_index.diff_to_tree(
+            repo[sha1_base].tree, context_lines=context_lines).patch
+        shas = [sha1_base, sha1_head]
+        commits = [get_commit(repo_path, sha, repo) for sha in shas]
+        diff = {'commits': commits, 'patch': diff,
+                'conflicts': sorted(conflicts)}
+        return diff
 
 
 def get_diff(repo_path, sha1_from, sha1_to, context_lines=3):
@@ -229,16 +236,15 @@ def get_diff(repo_path, sha1_from, sha1_to, context_lines=3):
     :param sha1_to: diff to sha1.
     :param context_lines: num unchanged lines that define a hunk boundary.
     """
-    repo = open_repo(repo_path)
-    shas = [sha1_from, sha1_to]
-    commits = [get_commit(repo_path, sha, repo) for sha in shas]
-    diff = {
-        'commits': commits,
-        'patch': repo.diff(commits[0]['sha1'], commits[1]['sha1'],
-                           False, 0, context_lines).patch
+    with open_repo(repo_path) as repo:
+        shas = [sha1_from, sha1_to]
+        commits = [get_commit(repo_path, sha, repo) for sha in shas]
+        diff = {
+            'commits': commits,
+            'patch': repo.diff(commits[0]['sha1'], commits[1]['sha1'],
+                               False, 0, context_lines).patch
         }
-    cleanup_repo(repo)
-    return diff
+        return diff
 
 
 def get_log(repo_path, start=None, limit=None, stop=None):
@@ -248,37 +254,34 @@ def get_log(repo_path, start=None, limit=None, stop=None):
     :param limit: limit number of commits to return.
     :param stop: ignore a commit (and its ancestors).
     """
-    repo = open_repo(repo_path)
-    if not start:
-        start = repo.head.target  # walk from HEAD
-    walker = repo.walk(start)
-    if stop:
-        walker.hide(stop)  # filter stop sha1 and its ancestors
-    if limit > 0:
-        walker = itertools.islice(walker, limit)
-    commits = [format_commit(commit) for commit in walker]
-    return commits
+    with open_repo(repo_path) as repo:
+        if not start:
+            start = repo.head.target  # walk from HEAD
+        walker = repo.walk(start)
+        if stop:
+            walker.hide(stop)  # filter stop sha1 and its ancestors
+        if limit > 0:
+            walker = itertools.islice(walker, limit)
+        return [format_commit(commit) for commit in walker]
 
 
 def get_commit(repo_path, commit_oid, repo=None):
     """Return a single commit object from an oid."""
-    if not repo:
-        repo = open_repo(repo_path)
-    git_object = repo.get(commit_oid)
-    if git_object is None:
-        raise GitError('Object {} does not exist in repository {}.'.format(
-            commit_oid, repo_path))
-    commit = format_commit(git_object)
-    return commit
+    with open_repo(repo_path) as repo:
+        git_object = repo.get(commit_oid)
+        if git_object is None:
+            raise GitError('Object {} does not exist in repository {}.'.format(
+                commit_oid, repo_path))
+        return format_commit(git_object)
 
 
 def get_commits(repo_path, commit_oids):
     """Return a collection of commit objects from a list of oids."""
-    repo = open_repo(repo_path)
-    commits = []
-    for commit in commit_oids:
-        try:
-            commits.append(get_commit(repo_path, commit, repo))
-        except GitError:
-            pass
-    return commits
+    with open_repo(repo_path) as repo:
+        commits = []
+        for commit in commit_oids:
+            try:
+                commits.append(get_commit(repo_path, commit, repo))
+            except GitError:
+                pass
+        return commits
