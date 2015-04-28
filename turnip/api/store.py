@@ -130,11 +130,11 @@ def open_repo(repo_path):
     """Open an existing git repository. Optionally create an
     ephemeral repository with alternates if repo_path contains ':'.
     """
-    (base_dir, name) = os.path.split(repo_path)
+    (repo_store, name) = os.path.split(repo_path)
     if ':' in name:
         # create ephemeral repo with alternates set from both
-        repos = [os.path.join(base_dir, repo) for repo in name.split(':')]
-        tmp_repo_path = os.path.join(base_dir,
+        repos = [os.path.join(repo_store, repo) for repo in name.split(':')]
+        tmp_repo_path = os.path.join(repo_store,
                                      'ephemeral-' + uuid.uuid4().hex)
         ephemeral_repo_path = init_repo(
             tmp_repo_path,
