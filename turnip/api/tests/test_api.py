@@ -74,8 +74,8 @@ class ApiTestCase(TestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn(new_repo_path, resp.json['repo_url'])
 
-    def test_cross_repo_diff(self):
-        """Diff can be requested across 2 repositories."""
+    def test_cross_repo_merge_diff(self):
+        """Merge diff can be requested across 2 repositories."""
         factory = RepoFactory(self.repo_store)
         c1 = factory.add_commit('foo', 'foobar.txt')
         factory.set_head(c1)
@@ -89,6 +89,23 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}:{}/compare-merge/{}:{}'.format(
             self.repo_path, repo2_name, c2, c3))
         self.assertIn('-bar', resp.json['patch'])
+
+    def test_cross_repo_diff(self):
+        """Diff can be requested across 2 repositories."""
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('foo', 'foobar.txt')
+        factory.set_head(c1)
+
+        repo2_name = uuid.uuid4().hex
+        factory2 = RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=factory)
+        c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
+        c3 = factory2.add_commit('baz', 'foobar.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}:{}/compare/{}..{}'.format(
+            self.repo_path, repo2_name, c2, c3))
+        self.assertIn('-bar', resp.json['patch'])
+        self.assertIn('+baz', resp.json['patch'])
 
     def test_cross_repo_diff_invalid_repo(self):
         """Cross repo diff with invalid repo returns HTTP 404."""

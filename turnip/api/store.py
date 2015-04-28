@@ -146,6 +146,12 @@ def open_repo(repo_path):
         return Repository(repo_path)
 
 
+def cleanup_repo(repo):
+    """Remove ephemeral repo."""
+    if hasattr(repo, 'epheameral'):
+        delete_repo(repo.path)
+
+
 def delete_repo(repo_path):
     """Permanently delete a git repository from repo store."""
     shutil.rmtree(repo_path)
@@ -212,9 +218,7 @@ def get_merge_diff(repo_path, sha1_base, sha1_head, context_lines=3):
     shas = [sha1_base, sha1_head]
     commits = [get_commit(repo_path, sha, repo) for sha in shas]
     diff = {'commits': commits, 'patch': diff, 'conflicts': sorted(conflicts)}
-    # remove ephemeral repo if created for this merge diff
-    if hasattr(repo, 'ephemeral'):
-        delete_repo(repo.path)
+    cleanup_repo(repo)
     return diff
 
 
@@ -233,6 +237,7 @@ def get_diff(repo_path, sha1_from, sha1_to, context_lines=3):
         'patch': repo.diff(commits[0]['sha1'], commits[1]['sha1'],
                            False, 0, context_lines).patch
         }
+    cleanup_repo(repo)
     return diff
 
 
