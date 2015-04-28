@@ -148,7 +148,7 @@ def open_repo(repo_path):
 
 def cleanup_repo(repo):
     """Remove ephemeral repo."""
-    if hasattr(repo, 'epheameral'):
+    if hasattr(repo, 'ephemeral'):
         delete_repo(repo.path)
 
 
