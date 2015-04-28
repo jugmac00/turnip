@@ -84,14 +84,13 @@ class ApiTestCase(TestCase):
         c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
         c3 = factory2.add_commit('baz', 'foobar.txt', parents=[c1])
 
-        resp = self.app.get('/repo/{}:{}/diff/{}:{}'.format(
+        resp = self.app.get('/repo/{}:{}/compare-merge/{}:{}'.format(
             self.repo_path, repo2_name, c2, c3))
-        self.assertIn('-bar', resp.body)
-        self.assertIn('+baz', resp.body)
+        self.assertIn('-bar', resp.json['patch'])
 
     def test_cross_repo_diff_invalid_repo(self):
         """Cross repo diff with invalid repo returns HTTP 404."""
-        resp = self.app.get('/repo/1:2/diff/3:4', expect_errors=True)
+        resp = self.app.get('/repo/1:2/compare-merge/3:4', expect_errors=True)
         self.assertEqual(404, resp.status_code)
 
     def test_cross_repo_diff_invalid_commit(self):
@@ -101,7 +100,7 @@ class ApiTestCase(TestCase):
         factory.set_head(c1)
 
         repo2_name = uuid.uuid4().hex
-        factory2 = RepoFactory(
+        RepoFactory(
             os.path.join(self.repo_root, repo2_name), clone_from=factory)
         c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
 

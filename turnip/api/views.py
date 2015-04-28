@@ -2,7 +2,6 @@
 
 import os
 import re
-import uuid
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
@@ -150,6 +149,7 @@ class DiffMergeAPI(BaseAPI):
     """Provides an HTTP API for merge previews.
 
     {head} will be merged into {base} and the diff from {base} returned.
+    {name} can be two : separated repositories, for a cross repository diff.
     """
     def __init__(self, request):
         super(DiffMergeAPI, self).__init__()
@@ -166,44 +166,6 @@ class DiffMergeAPI(BaseAPI):
         except (ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()
-        return patch
-
-
-@resource(path='/repo/{name}:{other_name}/diff/{commit}:{other_commit}')
-class RepoDiffAPI(BaseAPI):
-    """Provides HTTP API for cross repository diffs."""
-
-    def __init__(self, request):
-        super(RepoDiffAPI, self).__init__()
-        self.request = request
-
-    @repo_path
-    def get(self, repo_path):
-        context_lines = int(self.request.params.get('context_lines', 3))
-        other_name = self.request.matchdict['other_name']
-        commit = self.request.matchdict['commit']
-        other_commit = self.request.matchdict['other_commit']
-
-        other_repo_path = os.path.join(self.repo_store, other_name)
-        if not is_valid_path(self.repo_store, other_repo_path):
-            raise exc.HTTPInternalServerError()
-        tmp_repo_path = os.path.join(self.repo_store,
-                                     'ephemeral-' + uuid.uuid4().hex)
-        try:
-            # create a new ephemeral repo with alternates set from {name}
-            # and {other_name}
-            store.init_repo(
-                tmp_repo_path,
-                alternate_repo_paths=[repo_path, other_repo_path])
-            patch = store.get_diff(
-                tmp_repo_path, commit, other_commit, context_lines)
-        except (ValueError, GitError):
-            # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
-            return exc.HTTPNotFound()
-        finally:
-            # delete ephemeral repo
-            if is_valid_path(self.repo_store, tmp_repo_path):
-                store.delete_repo(tmp_repo_path)
         return patch
 
 

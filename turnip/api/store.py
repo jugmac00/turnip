@@ -5,6 +5,7 @@ import os
 import shutil
 import urllib
 import urlparse
+import uuid
 
 from pygit2 import (
     GitError,
@@ -107,8 +108,23 @@ def init_repo(repo_path, clone_from=None, alternate_repo_paths=None,
 
 
 def open_repo(repo_path):
-    """Open an existing git repository."""
-    return Repository(repo_path)
+    """Open an existing git repository. Optionally create an
+    ephemeral repository with alternates if repo_path contains ':'.
+    """
+    (base_dir, name) = os.path.split(repo_path)
+    if ':' in name:
+        # create ephemeral repo with alternates set from both
+        repos = [os.path.join(base_dir, repo) for repo in name.split(':')]
+        tmp_repo_path = os.path.join(base_dir,
+                                     'ephemeral-' + uuid.uuid4().hex)
+        ephemeral_repo_path = init_repo(
+            tmp_repo_path,
+            alternate_repo_paths=repos)
+        repo = Repository(ephemeral_repo_path)
+        repo.ephemeral = True
+        return repo
+    else:
+        return Repository(repo_path)
 
 
 def delete_repo(repo_path):
@@ -168,6 +184,9 @@ def get_merge_diff(repo_path, sha1_base, sha1_head, context_lines=3):
     shas = [sha1_base, sha1_head]
     commits = [get_commit(repo_path, sha, repo) for sha in shas]
     diff = {'commits': commits, 'patch': diff}
+    # remove ephemeral repo if created for this merge diff
+    if hasattr(repo, 'ephemeral'):
+        delete_repo(repo.path)
     return diff
 
 
