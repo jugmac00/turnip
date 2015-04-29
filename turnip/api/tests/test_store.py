@@ -80,9 +80,8 @@ class InitTestCase(TestCase):
         """
         repos = [uuid.uuid4().hex, uuid.uuid4().hex]
         repo_name = '{}:{}'.format(repos[0], repos[1])
-        repo_path = os.path.join(self.repo_store, repo_name)
         alt_path = os.path.join(self.repo_store, repos[0])
-        with store.open_repo(repo_path) as repo:
+        with store.open_repo(self.repo_store, repo_name) as repo:
             self.assert_alternate_exists(alt_path, repo.path)
 
     def test_repo_with_alternates(self):

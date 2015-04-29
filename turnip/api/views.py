@@ -17,9 +17,9 @@ def is_valid_path(repo_store, repo_path):
     return os.path.realpath(repo_path).startswith(os.path.realpath(repo_store))
 
 
-def repo_path(func):
-    """Decorator builds repo path from request name and repo_store."""
-    def repo_path_decorator(self):
+def validate_path(func):
+    """Decorator validates repo path from request name and repo_store."""
+    def validate_path_decorator(self):
         name = self.request.matchdict['name']
         if not name:
             self.request.errors.add('body', 'name', 'repo name is missing')
@@ -28,9 +28,8 @@ def repo_path(func):
         if not is_valid_path(self.repo_store, repo_path):
             self.request.errors.add('body', 'name', 'invalid path.')
             raise exc.HTTPInternalServerError()
-
-        return func(self, repo_path)
-    return repo_path_decorator
+        return func(self, self.repo_store, name)
+    return validate_path_decorator
 
 
 class BaseAPI(object):
@@ -79,10 +78,11 @@ class RepoAPI(BaseAPI):
         except GitError:
             return exc.HTTPConflict()  # 409
 
-    @repo_path
-    def delete(self, repo_path):
+    @validate_path
+    def delete(self, repo_store, repo_name):
         """Delete an existing git repository."""
         try:
+            repo_path = os.path.join(self.repo_store, repo_name)
             store.delete_repo(repo_path)
         except (IOError, OSError):
             return exc.HTTPNotFound()  # 404
@@ -97,18 +97,18 @@ class RefAPI(BaseAPI):
         super(RefAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def collection_get(self, repo_path):
+    @validate_path
+    def collection_get(self, repo_store, repo_name):
         try:
-            return store.get_refs(repo_path)
+            return store.get_refs(repo_store, repo_name)
         except (KeyError, GitError):
             return exc.HTTPNotFound()  # 404
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         ref = 'refs/' + self.request.matchdict['ref']
         try:
-            return store.get_ref(repo_path, ref)
+            return store.get_ref(repo_store, repo_name, ref)
         except (KeyError, GitError):
             return exc.HTTPNotFound()
 
@@ -127,8 +127,8 @@ class DiffAPI(BaseAPI):
         super(DiffAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         """Returns diff of two commits."""
         commits = re.split('(\.{2,3})', self.request.matchdict['commits'])
         context_lines = int(self.request.params.get('context_lines', 3))
@@ -136,7 +136,8 @@ class DiffAPI(BaseAPI):
             return exc.HTTPBadRequest()
         try:
             diff_type = commits[1]
-            args = (repo_path, commits[0], commits[2], context_lines)
+            args = (repo_store, repo_name, commits[0],
+                    commits[2], context_lines)
             if diff_type == '..':
                 patch = store.get_diff(*args)
             elif diff_type == '...':
@@ -158,13 +159,13 @@ class DiffMergeAPI(BaseAPI):
         super(DiffMergeAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         """Returns diff of two commits."""
         context_lines = int(self.request.params.get('context_lines', 3))
         try:
             patch = store.get_merge_diff(
-                repo_path, self.request.matchdict['base'],
+                repo_store, repo_name, self.request.matchdict['base'],
                 self.request.matchdict['head'], context_lines)
         except (ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
@@ -181,21 +182,21 @@ class CommitAPI(BaseAPI):
         super(CommitAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         commit_sha1 = self.request.matchdict['sha1']
         try:
-            commit = store.get_commit(repo_path, commit_sha1)
+            commit = store.get_commit(repo_store, repo_name, commit_sha1)
         except GitError:
             return exc.HTTPNotFound()
         return commit
 
-    @repo_path
-    def collection_post(self, repo_path):
+    @validate_path
+    def collection_post(self, repo_store, repo_name):
         """Get commits in bulk."""
         commits = extract_json_data(self.request).get('commits')
         try:
-            commits = store.get_commits(repo_path, commits)
+            commits = store.get_commits(repo_store, repo_name, commits)
         except GitError:
             return exc.HTTPNotFound()
         return commits
@@ -209,15 +210,15 @@ class LogAPI(BaseAPI):
         super(LogAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         """Get log by sha1, filtered by limit and stop."""
         sha1 = self.request.matchdict['sha1']
         limit = int(self.request.params.get('limit', -1))
         stop = self.request.params.get('stop')
 
         try:
-            log = store.get_log(repo_path, sha1, limit, stop)
+            log = store.get_log(repo_store, repo_name, sha1, limit, stop)
         except GitError:
             return exc.HTTPNotFound()
         return log

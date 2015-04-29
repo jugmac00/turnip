@@ -131,16 +131,18 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
 
 
 @contextmanager
-def open_repo(repo_path):
-    """Open an existing git repository. Optionally create an
-    ephemeral repository with alternates if repo_path contains ':'.
+def open_repo(repo_store, repo_name):
+    """Open an existing git repository. Optionally create an ephemeral
+    repository with alternates if repo_path contains ':'.
+
+    :param repo_store: path to repository root.
+    :param repo_name: repository name.
     """
-    (repo_store, name) = os.path.split(repo_path)
-    if ':' in name:
+    if ':' in repo_name:
         try:
             # create ephemeral repo with alternates set from both
             repos = [os.path.join(repo_store, repo)
-                     for repo in name.split(':')]
+                     for repo in repo_name.split(':')]
             tmp_repo_path = os.path.join(repo_store,
                                          'ephemeral-' + uuid.uuid4().hex)
             ephemeral_repo_path = init_repo(
@@ -149,8 +151,9 @@ def open_repo(repo_path):
             repo = Repository(ephemeral_repo_path)
             yield repo
         finally:
-            delete_repo(repo.path)
+            delete_repo(ephemeral_repo_path)
     else:
+        repo_path = os.path.join(repo_store, repo_name)
         yield Repository(repo_path)
 
 
@@ -159,9 +162,9 @@ def delete_repo(repo_path):
     shutil.rmtree(repo_path)
 
 
-def get_refs(repo_path):
+def get_refs(repo_store, repo_name):
     """Return all refs for a git repository."""
-    with open_repo(repo_path) as repo:
+    with open_repo(repo_store, repo_name) as repo:
         refs = {}
         for ref in repo.listall_references():
             git_object = repo.lookup_reference(ref).peel()
@@ -176,15 +179,15 @@ def get_refs(repo_path):
         return refs
 
 
-def get_ref(repo_path, ref):
+def get_ref(repo_store, repo_name, ref):
     """Return a specific ref for a git repository."""
-    with open_repo(repo_path) as repo:
+    with open_repo(repo_store, repo_name) as repo:
         git_object = repo.lookup_reference(ref.encode('utf-8')).peel()
         ref_obj = format_ref(ref, git_object)
         return ref_obj
 
 
-def get_common_ancestor_diff(repo_path, sha1_target, sha1_source,
+def get_common_ancestor_diff(repo_store, repo_name, sha1_target, sha1_source,
                              context_lines=3):
     """Get diff of common ancestor and source diff.
 
@@ -192,19 +195,21 @@ def get_common_ancestor_diff(repo_path, sha1_target, sha1_source,
     :param sha1_source: source sha1 for merge base.
     :param context_lines: num unchanged lines that define a hunk boundary.
     """
-    with open_repo(repo_path) as repo:
+    with open_repo(repo_store, repo_name) as repo:
         common_ancestor = repo.merge_base(sha1_target, sha1_source)
-        return get_diff(repo_path, common_ancestor, sha1_source, context_lines)
+        return get_diff(repo_store, repo_name, common_ancestor,
+                        sha1_source, context_lines)
 
 
-def get_merge_diff(repo_path, sha1_base, sha1_head, context_lines=3):
+def get_merge_diff(repo_store, repo_name, sha1_base,
+                   sha1_head, context_lines=3):
     """Get diff of common ancestor and source diff.
 
     :param sha1_base: target sha1 for merge.
     :param sha1_head: source sha1 for merge.
     :param context_lines: num unchanged lines that define a hunk boundary.
     """
-    with open_repo(repo_path) as repo:
+    with open_repo(repo_store, repo_name) as repo:
         merged_index = repo.merge_commits(sha1_base, sha1_head)
         conflicts = set()
         if merged_index.conflicts is not None:
@@ -219,22 +224,24 @@ def get_merge_diff(repo_path, sha1_base, sha1_head, context_lines=3):
         diff = merged_index.diff_to_tree(
             repo[sha1_base].tree, context_lines=context_lines).patch
         shas = [sha1_base, sha1_head]
-        commits = [get_commit(repo_path, sha, repo) for sha in shas]
+        commits = [get_commit(repo_store, repo_name, sha, repo)
+                   for sha in shas]
         diff = {'commits': commits, 'patch': diff,
                 'conflicts': sorted(conflicts)}
         return diff
 
 
-def get_diff(repo_path, sha1_from, sha1_to, context_lines=3):
+def get_diff(repo_store, repo_name, sha1_from, sha1_to, context_lines=3):
     """Get patch and associated commits of two sha1s.
 
     :param sha1_from: diff from sha1.
     :param sha1_to: diff to sha1.
     :param context_lines: num unchanged lines that define a hunk boundary.
     """
-    with open_repo(repo_path) as repo:
+    with open_repo(repo_store, repo_name) as repo:
         shas = [sha1_from, sha1_to]
-        commits = [get_commit(repo_path, sha, repo) for sha in shas]
+        commits = [get_commit(repo_store, repo_name, sha, repo)
+                   for sha in shas]
         diff = {
             'commits': commits,
             'patch': repo.diff(commits[0]['sha1'], commits[1]['sha1'],
@@ -243,14 +250,14 @@ def get_diff(repo_path, sha1_from, sha1_to, context_lines=3):
         return diff
 
 
-def get_log(repo_path, start=None, limit=None, stop=None):
+def get_log(repo_store, repo_name, start=None, limit=None, stop=None):
     """Return a commit collection from HEAD or optionally a start oid.
 
     :param start: sha1 or branch to start listing commits from.
     :param limit: limit number of commits to return.
     :param stop: ignore a commit (and its ancestors).
     """
-    with open_repo(repo_path) as repo:
+    with open_repo(repo_store, repo_name) as repo:
         if not start:
             start = repo.head.target  # walk from HEAD
         walker = repo.walk(start)
@@ -261,25 +268,25 @@ def get_log(repo_path, start=None, limit=None, stop=None):
         return [format_commit(commit) for commit in walker]
 
 
-def get_commit(repo_path, commit_oid, repo=None):
+def get_commit(repo_store, repo_name, commit_oid, repo=None):
     """Return a single commit object from an oid."""
     with ExitStack() as stack:
         if not repo:
-            repo = stack.enter_context(open_repo(repo_path))
+            repo = stack.enter_context(open_repo(repo_store, repo_name))
         git_object = repo.get(commit_oid)
         if git_object is None:
             raise GitError('Object {} does not exist in repository {}.'.format(
-                commit_oid, repo_path))
+                commit_oid, repo_name))
         return format_commit(git_object)
 
 
-def get_commits(repo_path, commit_oids):
+def get_commits(repo_store, repo_name, commit_oids):
     """Return a collection of commit objects from a list of oids."""
-    with open_repo(repo_path) as repo:
+    with open_repo(repo_store, repo_name) as repo:
         commits = []
         for commit in commit_oids:
             try:
-                commits.append(get_commit(repo_path, commit, repo))
+                commits.append(get_commit(repo_store, repo_name, commit, repo))
             except GitError:
                 pass
         return commits
