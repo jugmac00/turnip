@@ -82,7 +82,7 @@ class RepoAPI(BaseAPI):
     def delete(self, repo_store, repo_name):
         """Delete an existing git repository."""
         try:
-            repo_path = os.path.join(self.repo_store, repo_name)
+            repo_path = os.path.join(repo_store, repo_name)
             store.delete_repo(repo_path)
         except (IOError, OSError):
             return exc.HTTPNotFound()  # 404
