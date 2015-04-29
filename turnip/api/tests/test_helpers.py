@@ -2,9 +2,12 @@
 
 import itertools
 import os
+import urllib
+import urlparse
 import uuid
 
 from pygit2 import (
+    clone_repository,
     init_repository,
     GIT_FILEMODE_BLOB,
     GIT_OBJ_COMMIT,
@@ -29,7 +32,7 @@ class RepoFactory():
     """Builds a git repository in a user defined state."""
 
     def __init__(self, repo_path=None, num_commits=None,
-                 num_branches=None, num_tags=None):
+                 num_branches=None, num_tags=None, clone_from=None):
         self.author = Signature('Test Author', 'author@bar.com')
         self.branches = []
         self.committer = Signature('Test Commiter', 'committer@bar.com')
@@ -38,7 +41,10 @@ class RepoFactory():
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_path = repo_path
-        self.repo = self.init_repo()
+        if clone_from:
+            self.repo = self.clone_repo(clone_from)
+        else:
+            self.repo = self.init_repo()
 
     @property
     def commits(self):
@@ -61,6 +67,9 @@ class RepoFactory():
         oid = repo.create_commit(ref, author, committer,
                                  blob_content, tree_id, parents)
         return oid
+
+    def set_head(self, oid):
+        self.repo.create_reference('refs/heads/master', oid)
 
     def add_branch(self, name, oid):
         commit = self.repo.get(oid)
@@ -132,6 +141,12 @@ class RepoFactory():
 
     def init_repo(self):
         return init_repository(self.repo_path)
+
+    def clone_repo(self, repo_factory):
+        """Return a pygit2 repo object cloned from an existing factory repo."""
+        clone_from_url = urlparse.urljoin(
+            'file:', urllib.pathname2url(repo_factory.repo.path))
+        return clone_repository(clone_from_url, self.repo_path)
 
     def build(self):
         """Return a repo, optionally with generated commits and tags."""

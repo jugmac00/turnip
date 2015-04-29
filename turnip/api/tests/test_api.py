@@ -74,6 +74,59 @@ class ApiTestCase(TestCase):
         self.assertEqual(200, resp.status_code)
         self.assertIn(new_repo_path, resp.json['repo_url'])
 
+    def test_cross_repo_merge_diff(self):
+        """Merge diff can be requested across 2 repositories."""
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('foo', 'foobar.txt')
+        factory.set_head(c1)
+
+        repo2_name = uuid.uuid4().hex
+        factory2 = RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=factory)
+        c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
+        c3 = factory2.add_commit('baz', 'foobar.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}:{}/compare-merge/{}:{}'.format(
+            self.repo_path, repo2_name, c2, c3))
+        self.assertIn('-bar', resp.json['patch'])
+
+    def test_cross_repo_diff(self):
+        """Diff can be requested across 2 repositories."""
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('foo', 'foobar.txt')
+        factory.set_head(c1)
+
+        repo2_name = uuid.uuid4().hex
+        factory2 = RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=factory)
+        c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
+        c3 = factory2.add_commit('baz', 'foobar.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}:{}/compare/{}..{}'.format(
+            self.repo_path, repo2_name, c2, c3))
+        self.assertIn('-bar', resp.json['patch'])
+        self.assertIn('+baz', resp.json['patch'])
+
+    def test_cross_repo_diff_invalid_repo(self):
+        """Cross repo diff with invalid repo returns HTTP 404."""
+        resp = self.app.get('/repo/1:2/compare-merge/3:4', expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
+    def test_cross_repo_diff_invalid_commit(self):
+        """Cross repo diff with an invalid commit returns HTTP 404."""
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('foo', 'foobar.txt')
+        factory.set_head(c1)
+
+        repo2_name = uuid.uuid4().hex
+        RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=factory)
+        c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}:{}/diff/{}:{}'.format(
+            self.repo_path, repo2_name, c2, 'invalid'), expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
     def test_repo_delete(self):
         self.app.post_json('/repo', {'repo_path': self.repo_path})
         resp = self.app.delete('/repo/{}'.format(self.repo_path))
@@ -244,12 +297,15 @@ class ApiTestCase(TestCase):
         """Ensure expected changes exist in diff patch."""
         repo = RepoFactory(self.repo_store)
         c1 = repo.add_commit('foo\nbar\nbaz\n', 'blah.txt')
-        c2_right = repo.add_commit('quux\nbar\nbaz\n', 'blah.txt', parents=[c1])
-        c3_right = repo.add_commit('quux\nbar\nbaz\n', 'blah.txt', parents=[c2_right])
+        c2_right = repo.add_commit('quux\nbar\nbaz\n', 'blah.txt',
+                                   parents=[c1])
+        c3_right = repo.add_commit('quux\nbar\nbaz\n', 'blah.txt',
+                                   parents=[c2_right])
         c2_left = repo.add_commit('foo\nbar\nbar\n', 'blah.txt', parents=[c1])
-        c3_left = repo.add_commit('foo\nbar\nbar\n', 'blah.txt', parents=[c2_left])
+        c3_left = repo.add_commit('foo\nbar\nbar\n', 'blah.txt',
+                                  parents=[c2_left])
 
-        resp = self.app.get('/repo/{}/compare-merge/{}/{}'.format(
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, c3_right, c3_left))
         self.assertIn(' quux', resp.json_body['patch'])
         self.assertIn('-baz', resp.json_body['patch'])
@@ -264,7 +320,7 @@ class ApiTestCase(TestCase):
         c2_left = repo.add_commit('foo\nbar\n', 'blah.txt', parents=[c1])
         c2_right = repo.add_commit('foo\nbaz\n', 'blah.txt', parents=[c1])
 
-        resp = self.app.get('/repo/{}/compare-merge/{}/{}'.format(
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, c2_left, c2_right))
         self.assertIn(dedent("""\
             +<<<<<<< blah.txt
