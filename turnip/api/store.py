@@ -221,12 +221,14 @@ def get_merge_diff(repo_store, repo_name, sha1_base,
                 blob_oid = repo.create_blob(merged_file)
                 merged_index.add(IndexEntry(path, blob_oid, GIT_FILEMODE_BLOB))
                 del merged_index.conflicts[path]
-        diff = merged_index.diff_to_tree(
+        patch = merged_index.diff_to_tree(
             repo[sha1_base].tree, context_lines=context_lines).patch
+        if patch is None:
+            patch = u''
         shas = [sha1_base, sha1_head]
         commits = [get_commit(repo_store, repo_name, sha, repo)
                    for sha in shas]
-        diff = {'commits': commits, 'patch': diff,
+        diff = {'commits': commits, 'patch': patch,
                 'conflicts': sorted(conflicts)}
         return diff
 
@@ -242,10 +244,14 @@ def get_diff(repo_store, repo_name, sha1_from, sha1_to, context_lines=3):
         shas = [sha1_from, sha1_to]
         commits = [get_commit(repo_store, repo_name, sha, repo)
                    for sha in shas]
+        patch = repo.diff(
+            commits[0]['sha1'], commits[1]['sha1'], False, 0,
+            context_lines).patch
+        if patch is None:
+            patch = u''
         diff = {
             'commits': commits,
-            'patch': repo.diff(commits[0]['sha1'], commits[1]['sha1'],
-                               False, 0, context_lines).patch
+            'patch': patch,
         }
         return diff
 

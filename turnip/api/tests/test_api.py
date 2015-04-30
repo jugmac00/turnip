@@ -293,6 +293,16 @@ class ApiTestCase(TestCase):
         self.assertIn('+baz', resp.json_body['patch'])
         self.assertNotIn('+corge', resp.json_body['patch'])
 
+    def test_repo_diff_empty(self):
+        """Ensure that diffing two identical commits returns an empty string
+        as the patch, not None."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'blah.txt')
+
+        resp = self.app.get('/repo/{}/compare/{}..{}'.format(
+            self.repo_path, c1, c1))
+        self.assertEqual('', resp.json_body['patch'])
+
     def test_repo_diff_merge(self):
         """Ensure expected changes exist in diff patch."""
         repo = RepoFactory(self.repo_store)
@@ -330,6 +340,16 @@ class ApiTestCase(TestCase):
             +>>>>>>> blah.txt
             """), resp.json_body['patch'])
         self.assertEqual(['blah.txt'], resp.json_body['conflicts'])
+
+    def test_repo_diff_merge_empty(self):
+        """Ensure that diffing two identical commits returns an empty string
+        as the patch, not None."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'blah.txt')
+
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
+            self.repo_path, c1, c1))
+        self.assertEqual('', resp.json_body['patch'])
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
