@@ -25,6 +25,7 @@ from turnip.pack.helpers import (
     decode_request,
     encode_packet,
     encode_request,
+    ensure_config,
     ensure_hooks,
     INCOMPLETE_PKT,
     )
@@ -330,8 +331,9 @@ class PackBackendProtocol(PackServerProtocol):
 
         env = {}
         if subcmd == b'receive-pack' and self.factory.hookrpc_handler:
-            # This is a write operation, so prepare hooks, the hook RPC
-            # server, and the environment variables that link them up.
+            # This is a write operation, so prepare config, hooks, the hook
+            # RPC server, and the environment variables that link them up.
+            ensure_config(path)
             self.hookrpc_key = str(uuid.uuid4())
             self.factory.hookrpc_handler.registerKey(
                 self.hookrpc_key, raw_pathname, [])

@@ -13,6 +13,8 @@ from tempfile import (
     NamedTemporaryFile,
     )
 
+from pygit2 import Repository
+
 import turnip.pack.hooks
 
 
@@ -94,6 +96,17 @@ def encode_request(command, pathname, params):
             raise ValueError('Metacharacter in arguments')
         bits.append(name + b'=' + value)
     return command + b' ' + b'\0'.join(bits) + b'\0'
+
+
+def ensure_config(repo_root):
+    """Put a repository's configuration into the desired state.
+
+    pygit2.Config handles locking itself, so we don't need to think too hard
+    about concurrency.
+    """
+
+    config = Repository(repo_root).config
+    config['core.logallrefupdates'] = True
 
 
 def ensure_hooks(repo_root):
