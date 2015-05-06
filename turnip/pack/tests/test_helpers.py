@@ -7,8 +7,14 @@ from __future__ import (
 import hashlib
 import os.path
 import stat
+from textwrap import dedent
+import time
 
 from fixtures import TempDir
+from pygit2 import (
+    Config,
+    init_repository,
+    )
 from testtools import TestCase
 
 from turnip.pack import helpers
@@ -159,6 +165,43 @@ class TestEncodeRequest(TestCase):
         self.assertInvalid(
             b'git-do-stuff', b'/some/path', {b'host': b'exam\0le.com'},
             b'Metacharacter in arguments')
+
+
+class TestEnsureConfig(TestCase):
+    """Test repository configuration maintenance."""
+
+    def setUp(self):
+        super(TestEnsureConfig, self).setUp()
+        self.repo_dir = self.useFixture(TempDir()).path
+        init_repository(self.repo_dir, bare=True)
+        self.config_path = os.path.join(self.repo_dir, 'config')
+
+    def assertWritesCorrectConfig(self):
+        helpers.ensure_config(self.repo_dir)
+        config = Config(path=self.config_path)
+        self.assertTrue(config['core.logallrefupdates'])
+
+    def test_writes_new(self):
+        self.assertWritesCorrectConfig()
+
+    def test_preserves_existing(self):
+        # If the configuration file is already in the correct state, then
+        # the file is left unchanged; for efficiency we do not even write
+        # out a new file.  (Currently, pygit2/libgit2 take care of this; if
+        # they ever stop doing so then we should take extra care ourselves.)
+        helpers.ensure_config(self.repo_dir)
+        now = time.time()
+        os.utime(self.config_path, (now - 60, now - 60))
+        self.assertWritesCorrectConfig()
+        self.assertEqual(now - 60, os.stat(self.config_path).st_mtime)
+
+    def test_fixes_incorrect(self):
+        with open(self.config_path, 'w') as f:
+            f.write(dedent("""\
+                [core]
+                \tlogallrefupdates = false
+                """))
+        self.assertWritesCorrectConfig()
 
 
 class TestEnsureHooks(TestCase):
