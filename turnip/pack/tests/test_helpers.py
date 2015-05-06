@@ -180,6 +180,7 @@ class TestEnsureConfig(TestCase):
         helpers.ensure_config(self.repo_dir)
         config = Config(path=self.config_path)
         self.assertTrue(config['core.logallrefupdates'])
+        self.assertTrue(config['repack.writeBitmaps'])
 
     def test_writes_new(self):
         self.assertWritesCorrectConfig()
@@ -201,6 +202,8 @@ class TestEnsureConfig(TestCase):
             f.write(dedent("""\
                 [core]
                 \tlogallrefupdates = false
+                [repack]
+                \twriteBitmaps = false
                 """))
         self.assertWritesCorrectConfig()
 

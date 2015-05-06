@@ -107,6 +107,7 @@ def ensure_config(repo_root):
 
     config = Repository(repo_root).config
     config['core.logallrefupdates'] = True
+    config['repack.writeBitmaps'] = True
 
 
 def ensure_hooks(repo_root):
