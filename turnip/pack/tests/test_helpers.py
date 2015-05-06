@@ -192,8 +192,9 @@ class TestEnsureConfig(TestCase):
         helpers.ensure_config(self.repo_dir)
         now = time.time()
         os.utime(self.config_path, (now - 60, now - 60))
+        old_mtime = os.stat(self.config_path).st_mtime
         self.assertWritesCorrectConfig()
-        self.assertEqual(now - 60, os.stat(self.config_path).st_mtime)
+        self.assertEqual(old_mtime, os.stat(self.config_path).st_mtime)
 
     def test_fixes_incorrect(self):
         with open(self.config_path, 'w') as f:
