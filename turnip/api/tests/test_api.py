@@ -35,6 +35,11 @@ class ApiTestCase(TestCase):
         self.commit = {'ref': 'refs/heads/master', 'message': 'test commit.'}
         self.tag = {'ref': 'refs/tags/tag0', 'message': 'tag message'}
 
+    def assertReferencesEqual(self, repo, expected, observed):
+        self.assertEqual(
+            repo.lookup_reference(expected).peel().oid,
+            repo.lookup_reference(observed).peel().oid)
+
     def get_ref(self, ref):
         resp = self.app.get('/repo/{}/{}'.format(self.repo_path, ref))
         return resp.json
@@ -73,6 +78,40 @@ class ApiTestCase(TestCase):
         self.assertEqual(repo1_revlist, repo2_revlist)
         self.assertEqual(200, resp.status_code)
         self.assertIn(new_repo_path, resp.json['repo_url'])
+
+    def test_repo_get(self):
+        """The GET method on a repository returns its properties."""
+        factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
+        factory.build()
+        factory.repo.set_head('refs/heads/branch-0')
+
+        resp = self.app.get('/repo/{}'.format(self.repo_path))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({'default_branch': 'refs/heads/branch-0'}, resp.json)
+
+    def test_repo_get_default_branch_missing(self):
+        """default_branch is returned even if that branch has been deleted."""
+        factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
+        factory.build()
+        factory.repo.set_head('refs/heads/branch-0')
+        factory.repo.lookup_reference('refs/heads/branch-0').delete()
+
+        resp = self.app.get('/repo/{}'.format(self.repo_path))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({'default_branch': 'refs/heads/branch-0'}, resp.json)
+
+    def test_repo_patch_default_branch(self):
+        """A repository's default branch ("HEAD") can be changed."""
+        factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
+        factory.build()
+        factory.repo.set_head('refs/heads/branch-0')
+        self.assertReferencesEqual(factory.repo, 'refs/heads/branch-0', 'HEAD')
+
+        resp = self.app.patch_json(
+            '/repo/{}'.format(self.repo_path),
+            {'default_branch': 'refs/heads/branch-1'})
+        self.assertEqual(204, resp.status_code)
+        self.assertReferencesEqual(factory.repo, 'refs/heads/branch-1', 'HEAD')
 
     def test_cross_repo_merge_diff(self):
         """Merge diff can be requested across 2 repositories."""
