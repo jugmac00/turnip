@@ -79,6 +79,41 @@ class RepoAPI(BaseAPI):
             return exc.HTTPConflict()  # 409
 
     @validate_path
+    def get(self, repo_store, repo_name):
+        """Get properties of an existing git repository."""
+        repo_path = os.path.join(repo_store, repo_name)
+        if not os.path.exists(repo_path):
+            self.request.errors.add(
+                'body', 'name', 'repository does not exist')
+            raise exc.HTTPNotFound()
+        return {
+            'default_branch': store.get_default_branch(repo_path),
+            }
+
+    def _patch_default_branch(self, repo_path, value):
+        try:
+            store.set_default_branch(repo_path, value)
+        except (KeyError, ValueError, GitError):
+            raise exc.HTTPBadRequest()
+
+    @validate_path
+    def patch(self, repo_store, repo_name):
+        """Change properties of an existing git repository."""
+        repo_path = os.path.join(repo_store, repo_name)
+        if not os.path.exists(repo_path):
+            self.request.errors.add(
+                'body', 'name', 'repository does not exist')
+            raise exc.HTTPNotFound()
+        data = extract_json_data(self.request)
+        for key in data:
+            if not hasattr(self, "_patch_%s" % key):
+                self.request.errors.add('body', key, 'unknown property')
+                raise exc.HTTPBadRequest()
+        for key, value in data.items():
+            getattr(self, "_patch_%s" % key)(repo_path, value)
+        return exc.HTTPNoContent()
+
+    @validate_path
     def delete(self, repo_store, repo_name):
         """Delete an existing git repository."""
         try:

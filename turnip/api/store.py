@@ -157,6 +157,16 @@ def open_repo(repo_store, repo_name):
         yield Repository(repo_path)
 
 
+def get_default_branch(repo_path):
+    repo = Repository(repo_path)
+    return repo.lookup_reference('HEAD').target
+
+
+def set_default_branch(repo_path, target):
+    repo = Repository(repo_path)
+    repo.set_head(target)
+
+
 def delete_repo(repo_path):
     """Permanently delete a git repository from repo store."""
     shutil.rmtree(repo_path)
