@@ -12,7 +12,6 @@ import urllib
 import urlparse
 import uuid
 
-
 from pygit2 import (
     clone_repository,
     GitError,
@@ -176,23 +175,32 @@ def set_default_branch(repo_path, target):
 def delete_repo(repo_path):
     """Permanently delete a git repository from repo store."""
     shutil.rmtree(repo_path)
-    
 
-def repack(repo_path, single=False, prune=False):
-    """Repack a repository with git-repack."""
+
+def repack(repo_path, ignore_alternates=False, single=False,
+           prune=False, no_reuse_delta=False):
+    """Repack a repository with git-repack.
+
+    :param ignore_alternates: Only repack local refs (git repack --local).
+    :param single: Create a single packfile (git repack -a).
+    :param prune: Remove redundant packs. (git repack -d)
+    :param no_reuse_delta: Force delta recalculation.
+    """
     config = TurnipConfig()
     repack_args = [
         'git', 'repack',
-        '--window', config.get('git_repack_window'),
         '--depth', config.get('git_repack_depth'),
-        '--window-memory', config.get('git_repack_window_memory'),
         '--max-pack-size', config.get('git_repack_max_pack_size'),
+        '--window', config.get('git_repack_window'),
+        '--window-memory', config.get('git_repack_window_memory'),
         ]
+    if ignore_alternates:
+        repack_args.append('-l') # repack --local
+    if no_reuse_delta:
+        repack_args.append('-f')
     if prune:
-        # Remove redundant packs after packing.
         repack_args.append('-d')
     if single:
-        # Pack everything referenced into a single pack.
         repack_args.append('-a')
     return subprocess.check_call(
         repack_args, cwd=repo_path,

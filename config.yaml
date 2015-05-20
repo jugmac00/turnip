@@ -1,8 +1,8 @@
 authentication_endpoint: http://xmlrpc-private.launchpad.dev:8087/authserver
-git_repack_window_memory: '20m'
+git_repack_depth: '50'
 git_repack_max_pack_size: '20m'
 git_repack_window: '10'
-git_repack_depth: '50'
+git_repack_window_memory: '20m'
 pack_backend_port: 19418
 pack_frontend_port: 9418
 pack_virt_port: 19419
