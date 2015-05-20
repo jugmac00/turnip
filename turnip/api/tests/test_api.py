@@ -103,8 +103,6 @@ class ApiTestCase(TestCase):
         factory.set_head(c1)
 
         repo2_name = uuid.uuid4().hex
-        factory2 = RepoFactory(
-            os.path.join(self.repo_root, repo2_name), clone_from=factory)
         c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
 
         resp = self.app.get('/repo/{}:{}/diff/{}:{}'.format(

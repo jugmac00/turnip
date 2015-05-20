@@ -89,11 +89,11 @@ class RepoAPI(BaseAPI):
 
 
 @resource(path='/repo/{name}/repack')
-class RepoRepackAPI(BaseAPI):
+class RepackAPI(BaseAPI):
     """Provides HTTP API for repository repacking."""
 
     def __init__(self, request):
-        super(RepoRepackAPI, self).__init__()
+        super(RepackAPI, self).__init__()
         self.request = request
 
     @repo_path
