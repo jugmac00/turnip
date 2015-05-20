@@ -133,8 +133,9 @@ class RepackAPI(BaseAPI):
         super(RepackAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def post(self, repo_path):
+    @validate_path
+    def post(self, repo_store, repo_name):
+        repo_path = os.path.join(repo_store, repo_name)
         prune = extract_json_data(self.request).get('prune')
         single = extract_json_data(self.request).get('single')
 
