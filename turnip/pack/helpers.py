@@ -13,7 +13,9 @@ from tempfile import (
     NamedTemporaryFile,
     )
 
-import turnip.pack.hooks.hook
+from pygit2 import Repository
+
+import turnip.pack.hooks
 
 
 PKT_LEN_SIZE = 4
@@ -96,6 +98,18 @@ def encode_request(command, pathname, params):
     return command + b' ' + b'\0'.join(bits) + b'\0'
 
 
+def ensure_config(repo_root):
+    """Put a repository's configuration into the desired state.
+
+    pygit2.Config handles locking itself, so we don't need to think too hard
+    about concurrency.
+    """
+
+    config = Repository(repo_root).config
+    config['core.logallrefupdates'] = True
+    config['repack.writeBitmaps'] = True
+
+
 def ensure_hooks(repo_root):
     """Put a repository's hooks into the desired state.
 
@@ -110,19 +124,23 @@ def ensure_hooks(repo_root):
     def hook_path(name):
         return os.path.join(repo_root, 'hooks', name)
 
+    orig_hook_path = os.path.join(
+        os.path.dirname(turnip.pack.hooks.__file__), 'hook.py')
+
     if not os.path.exists(hook_path(target_name)):
         need_target = True
     elif not os.stat(hook_path(target_name)).st_mode & stat.S_IXUSR:
         need_target = True
     else:
-        with open(turnip.pack.hooks.hook.__file__, 'rb') as f:
+        # Always use the py, not the pyc, for consistency
+        with open(orig_hook_path, 'rb') as f:
             wanted = hashlib.sha256(f.read()).hexdigest()
         with open(hook_path(target_name), 'rb') as f:
             have = hashlib.sha256(f.read()).hexdigest()
         need_target = wanted != have
 
     if need_target:
-        with open(turnip.pack.hooks.hook.__file__, 'rb') as master:
+        with open(orig_hook_path, 'rb') as master:
             with NamedTemporaryFile(dir=hook_path('.'), delete=False) as this:
                 shutil.copyfileobj(master, this)
         os.chmod(this.name, 0o755)

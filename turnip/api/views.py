@@ -19,9 +19,9 @@ def is_valid_path(repo_store, repo_path):
     return os.path.realpath(repo_path).startswith(os.path.realpath(repo_store))
 
 
-def repo_path(func):
-    """Decorator builds repo path from request name and repo_store."""
-    def repo_path_decorator(self):
+def validate_path(func):
+    """Decorator validates repo path from request name and repo_store."""
+    def validate_path_decorator(self):
         name = self.request.matchdict['name']
         if not name:
             self.request.errors.add('body', 'name', 'repo name is missing')
@@ -30,9 +30,8 @@ def repo_path(func):
         if not is_valid_path(self.repo_store, repo_path):
             self.request.errors.add('body', 'name', 'invalid path.')
             raise exc.HTTPInternalServerError()
-
-        return func(self, repo_path)
-    return repo_path_decorator
+        return func(self, self.repo_store, name)
+    return validate_path_decorator
 
 
 class BaseAPI(object):
@@ -57,6 +56,7 @@ class RepoAPI(BaseAPI):
         """Initialise a new git repository, or clone from an existing repo."""
         repo_path = extract_json_data(self.request).get('repo_path')
         clone_path = extract_json_data(self.request).get('clone_from')
+        clone_refs = extract_json_data(self.request).get('clone_refs', False)
 
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
@@ -73,16 +73,53 @@ class RepoAPI(BaseAPI):
             repo_clone = None
 
         try:
-            new_repo_path = store.init_repo(repo, clone_from=repo_clone)
+            new_repo_path = store.init_repo(
+                repo, clone_from=repo_clone, clone_refs=clone_refs)
             repo_name = os.path.basename(os.path.normpath(new_repo_path))
             return {'repo_url': '/'.join([self.request.url, repo_name])}
         except GitError:
             return exc.HTTPConflict()  # 409
 
-    @repo_path
-    def delete(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
+        """Get properties of an existing git repository."""
+        repo_path = os.path.join(repo_store, repo_name)
+        if not os.path.exists(repo_path):
+            self.request.errors.add(
+                'body', 'name', 'repository does not exist')
+            raise exc.HTTPNotFound()
+        return {
+            'default_branch': store.get_default_branch(repo_path),
+            }
+
+    def _patch_default_branch(self, repo_path, value):
+        try:
+            store.set_default_branch(repo_path, value)
+        except (KeyError, ValueError, GitError):
+            raise exc.HTTPBadRequest()
+
+    @validate_path
+    def patch(self, repo_store, repo_name):
+        """Change properties of an existing git repository."""
+        repo_path = os.path.join(repo_store, repo_name)
+        if not os.path.exists(repo_path):
+            self.request.errors.add(
+                'body', 'name', 'repository does not exist')
+            raise exc.HTTPNotFound()
+        data = extract_json_data(self.request)
+        for key in data:
+            if not hasattr(self, "_patch_%s" % key):
+                self.request.errors.add('body', key, 'unknown property')
+                raise exc.HTTPBadRequest()
+        for key, value in data.items():
+            getattr(self, "_patch_%s" % key)(repo_path, value)
+        return exc.HTTPNoContent()
+
+    @validate_path
+    def delete(self, repo_store, repo_name):
         """Delete an existing git repository."""
         try:
+            repo_path = os.path.join(repo_store, repo_name)
             store.delete_repo(repo_path)
         except (IOError, OSError):
             return exc.HTTPNotFound()  # 404
@@ -117,18 +154,18 @@ class RefAPI(BaseAPI):
         super(RefAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def collection_get(self, repo_path):
+    @validate_path
+    def collection_get(self, repo_store, repo_name):
         try:
-            return store.get_refs(repo_path)
+            return store.get_refs(repo_store, repo_name)
         except (KeyError, GitError):
             return exc.HTTPNotFound()  # 404
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         ref = 'refs/' + self.request.matchdict['ref']
         try:
-            return store.get_ref(repo_path, ref)
+            return store.get_ref(repo_store, repo_name, ref)
         except (KeyError, GitError):
             return exc.HTTPNotFound()
 
@@ -141,13 +178,14 @@ class DiffAPI(BaseAPI):
     Two dots provides a simple diff, equivalent to `git diff A B`.
     Three dots provides the symmetric or common ancestor diff, equivalent
     to `git diff $(git-merge-base A B) B`.
+    {name} can be two : separated repositories, for a cross repository diff.
     """
     def __init__(self, request):
         super(DiffAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         """Returns diff of two commits."""
         commits = re.split('(\.{2,3})', self.request.matchdict['commits'])
         context_lines = int(self.request.params.get('context_lines', 3))
@@ -155,7 +193,8 @@ class DiffAPI(BaseAPI):
             return exc.HTTPBadRequest()
         try:
             diff_type = commits[1]
-            args = (repo_path, commits[0], commits[2], context_lines)
+            args = (repo_store, repo_name, commits[0],
+                    commits[2], context_lines)
             if diff_type == '..':
                 patch = store.get_diff(*args)
             elif diff_type == '...':
@@ -166,65 +205,28 @@ class DiffAPI(BaseAPI):
         return patch
 
 
-@resource(path='/repo/{name}/compare-merge/{base}/{head}')
+@resource(path='/repo/{name}/compare-merge/{base}:{head}')
 class DiffMergeAPI(BaseAPI):
     """Provides an HTTP API for merge previews.
 
     {head} will be merged into {base} and the diff from {base} returned.
+    {name} can be two : separated repositories, for a cross repository diff.
     """
     def __init__(self, request):
         super(DiffMergeAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         """Returns diff of two commits."""
         context_lines = int(self.request.params.get('context_lines', 3))
         try:
             patch = store.get_merge_diff(
-                repo_path, self.request.matchdict['base'],
+                repo_store, repo_name, self.request.matchdict['base'],
                 self.request.matchdict['head'], context_lines)
         except (ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()
-        return patch
-
-
-@resource(path='/repo/{name}:{other_name}/diff/{commit}:{other_commit}')
-class RepoDiffAPI(BaseAPI):
-    """Provides HTTP API for cross repository diffs."""
-
-    def __init__(self, request):
-        super(RepoDiffAPI, self).__init__()
-        self.request = request
-
-    @repo_path
-    def get(self, repo_path):
-        context_lines = int(self.request.params.get('context_lines', 3))
-        other_name = self.request.matchdict['other_name']
-        commit = self.request.matchdict['commit']
-        other_commit = self.request.matchdict['other_commit']
-
-        other_repo_path = os.path.join(self.repo_store, other_name)
-        if not is_valid_path(self.repo_store, other_repo_path):
-            raise exc.HTTPInternalServerError()
-        tmp_repo_path = os.path.join(self.repo_store,
-                                     'ephemeral-' + uuid.uuid4().hex)
-        try:
-            # create a new ephemeral repo with alternates set from {name}
-            # and {other_name}
-            store.init_repo(
-                tmp_repo_path,
-                alternate_repo_paths=[repo_path, other_repo_path])
-            patch = store.get_diff(
-                tmp_repo_path, commit, other_commit, context_lines)
-        except (ValueError, GitError):
-            # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
-            return exc.HTTPNotFound()
-        finally:
-            # delete ephemeral repo
-            if is_valid_path(self.repo_store, tmp_repo_path):
-                store.delete_repo(tmp_repo_path)
         return patch
 
 
@@ -237,21 +239,21 @@ class CommitAPI(BaseAPI):
         super(CommitAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         commit_sha1 = self.request.matchdict['sha1']
         try:
-            commit = store.get_commit(repo_path, commit_sha1)
+            commit = store.get_commit(repo_store, repo_name, commit_sha1)
         except GitError:
             return exc.HTTPNotFound()
         return commit
 
-    @repo_path
-    def collection_post(self, repo_path):
+    @validate_path
+    def collection_post(self, repo_store, repo_name):
         """Get commits in bulk."""
         commits = extract_json_data(self.request).get('commits')
         try:
-            commits = store.get_commits(repo_path, commits)
+            commits = store.get_commits(repo_store, repo_name, commits)
         except GitError:
             return exc.HTTPNotFound()
         return commits
@@ -265,15 +267,15 @@ class LogAPI(BaseAPI):
         super(LogAPI, self).__init__()
         self.request = request
 
-    @repo_path
-    def get(self, repo_path):
+    @validate_path
+    def get(self, repo_store, repo_name):
         """Get log by sha1, filtered by limit and stop."""
         sha1 = self.request.matchdict['sha1']
         limit = int(self.request.params.get('limit', -1))
         stop = self.request.params.get('stop')
 
         try:
-            log = store.get_log(repo_path, sha1, limit, stop)
+            log = store.get_log(repo_store, repo_name, sha1, limit, stop)
         except GitError:
             return exc.HTTPNotFound()
         return log

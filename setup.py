@@ -15,8 +15,10 @@ with open(os.path.join(here, 'README')) as f:
     README = f.read()
 
 requires = [
+    'contextlib2',
     'cornice',
     'lazr.sshserver',
+    # Should be 0.22.1 once released; for the time being we carry cherry-picks.
     'pygit2>=0.22.0,<0.23.0',
     'PyYAML',
     'Twisted',

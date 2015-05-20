@@ -5,6 +5,8 @@ from __future__ import print_function
 import fnmatch
 import os
 import subprocess
+from textwrap import dedent
+
 import unittest
 import uuid
 
@@ -36,6 +38,11 @@ class ApiTestCase(TestCase):
         self.commit = {'ref': 'refs/heads/master', 'message': 'test commit.'}
         self.tag = {'ref': 'refs/tags/tag0', 'message': 'tag message'}
 
+    def assertReferencesEqual(self, repo, expected, observed):
+        self.assertEqual(
+            repo.lookup_reference(expected).peel().oid,
+            repo.lookup_reference(observed).peel().oid)
+
     def get_ref(self, ref):
         resp = self.app.get('/repo/{}/{}'.format(self.repo_path, ref))
         return resp.json
@@ -64,7 +71,8 @@ class ApiTestCase(TestCase):
         factory.build()
         new_repo_path = uuid.uuid1().hex
         resp = self.app.post_json('/repo', {'repo_path': new_repo_path,
-                                            'clone_from': self.repo_path})
+                                            'clone_from': self.repo_path,
+                                            'clone_refs': True})
         repo1_revlist = get_revlist(factory.repo)
         clone_from = resp.json['repo_url'].split('/')[-1]
         repo2 = open_repo(os.path.join(self.repo_root, clone_from))
@@ -73,6 +81,56 @@ class ApiTestCase(TestCase):
         self.assertEqual(repo1_revlist, repo2_revlist)
         self.assertEqual(200, resp.status_code)
         self.assertIn(new_repo_path, resp.json['repo_url'])
+
+    def test_repo_get(self):
+        """The GET method on a repository returns its properties."""
+        factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
+        factory.build()
+        factory.repo.set_head('refs/heads/branch-0')
+
+        resp = self.app.get('/repo/{}'.format(self.repo_path))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({'default_branch': 'refs/heads/branch-0'}, resp.json)
+
+    def test_repo_get_default_branch_missing(self):
+        """default_branch is returned even if that branch has been deleted."""
+        factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
+        factory.build()
+        factory.repo.set_head('refs/heads/branch-0')
+        factory.repo.lookup_reference('refs/heads/branch-0').delete()
+
+        resp = self.app.get('/repo/{}'.format(self.repo_path))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({'default_branch': 'refs/heads/branch-0'}, resp.json)
+
+    def test_repo_patch_default_branch(self):
+        """A repository's default branch ("HEAD") can be changed."""
+        factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
+        factory.build()
+        factory.repo.set_head('refs/heads/branch-0')
+        self.assertReferencesEqual(factory.repo, 'refs/heads/branch-0', 'HEAD')
+
+        resp = self.app.patch_json(
+            '/repo/{}'.format(self.repo_path),
+            {'default_branch': 'refs/heads/branch-1'})
+        self.assertEqual(204, resp.status_code)
+        self.assertReferencesEqual(factory.repo, 'refs/heads/branch-1', 'HEAD')
+
+    def test_cross_repo_merge_diff(self):
+        """Merge diff can be requested across 2 repositories."""
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('foo', 'foobar.txt')
+        factory.set_head(c1)
+
+        repo2_name = uuid.uuid4().hex
+        factory2 = RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=factory)
+        c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
+        c3 = factory2.add_commit('baz', 'foobar.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}:{}/compare-merge/{}:{}'.format(
+            self.repo_path, repo2_name, c2, c3))
+        self.assertIn('-bar', resp.json['patch'])
 
     def test_cross_repo_diff(self):
         """Diff can be requested across 2 repositories."""
@@ -86,14 +144,14 @@ class ApiTestCase(TestCase):
         c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
         c3 = factory2.add_commit('baz', 'foobar.txt', parents=[c1])
 
-        resp = self.app.get('/repo/{}:{}/diff/{}:{}'.format(
+        resp = self.app.get('/repo/{}:{}/compare/{}..{}'.format(
             self.repo_path, repo2_name, c2, c3))
-        self.assertIn('-bar', resp.body)
-        self.assertIn('+baz', resp.body)
+        self.assertIn('-bar', resp.json['patch'])
+        self.assertIn('+baz', resp.json['patch'])
 
     def test_cross_repo_diff_invalid_repo(self):
         """Cross repo diff with invalid repo returns HTTP 404."""
-        resp = self.app.get('/repo/1:2/diff/3:4', expect_errors=True)
+        resp = self.app.get('/repo/1:2/compare-merge/3:4', expect_errors=True)
         self.assertEqual(404, resp.status_code)
 
     def test_cross_repo_diff_invalid_commit(self):
@@ -103,6 +161,8 @@ class ApiTestCase(TestCase):
         factory.set_head(c1)
 
         repo2_name = uuid.uuid4().hex
+        RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=factory)
         c2 = factory.add_commit('bar', 'foobar.txt', parents=[c1])
 
         resp = self.app.get('/repo/{}:{}/diff/{}:{}'.format(
@@ -275,6 +335,16 @@ class ApiTestCase(TestCase):
         self.assertIn('+baz', resp.json_body['patch'])
         self.assertNotIn('+corge', resp.json_body['patch'])
 
+    def test_repo_diff_empty(self):
+        """Ensure that diffing two identical commits returns an empty string
+        as the patch, not None."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'blah.txt')
+
+        resp = self.app.get('/repo/{}/compare/{}..{}'.format(
+            self.repo_path, c1, c1))
+        self.assertEqual('', resp.json_body['patch'])
+
     def test_repo_diff_merge(self):
         """Ensure expected changes exist in diff patch."""
         repo = RepoFactory(self.repo_store)
@@ -287,12 +357,41 @@ class ApiTestCase(TestCase):
         c3_left = repo.add_commit('foo\nbar\nbar\n', 'blah.txt',
                                   parents=[c2_left])
 
-        resp = self.app.get('/repo/{}/compare-merge/{}/{}'.format(
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, c3_right, c3_left))
         self.assertIn(' quux', resp.json_body['patch'])
         self.assertIn('-baz', resp.json_body['patch'])
         self.assertIn('+bar', resp.json_body['patch'])
         self.assertNotIn('foo', resp.json_body['patch'])
+        self.assertEqual([], resp.json_body['conflicts'])
+
+    def test_repo_diff_merge_with_conflicts(self):
+        """Ensure that compare-merge returns conflicts information."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'blah.txt')
+        c2_left = repo.add_commit('foo\nbar\n', 'blah.txt', parents=[c1])
+        c2_right = repo.add_commit('foo\nbaz\n', 'blah.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
+            self.repo_path, c2_left, c2_right))
+        self.assertIn(dedent("""\
+            +<<<<<<< blah.txt
+             bar
+            +=======
+            +baz
+            +>>>>>>> blah.txt
+            """), resp.json_body['patch'])
+        self.assertEqual(['blah.txt'], resp.json_body['conflicts'])
+
+    def test_repo_diff_merge_empty(self):
+        """Ensure that diffing two identical commits returns an empty string
+        as the patch, not None."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'blah.txt')
+
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
+            self.repo_path, c1, c1))
+        self.assertEqual('', resp.json_body['patch'])
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
