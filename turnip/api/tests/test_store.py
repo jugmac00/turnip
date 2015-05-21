@@ -74,6 +74,13 @@ class InitTestCase(TestCase):
         r = pygit2.Repository(path)
         self.assertEqual([], r.listall_references())
 
+    def test_repo_config(self):
+        """Assert repository is initialised with correct config defaults."""
+        repo_path = store.init_repo(self.repo_path)
+        config = pygit2.Repository(repo_path).config
+        self.assertTrue(config['core.logallrefupdates'])
+        self.assertTrue(config['repack.writeBitmaps'])
+
     def test_open_ephemeral_repo(self):
         """Opening a repo where a repo name contains ':' should return
         a new ephemeral repo.

@@ -2,7 +2,6 @@
 
 import os
 import re
-import uuid
 from subprocess import CalledProcessError
 
 from cornice.resource import resource

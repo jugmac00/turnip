@@ -11,9 +11,9 @@ import os
 import subprocess
 from textwrap import dedent
 from testtools import TestCase
-from webtest import TestApp
 import unittest
 import uuid
+from webtest import TestApp
 
 from turnip import api
 from turnip.api.tests.test_helpers import (

@@ -8,8 +8,6 @@ import itertools
 import os
 import shutil
 import subprocess
-import urllib
-import urlparse
 import uuid
 
 from pygit2 import (
@@ -26,6 +24,7 @@ from pygit2 import (
     )
 
 from turnip.config import TurnipConfig
+from turnip.pack.helpers import ensure_config
 
 
 REF_TYPE_NAME = {
@@ -132,6 +131,7 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
 
     if alternate_repo_paths:
         write_alternates(repo_path, alternate_repo_paths)
+    ensure_config(repo_path)  # set repository configuration defaults
     return repo_path
 
 
@@ -195,7 +195,7 @@ def repack(repo_path, ignore_alternates=False, single=False,
         '--window-memory', config.get('git_repack_window_memory'),
         ]
     if ignore_alternates:
-        repack_args.append('-l') # repack --local
+        repack_args.append('-l')
     if no_reuse_delta:
         repack_args.append('-f')
     if prune:
