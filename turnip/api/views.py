@@ -135,16 +135,20 @@ class RepackAPI(BaseAPI):
     @validate_path
     def post(self, repo_store, repo_name):
         repo_path = os.path.join(repo_store, repo_name)
+
         data = extract_json_data(self.request)
         ignore_alternates = data.get('ignore_alternates')
         no_reuse_delta = data.get('no_reuse_delta')
         prune = data.get('prune')
         single = data.get('single')
+        window = data.get('window')
+        depth = data.get('depth')
 
         try:
             store.repack(repo_path, single=single, prune=prune,
                          no_reuse_delta=no_reuse_delta,
-                         ignore_alternates=ignore_alternates)
+                         ignore_alternates=ignore_alternates,
+                         window=window, depth=depth)
         except (CalledProcessError):
             return exc.HTTPInternalServerError()
         return

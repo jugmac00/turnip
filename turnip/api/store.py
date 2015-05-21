@@ -177,7 +177,7 @@ def delete_repo(repo_path):
 
 
 def repack(repo_path, ignore_alternates=False, single=False,
-           prune=False, no_reuse_delta=False):
+           prune=False, no_reuse_delta=False, window=None, depth=None):
     """Repack a repository with git-repack.
 
     :param ignore_alternates: Only repack local refs (git repack --local).
@@ -185,6 +185,8 @@ def repack(repo_path, ignore_alternates=False, single=False,
     :param prune: Remove redundant packs. (git repack -d)
     :param no_reuse_delta: Force delta recalculation.
     """
+    ensure_config(repo_path)
+
     repack_args = ['git', 'repack', '-q']
     if ignore_alternates:
         repack_args.append('-l')
@@ -194,6 +196,11 @@ def repack(repo_path, ignore_alternates=False, single=False,
         repack_args.append('-d')
     if single:
         repack_args.append('-a')
+    if window:
+        repack_args.append('--window', window)
+    if depth:
+        repack_args.append('--depth', depth)
+
     return subprocess.check_call(
         repack_args, cwd=repo_path,
         stderr=subprocess.PIPE, stdout=subprocess.PIPE)
