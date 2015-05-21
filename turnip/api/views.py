@@ -135,12 +135,11 @@ class RepackAPI(BaseAPI):
     @validate_path
     def post(self, repo_store, repo_name):
         repo_path = os.path.join(repo_store, repo_name)
-
-        ignore_alternates = extract_json_data(self.request).get(
-            'ignore_alternates')
-        no_reuse_delta = extract_json_data(self.request).get('no_reuse_delta')
-        prune = extract_json_data(self.request).get('prune')
-        single = extract_json_data(self.request).get('single')
+        data = extract_json_data(self.request)
+        ignore_alternates = data.get('ignore_alternates')
+        no_reuse_delta = data.get('no_reuse_delta')
+        prune = data.get('prune')
+        single = data.get('single')
 
         try:
             store.repack(repo_path, single=single, prune=prune,
