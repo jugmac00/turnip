@@ -23,7 +23,6 @@ from pygit2 import (
     Repository,
     )
 
-from turnip.config import TurnipConfig
 from turnip.pack.helpers import ensure_config
 
 
@@ -186,7 +185,6 @@ def repack(repo_path, ignore_alternates=False, single=False,
     :param prune: Remove redundant packs. (git repack -d)
     :param no_reuse_delta: Force delta recalculation.
     """
-    config = TurnipConfig()
     repack_args = ['git', 'repack']
     if ignore_alternates:
         repack_args.append('-l')
