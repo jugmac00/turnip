@@ -2,20 +2,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-import fnmatch
-import os
-import subprocess
-from textwrap import dedent
-
-import unittest
-import uuid
-
 from fixtures import (
     EnvironmentVariable,
     TempDir,
     )
+import fnmatch
+import os
+import subprocess
+from textwrap import dedent
 from testtools import TestCase
 from webtest import TestApp
+import unittest
+import uuid
 
 from turnip import api
 from turnip.api.tests.test_helpers import (
