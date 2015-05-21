@@ -2,17 +2,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import fnmatch
+import os
+import subprocess
+import unittest
+import uuid
+
 from fixtures import (
     EnvironmentVariable,
     TempDir,
     )
-import fnmatch
-import os
-import subprocess
-from textwrap import dedent
 from testtools import TestCase
-import unittest
-import uuid
+from textwrap import dedent
 from webtest import TestApp
 
 from turnip import api
