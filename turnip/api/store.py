@@ -185,7 +185,7 @@ def repack(repo_path, ignore_alternates=False, single=False,
     :param prune: Remove redundant packs. (git repack -d)
     :param no_reuse_delta: Force delta recalculation.
     """
-    repack_args = ['git', 'repack']
+    repack_args = ['git', 'repack', '-q']
     if ignore_alternates:
         repack_args.append('-l')
     if no_reuse_delta:
