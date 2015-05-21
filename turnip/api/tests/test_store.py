@@ -16,6 +16,7 @@ from fixtures import (
     )
 import pygit2
 from testtools import TestCase
+import yaml
 
 from turnip.api import store
 from turnip.api.tests.test_helpers import (
@@ -77,9 +78,13 @@ class InitTestCase(TestCase):
     def test_repo_config(self):
         """Assert repository is initialised with correct config defaults."""
         repo_path = store.init_repo(self.repo_path)
-        config = pygit2.Repository(repo_path).config
-        self.assertTrue(config['core.logallrefupdates'])
-        self.assertTrue(config['repack.writeBitmaps'])
+        repo_config = pygit2.Repository(repo_path).config
+        yaml_config = yaml.load(open('git.config.yaml'))
+
+        self.assertEqual(bool(yaml_config['core.logallrefupdates']),
+                         bool(repo_config['core.logallrefupdates']))
+        self.assertEqual(str(yaml_config['pack.depth']),
+                         repo_config['pack.depth'])
 
     def test_open_ephemeral_repo(self):
         """Opening a repo where a repo name contains ':' should return

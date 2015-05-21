@@ -187,13 +187,7 @@ def repack(repo_path, ignore_alternates=False, single=False,
     :param no_reuse_delta: Force delta recalculation.
     """
     config = TurnipConfig()
-    repack_args = [
-        'git', 'repack',
-        '--depth', config.get('git_repack_depth'),
-        '--max-pack-size', config.get('git_repack_max_pack_size'),
-        '--window', config.get('git_repack_window'),
-        '--window-memory', config.get('git_repack_window_memory'),
-        ]
+    repack_args = ['git', 'repack']
     if ignore_alternates:
         repack_args.append('-l')
     if no_reuse_delta:
