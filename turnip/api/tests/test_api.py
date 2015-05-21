@@ -5,6 +5,7 @@ from __future__ import print_function
 import fnmatch
 import os
 import subprocess
+from textwrap import dedent
 import unittest
 import uuid
 
@@ -13,7 +14,6 @@ from fixtures import (
     TempDir,
     )
 from testtools import TestCase
-from textwrap import dedent
 from webtest import TestApp
 
 from turnip import api
