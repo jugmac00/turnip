@@ -1,13 +1,19 @@
 contextlib2==0.4.0
 cornice==0.19.0
 lazr.sshserver==0.1.1
+Paste==2.0.2
 PasteDeploy==1.5.2
 pyasn1==0.1.7
 pycrypto==2.6.1
 pyramid==1.5.4
+# XXX: deryck 2012-08-10
+# See lp:~deryck/python-openid/python-openid-fix1034376 which
+# reapplied a patch from wgrant to get codehosting going again.
+python-openid==2.2.5-fix1034376
 PyYAML==3.11
 repoze.lru==0.6
 simplejson==3.6.5
+six==1.9.0
 translationstring==1.3
 Twisted==15.0.0
 venusian==1.0
