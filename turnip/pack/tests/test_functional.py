@@ -343,7 +343,11 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         # virtinfo servers started by the mixin.
         frontend_site = server.Site(
             SmartHTTPFrontendResource(
-                b'localhost', self.virt_port, self.virtinfo_url, self.root))
+                b'localhost', {
+                    "pack_virt_port": self.virt_port,
+                    "virtinfo_endpoint": self.virtinfo_url,
+                    "repo_store": self.root,
+                    }))
         self.frontend_listener = reactor.listenTCP(0, frontend_site)
         self.port = self.frontend_listener.getHost().port
 

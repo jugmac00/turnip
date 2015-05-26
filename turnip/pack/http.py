@@ -5,16 +5,35 @@ from __future__ import (
     )
 
 from cStringIO import StringIO
+import json
 import os.path
 import tempfile
 import textwrap
+try:
+    from urllib.parse import urlencode
+except ImportError:
+    from urllib import urlencode
 import sys
 import zlib
 
+from openid.consumer import consumer
+from openid.extensions.sreg import (
+    SRegRequest,
+    SRegResponse,
+    )
+from paste.auth.cookie import (
+    AuthCookieSigner,
+    decode as decode_cookie,
+    encode as encode_cookie,
+    )
 from twisted.internet import (
     defer,
     protocol,
     reactor,
+    )
+from twisted.python import (
+    compat,
+    log,
     )
 from twisted.web import (
     http,
@@ -338,57 +357,24 @@ class RobotsResource(static.Data):
 class CGitScriptResource(twcgi.CGIScript):
     """HTTP resource to run cgit."""
 
-    def __init__(self, root):
+    def __init__(self, root, repo_url, repo_path, trailing):
         twcgi.CGIScript.__init__(self, root.cgit_exec_path)
         self.root = root
+        self.repo_url = repo_url
+        self.repo_path = repo_path
+        self.trailing = trailing
         self.cgit_config = None
-
-    def _error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
-        request.setResponseCode(code)
-        request.setHeader(b'Content-Type', b'text/plain')
-        request.write(message)
-        request.finish()
 
     def _finished(self, ignored):
         if self.cgit_config is not None:
             self.cgit_config.close()
 
-    def _translatePathCallback(self, translated, env, request,
-                               *args, **kwargs):
-        if 'path' not in translated:
-            self._error(
-                request, b'translatePath response did not include path')
-            return
-        repo_url = request.path.rstrip('/')
-        # cgit simply parses configuration values up to the end of a line
-        # following the first '=', so almost anything is safe, but
-        # double-check that there are no newlines to confuse things.
-        if '\n' in repo_url:
-            self._error(request, b'repository URL may not contain newlines')
-            return
-        try:
-            repo_path = compose_path(self.root.repo_store, translated['path'])
-        except ValueError as e:
-            self._error(request, str(e).encode('UTF-8'))
-            return
-        trailing = translated.get('trailing')
-        if trailing:
-            if not trailing.startswith('/'):
-                trailing = '/' + trailing
-            if not repo_url.endswith(trailing):
-                self._error(
-                    request,
-                    b'translatePath returned inconsistent response: '
-                    b'"%s" does not end with "%s"' % (
-                        repo_url.encode('UTF-8'), trailing.encode('UTF-8')))
-                return
-            repo_url = repo_url[:-len(trailing)]
-        repo_url = repo_url.strip('/')
+    def runProcess(self, env, request, *args, **kwargs):
         request.notifyFinish().addBoth(self._finished)
         self.cgit_config = tempfile.NamedTemporaryFile(
             mode='w+', prefix='turnip-cgit-')
         os.chmod(self.cgit_config.name, 0o644)
-        fmt = {'repo_url': repo_url, 'repo_path': repo_path}
+        fmt = {'repo_url': self.repo_url, 'repo_path': self.repo_path}
         if self.root.site_name is not None:
             prefixes = " ".join(
                 "{}://{}".format(scheme, self.root.site_name)
@@ -405,33 +391,236 @@ class CGitScriptResource(twcgi.CGIScript):
             """).format(**fmt), file=self.cgit_config)
         self.cgit_config.flush()
         env["CGIT_CONFIG"] = self.cgit_config.name
-        env["PATH_INFO"] = "/%s%s" % (repo_url, trailing)
+        env["PATH_INFO"] = "/%s%s" % (self.repo_url, self.trailing)
         env["SCRIPT_NAME"] = "/"
         twcgi.CGIScript.runProcess(self, env, request, *args, **kwargs)
 
-    def _translatePathErrback(self, failure, request):
+
+class BaseHTTPAuthResource(resource.Resource):
+    """Base HTTP resource for OpenID authentication handling."""
+
+    session_var = 'turnip.session'
+    cookie_name = 'TURNIP_COOKIE'
+    anonymous_id = '+launchpad-anonymous'
+
+    def __init__(self, root):
+        resource.Resource.__init__(self)
+        self.root = root
+        if root.cgit_secret is not None:
+            self.signer = AuthCookieSigner(root.cgit_secret)
+        else:
+            self.signer = None
+
+    def _getSession(self, request):
+        if self.signer is not None:
+            cookie = request.getCookie(self.cookie_name)
+            if cookie is not None:
+                content = self.signer.auth(cookie)
+                if content:
+                    return json.loads(decode_cookie(content))
+        return {}
+
+    def _putSession(self, request, session):
+        if self.signer is not None:
+            content = self.signer.sign(encode_cookie(json.dumps(session)))
+            cookie = '%s=%s; Path=/; secure;' % (self.cookie_name, content)
+            request.setHeader(b'Set-Cookie', cookie.encode('UTF-8'))
+
+    def _setErrorCode(self, request, code=http.INTERNAL_SERVER_ERROR):
+        request.setResponseCode(code)
+        request.setHeader(b'Content-Type', b'text/plain')
+
+    def _error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
+        self._setErrorCode(request, code=code)
+        request.write(message.encode('UTF-8'))
+        request.finish()
+
+    def _makeConsumer(self, session):
+        """Build an OpenID `Consumer` object with standard arguments."""
+        # Multiple instances need to share a store or not use one at all (in
+        # which case they will use check_authentication).  Using no store is
+        # easier, and check_authentication is cheap.
+        return consumer.Consumer(session, None)
+
+
+class HTTPAuthLoginResource(BaseHTTPAuthResource):
+    """HTTP resource to complete OpenID authentication."""
+
+    isLeaf = True
+
+    def render_GET(self, request):
+        """Complete the OpenID authentication process.
+
+        Here we handle the result of the OpenID process.  If the process
+        succeeded, we record the identity URL and username in the session
+        and redirect the user to the page they were trying to view that
+        triggered the login attempt.  In the various failure cases we return
+        a 401 Unauthorized response with a brief explanation of what went
+        wrong.
+        """
+        session = self._getSession(request)
+        query = {k: v[-1] for k, v in request.args.items()}
+        response = self._makeConsumer(session).complete(
+            query, query['openid.return_to'])
+        if response.status == consumer.SUCCESS:
+            log.msg('OpenID response: SUCCESS')
+            sreg_info = SRegResponse.fromSuccessResponse(response)
+            if not sreg_info:
+                log.msg('sreg_info is None')
+                self._setErrorCode(request, http.UNAUTHORIZED)
+                return (
+                    b"You don't have a Launchpad account.  Check that you're "
+                    b"logged in as the right user, or log into Launchpad and "
+                    b"try again.")
+            else:
+                session['identity_url'] = response.identity_url
+                session['user'] = sreg_info['nickname']
+                self._putSession(request, session)
+                request.redirect(query['back_to'])
+                return b''
+        elif response.status == consumer.FAILURE:
+            log.msg('OpenID response: FAILURE: %s' % response.message)
+            self._setErrorCode(request, http.UNAUTHORIZED)
+            return response.message.encode('UTF-8')
+        elif response.status == consumer.CANCEL:
+            log.msg('OpenID response: CANCEL')
+            self._setErrorCode(request, http.UNAUTHORIZED)
+            return b'Authentication cancelled.'
+        else:
+            log.msg('OpenID response: UNKNOWN')
+            self._setErrorCode(request, http.UNAUTHORIZED)
+            return b'Unknown OpenID response.'
+
+
+class HTTPAuthLogoutResource(BaseHTTPAuthResource):
+    """HTTP resource to log out of OpenID authentication."""
+
+    isLeaf = True
+
+    def render_GET(self, request):
+        """Log out of turnip.
+
+        Clear the cookie and redirect to `next_to`.
+        """
+        self._putSession(request, {})
+        if 'next_to' in request.args:
+            next_url = request.args['next_to'][-1]
+        else:
+            next_url = self.root.main_site_root
+        request.redirect(next_url)
+        return b''
+
+
+class HTTPAuthRootResource(BaseHTTPAuthResource):
+    """HTTP resource to translate a path and authenticate if necessary.
+
+    Requests that require further authentication are denied or sent through
+    OpenID redirection, as appropriate.  Properly-authenticated requests are
+    passed on to cgit.
+    """
+
+    isLeaf = True
+
+    def _beginLogin(self, request, session):
+        """Start the process of authenticating with OpenID.
+
+        We redirect the user to Launchpad to identify themselves.  Launchpad
+        will then redirect them to our +login page with enough information
+        that we can then redirect them again to the page they were looking
+        at, with a cookie that gives us the identity URL and username.
+        """
+        openid_request = self._makeConsumer(session).begin(
+            self.root.openid_provider_root)
+        openid_request.addExtension(SRegRequest(required=['nickname']))
+        base_url = 'https://%s' % compat.nativeString(
+            request.getRequestHostname())
+        back_to = base_url + request.uri
+        target = openid_request.redirectURL(
+            base_url + '/',
+            base_url + '/+login/?' + urlencode({'back_to': back_to}))
+        request.redirect(target.encode('UTF-8'))
+        request.finish()
+
+    def _translatePathCallback(self, translated, request):
+        if 'path' not in translated:
+            self._error(request, 'translatePath response did not include path')
+            return
+        repo_url = request.path.rstrip('/')
+        # cgit simply parses configuration values up to the end of a line
+        # following the first '=', so almost anything is safe, but
+        # double-check that there are no newlines to confuse things.
+        if '\n' in repo_url:
+            self._error(request, 'repository URL may not contain newlines')
+            return
+        try:
+            repo_path = compose_path(self.root.repo_store, translated['path'])
+        except ValueError as e:
+            self._error(request, str(e))
+            return
+        trailing = translated.get('trailing')
+        if trailing:
+            if not trailing.startswith('/'):
+                trailing = '/' + trailing
+            if not repo_url.endswith(trailing):
+                self._error(
+                    request,
+                    'translatePath returned inconsistent response: '
+                    '"%s" does not end with "%s"' % (repo_url, trailing))
+                return
+            repo_url = repo_url[:-len(trailing)]
+        repo_url = repo_url.strip('/')
+        cgit_resource = CGitScriptResource(
+            self.root, repo_url, repo_path, trailing)
+        request.render(cgit_resource)
+
+    def _translatePathErrback(self, failure, request, session):
         e = failure.value
+        message = e.faultString
         if e.faultCode in (1, 290):
             error_code = http.NOT_FOUND
         elif e.faultCode in (2, 310):
             error_code = http.FORBIDDEN
         elif e.faultCode in (3, 410):
-            # XXX cjwatson 2015-03-30: should be UNAUTHORIZED, but we
-            # don't implement that yet
-            error_code = http.FORBIDDEN
+            if 'user' in session:
+                error_code = http.FORBIDDEN
+                message = (
+                    'You are logged in as %s, but do not have access to this '
+                    'repository.' % session['user'])
+            elif self.signer is None:
+                error_code = http.FORBIDDEN
+                message = 'Server does not support OpenID authentication.'
+            else:
+                self._beginLogin(request, session)
+                return
         else:
             error_code = http.INTERNAL_SERVER_ERROR
-        self._error(request, e.faultString, code=error_code)
+        self._error(request, message, code=error_code)
 
-    def runProcess(self, env, request, *args, **kwargs):
+    def render_GET(self, request):
+        session = self._getSession(request)
+        identity_url = session.get('identity_url', self.anonymous_id)
         proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint, allowNone=True)
-        # XXX cjwatson 2015-03-30: authentication
         d = proxy.callRemote(
-            b'translatePath', request.path, b'read', None, False)
-        d.addCallback(
-            self._translatePathCallback, env, request, *args, **kwargs)
-        d.addErrback(self._translatePathErrback, request)
+            b'translatePath', request.path, b'read', identity_url, True)
+        d.addCallback(self._translatePathCallback, request)
+        d.addErrback(self._translatePathErrback, request, session)
         return server.NOT_DONE_YET
+
+
+class HTTPAuthResource(resource.Resource):
+    """Container for the various HTTP authentication resources."""
+
+    def __init__(self, root):
+        resource.Resource.__init__(self)
+        self.root = root
+        self.putChild('+login', HTTPAuthLoginResource(root))
+        self.putChild('+logout', HTTPAuthLogoutResource(root))
+
+    def getChild(self, path, request):
+        # Delegate to a child resource without consuming a path element.
+        request.postpath.insert(0, path)
+        request.prepath.pop()
+        return HTTPAuthRootResource(self.root)
 
 
 class SmartHTTPFrontendResource(resource.Resource):
@@ -439,20 +628,21 @@ class SmartHTTPFrontendResource(resource.Resource):
 
     allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
 
-    def __init__(self, backend_host, backend_port, virtinfo_endpoint,
-                 repo_store, cgit_exec_path=None, cgit_data_path=None,
-                 site_name=None):
+    def __init__(self, backend_host, config):
         resource.Resource.__init__(self)
         self.backend_host = backend_host
-        self.backend_port = backend_port
-        self.virtinfo_endpoint = virtinfo_endpoint
+        self.backend_port = config.get("pack_virt_port")
+        self.virtinfo_endpoint = config.get("virtinfo_endpoint")
         # XXX cjwatson 2015-03-30: Knowing about the store path here
         # violates turnip's layering and may cause scaling problems later,
         # but for now cgit needs direct filesystem access.
-        self.repo_store = repo_store
-        self.cgit_exec_path = cgit_exec_path
-        self.site_name = site_name
+        self.repo_store = config.get("repo_store")
+        self.cgit_exec_path = config.get("cgit_exec_path")
+        self.openid_provider_root = config.get("openid_provider_root")
+        self.site_name = config.get("site_name")
+        self.main_site_root = config.get("main_site_root")
         self.putChild('', SmartHTTPRootResource())
+        cgit_data_path = config.get("cgit_data_path")
         if cgit_data_path is not None:
             static_resource = DirectoryWithoutListings(
                 cgit_data_path, defaultType='text/plain')
@@ -462,6 +652,12 @@ class SmartHTTPFrontendResource(resource.Resource):
             self.putChild('static', static_resource)
             favicon = os.path.join(top, 'images', 'launchpad.png')
             self.putChild('favicon.ico', static.File(favicon))
+        cgit_secret_path = config.get("cgit_secret_path")
+        if cgit_secret_path:
+            with open(cgit_secret_path, 'rb') as cgit_secret_file:
+                self.cgit_secret = cgit_secret_file.read()
+        else:
+            self.cgit_secret = None
 
     @staticmethod
     def _isGitRequest(request):
@@ -489,7 +685,10 @@ class SmartHTTPFrontendResource(resource.Resource):
             if service in self.allowed_services:
                 return SmartHTTPCommandResource(self, service, path)
         elif self.cgit_exec_path is not None:
-            return CGitScriptResource(self)
+            # Delegate to a child resource without consuming a path element.
+            request.postpath.insert(0, path)
+            request.prepath.pop()
+            return HTTPAuthResource(self)
         return resource.NoResource(b'No such resource')
 
     def connectToBackend(self, client_factory):
