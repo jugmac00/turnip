@@ -105,8 +105,8 @@ def ensure_config(repo_root):
     pygit2.Config handles locking itself, so we don't need to think too hard
     about concurrency.
     """
-    config_file = open('git.config.yaml')
-    git_config_defaults = yaml.load(config_file)
+    with open('git.config.yaml') as config_file:
+        git_config_defaults = yaml.load(config_file)
     config = Repository(repo_root).config
     for key, val in git_config_defaults.iteritems():
         config[key] = val
