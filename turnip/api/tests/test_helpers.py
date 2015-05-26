@@ -1,5 +1,6 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import contextlib
 import itertools
 import os
 import urllib
@@ -26,6 +27,17 @@ def get_revlist(repo):
 def open_repo(repo_path):
     """Return a pygit2 repo object for a given path."""
     return Repository(repo_path)
+
+
+@contextlib.contextmanager
+def chdir(dirname=None):
+  curdir = os.getcwd()
+  try:
+    if dirname is not None:
+      os.chdir(dirname)
+    yield
+  finally:
+    os.chdir(curdir)
 
 
 class RepoFactory():
@@ -66,10 +78,17 @@ class RepoFactory():
         tree_id = repo.index.write_tree()
         oid = repo.create_commit(ref, author, committer,
                                  blob_content, tree_id, parents)
+        self.set_head(oid)  # set master
         return oid
 
     def set_head(self, oid):
-        self.repo.create_reference('refs/heads/master', oid)
+        try:
+            master_ref = self.repo.lookup_reference('refs/heads/master')
+        except KeyError:
+            master_ref = self.repo.create_reference('refs/heads/master', oid)
+        finally:
+            master_ref.set_target(oid)
+
 
     def add_branch(self, name, oid):
         commit = self.repo.get(oid)

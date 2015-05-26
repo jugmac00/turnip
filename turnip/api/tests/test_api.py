@@ -18,6 +18,7 @@ from webtest import TestApp
 
 from turnip import api
 from turnip.api.tests.test_helpers import (
+    chdir,
     get_revlist,
     open_repo,
     RepoFactory,
@@ -119,7 +120,6 @@ class ApiTestCase(TestCase):
         """Merge diff can be requested across 2 repositories."""
         factory = RepoFactory(self.repo_store)
         c1 = factory.add_commit('foo', 'foobar.txt')
-        factory.set_head(c1)
 
         repo2_name = uuid.uuid4().hex
         factory2 = RepoFactory(
@@ -135,7 +135,6 @@ class ApiTestCase(TestCase):
         """Diff can be requested across 2 repositories."""
         factory = RepoFactory(self.repo_store)
         c1 = factory.add_commit('foo', 'foobar.txt')
-        factory.set_head(c1)
 
         repo2_name = uuid.uuid4().hex
         factory2 = RepoFactory(
@@ -157,7 +156,6 @@ class ApiTestCase(TestCase):
         """Cross repo diff with an invalid commit returns HTTP 404."""
         factory = RepoFactory(self.repo_store)
         c1 = factory.add_commit('foo', 'foobar.txt')
-        factory.set_head(c1)
 
         repo2_name = uuid.uuid4().hex
         RepoFactory(
@@ -203,7 +201,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         refs = resp.json
-        self.assertEqual(0, len(refs.keys()))
+        self.assertEqual(1, len(refs.keys()))
 
     def test_allow_unicode_refs(self):
         """Ensure unicode refs are included in ref collection."""
@@ -215,7 +213,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         refs = resp.json
-        self.assertEqual(1, len(refs.keys()))
+        self.assertEqual(2, len(refs.keys()))
 
     def test_repo_get_ref(self):
         RepoFactory(self.repo_store, num_commits=1).build()
@@ -516,7 +514,6 @@ class ApiTestCase(TestCase):
         """Ensure commit exists in pack."""
         factory = RepoFactory(self.repo_store)
         oid = factory.add_commit('foo', 'foobar.txt')
-        factory.set_head(oid)
         resp = self.app.post_json('/repo/{}/repack'.format(self.repo_path),
                                   {'prune': True, 'single': True})
         for root, dirnames, filenames in os.walk(factory.repo_path):
@@ -525,6 +522,32 @@ class ApiTestCase(TestCase):
         out = subprocess.check_output(['git', 'verify-pack', pack, '-v'])
         self.assertEqual(200, resp.status_code)
         self.assertIn(oid.hex, out)
+
+    def test_repo_repack_verify_commits_to_pack(self):
+        """Ensure commits in different packs exist in merged pack."""
+        factory = RepoFactory(self.repo_store)
+        oid = factory.add_commit('foo', 'foobar.txt')
+        packdir = os.path.join(factory.repo.path,'objects', 'pack')
+        with chdir(packdir):
+            subprocess.call(['git', 'gc', '-q'])
+            oid2 = factory.add_commit('bar', 'foobar.txt', [oid])
+            with open('revlist', 'w') as revlist:
+                revlist.write(oid2.hex)
+                subprocess.Popen(['git', 'pack-objects', 'pack2'],
+                                 stdout=revlist)
+                for filename in fnmatch.filter(os.listdir(packdir),
+                                               'pack2*.pack'):
+                    pack2 = os.path.join(packdir, filename)
+                    subprocess.call(['git', 'pack-objects' 'pack2'],
+                                    stdout=pack2)
+        self.app.post_json('/repo/{}/repack'.format(self.repo_path),
+                           {'prune': True, 'single': True})
+        for filename in fnmatch.filter(os.listdir(packdir), '*.pack'):
+            repacked_pack = os.path.join(packdir, filename)
+            out = subprocess.check_output(['git', 'verify-pack',
+                                           repacked_pack, '-v'])
+        self.assertIn(oid.hex, out)
+        self.assertIn(oid2.hex, out)
 
 
 if __name__ == '__main__':
