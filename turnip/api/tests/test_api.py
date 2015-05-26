@@ -529,7 +529,7 @@ class ApiTestCase(TestCase):
         oid = factory.add_commit('foo', 'foobar.txt')
         packdir = os.path.join(factory.repo.path,'objects', 'pack')
         with chdir(packdir):
-            subprocess.call(['git', 'gc', '-q'])
+            subprocess.call(['git', 'gc', '-q'])  # pack first commit
             oid2 = factory.add_commit('bar', 'foobar.txt', [oid])
             for filename in fnmatch.filter(os.listdir(packdir),
                                            'pack2*.pack'):
