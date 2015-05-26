@@ -1,0 +1,36 @@
+/* Move the content down so the notification banner doesn't hide any content. */
+body {
+	padding-top: 40px;
+}
+
+.global-notification {
+	position: fixed;
+	z-index: 10;
+	top: 0;
+	left: 0;
+	right: 0;
+	padding: 8px 20px;
+	/* Define colour for browsers that don't support transparency */
+	background-color: #8d1f1f;
+	/* Set transparent background for browsers that support it */
+	background-color: rgba(125,0,0,0.9);
+	color: #fff;
+	text-shadow: 0 -1px 0 #631616;
+	font-size: 14px;
+	line-height: 21px;
+	font-weight: bold;
+	-moz-box-shadow: 0 0 5px #333;
+	-webkit-box-shadow: 0 0 5px #333;
+	box-shadow: 0 0 5px #333;
+}
+
+.notification-private {
+	background-image: url(/static/notification-private.png);
+	background-repeat: no-repeat;
+	float: left;
+	display: inline-block;
+	height: 21px;
+	width: 20px;
+	margin-right: 10px;
+	padding: 0;
+}

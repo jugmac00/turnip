@@ -357,12 +357,13 @@ class RobotsResource(static.Data):
 class CGitScriptResource(twcgi.CGIScript):
     """HTTP resource to run cgit."""
 
-    def __init__(self, root, repo_url, repo_path, trailing):
+    def __init__(self, root, repo_url, repo_path, trailing, private):
         twcgi.CGIScript.__init__(self, root.cgit_exec_path)
         self.root = root
         self.repo_url = repo_url
         self.repo_path = repo_path
         self.trailing = trailing
+        self.private = private
         self.cgit_config = None
 
     def _finished(self, ignored):
@@ -380,15 +381,26 @@ class CGitScriptResource(twcgi.CGIScript):
                 "{}://{}".format(scheme, self.root.site_name)
                 for scheme in ("git", "git+ssh", "https"))
             print("clone-prefix={}".format(prefixes), file=self.cgit_config)
+        if self.private:
+            fmt['css'] = '/static/cgit-private.css'
+        else:
+            fmt['css'] = '/static/cgit-public.css'
         print(textwrap.dedent("""\
-            css=/static/cgit.css
+            css={css}
             enable-http-clone=0
             enable-index-owner=0
             logo=/static/launchpad-logo.png
-
+            """).format(**fmt), end='', file=self.cgit_config)
+        if self.private:
+            top = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            print(
+                'header={top}/static/private-banner.html'.format(top=top),
+                file=self.cgit_config)
+        print(file=self.cgit_config)
+        print(textwrap.dedent("""\
             repo.url={repo_url}
             repo.path={repo_path}
-            """).format(**fmt), file=self.cgit_config)
+            """).format(**fmt), end='', file=self.cgit_config)
         self.cgit_config.flush()
         env["CGIT_CONFIG"] = self.cgit_config.name
         env["PATH_INFO"] = "/%s%s" % (self.repo_url, self.trailing)
@@ -570,7 +582,7 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
             repo_url = repo_url[:-len(trailing)]
         repo_url = repo_url.strip('/')
         cgit_resource = CGitScriptResource(
-            self.root, repo_url, repo_path, trailing)
+            self.root, repo_url, repo_path, trailing, translated['private'])
         request.render(cgit_resource)
 
     def _translatePathErrback(self, failure, request, session):
@@ -647,10 +659,24 @@ class SmartHTTPFrontendResource(resource.Resource):
             static_resource = DirectoryWithoutListings(
                 cgit_data_path, defaultType='text/plain')
             top = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            logo = os.path.join(top, 'static', 'launchpad-logo.png')
-            static_resource.putChild('launchpad-logo.png', static.File(logo))
+            stdir = os.path.join(top, 'static')
+            for name in ('launchpad-logo.png', 'notification-private.png'):
+                path = os.path.join(stdir, name)
+                static_resource.putChild(name, static.File(path))
+            with open(os.path.join(cgit_data_path, 'cgit.css'), 'rb') as f:
+                css = f.read()
+            with open(os.path.join(stdir, 'ubuntu-webfonts.css'), 'rb') as f:
+                css += b'\n' + f.read()
+            with open(os.path.join(stdir, 'global.css'), 'rb') as f:
+                css += b'\n' + f.read()
+            with open(os.path.join(stdir, 'private.css'), 'rb') as f:
+                private_css = css + b'\n' + f.read()
+            static_resource.putChild(
+                'cgit-public.css', static.Data(css, b'text/css'))
+            static_resource.putChild(
+                'cgit-private.css', static.Data(private_css, b'text/css'))
             self.putChild('static', static_resource)
-            favicon = os.path.join(top, 'static', 'launchpad.png')
+            favicon = os.path.join(stdir, 'launchpad.png')
             self.putChild('favicon.ico', static.File(favicon))
         cgit_secret_path = config.get("cgit_secret_path")
         if cgit_secret_path:
