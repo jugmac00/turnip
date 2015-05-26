@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-import fnmatch
 import os
 import subprocess
 from textwrap import dedent
@@ -516,9 +515,8 @@ class ApiTestCase(TestCase):
         oid = factory.add_commit('foo', 'foobar.txt')
         resp = self.app.post_json('/repo/{}/repack'.format(self.repo_path),
                                   {'prune': True, 'single': True})
-        for root, dirnames, filenames in os.walk(factory.repo_path):
-            for filename in fnmatch.filter(filenames, '*.pack'):
-                pack = os.path.join(root, filename)
+        for filename in factory.packs:
+            pack = os.path.join(factory.pack_dir, filename)
         out = subprocess.check_output(['git', 'verify-pack', pack, '-v'])
         self.assertEqual(200, resp.status_code)
         self.assertIn(oid.hex, out)
@@ -527,20 +525,18 @@ class ApiTestCase(TestCase):
         """Ensure commits in different packs exist in merged pack."""
         factory = RepoFactory(self.repo_store)
         oid = factory.add_commit('foo', 'foobar.txt')
-        packdir = os.path.join(factory.repo.path,'objects', 'pack')
-        with chdir(packdir):
+        with chdir(factory.pack_dir):
             subprocess.call(['git', 'gc', '-q'])  # pack first commit
             oid2 = factory.add_commit('bar', 'foobar.txt', [oid])
-            p = subprocess.Popen(['git', 'pack-objects', 'pack2'],
-                                stdin=subprocess.PIPE)
-            p.communicate(input=oid2.hex)[0]
+            p = subprocess.Popen(['git', 'pack-objects', '-q', 'pack2'],
+                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            p.communicate(input=oid2.hex)
         # ensure 2 packs exist
-        self.assertEqual(2, len([file for filename in fnmatch.filter(
-            os.listdir(packdir), '*.pack')]))
+        self.assertEqual(2, len(factory.packs))
         self.app.post_json('/repo/{}/repack'.format(self.repo_path),
                            {'prune': True, 'single': True})
-        for filename in fnmatch.filter(os.listdir(packdir), '*.pack'):
-            repacked_pack = os.path.join(packdir, filename)
+        for filename in factory.packs:
+            repacked_pack = os.path.join(factory.pack_dir, filename)
         out = subprocess.check_output(['git', 'verify-pack',
                                        repacked_pack, '-v'])
         self.assertIn(oid.hex, out)
