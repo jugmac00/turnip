@@ -534,8 +534,8 @@ class ApiTestCase(TestCase):
         self.assertEqual(2, len(factory.packs))  # ensure 2 packs exist
         self.app.post_json('/repo/{}/repack'.format(self.repo_path),
                            {'prune': True, 'single': True})
-        for filename in factory.packs:
-            repacked_pack = os.path.join(factory.pack_dir, filename)
+        self.assertEqual(1, len(factory.packs))
+        repacked_pack = os.path.join(factory.pack_dir, factory.packs[0])
         out = subprocess.check_output(['git', 'verify-pack',
                                        repacked_pack, '-v'])
         self.assertIn(oid.hex, out)
