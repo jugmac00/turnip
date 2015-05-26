@@ -647,10 +647,10 @@ class SmartHTTPFrontendResource(resource.Resource):
             static_resource = DirectoryWithoutListings(
                 cgit_data_path, defaultType='text/plain')
             top = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            logo = os.path.join(top, 'images', 'launchpad-logo.png')
+            logo = os.path.join(top, 'static', 'launchpad-logo.png')
             static_resource.putChild('launchpad-logo.png', static.File(logo))
             self.putChild('static', static_resource)
-            favicon = os.path.join(top, 'images', 'launchpad.png')
+            favicon = os.path.join(top, 'static', 'launchpad.png')
             self.putChild('favicon.ico', static.File(favicon))
         cgit_secret_path = config.get("cgit_secret_path")
         if cgit_secret_path:
