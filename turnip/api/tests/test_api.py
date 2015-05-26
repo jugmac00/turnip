@@ -531,8 +531,7 @@ class ApiTestCase(TestCase):
             p = subprocess.Popen(['git', 'pack-objects', '-q', 'pack2'],
                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             p.communicate(input=oid2.hex)
-        # ensure 2 packs exist
-        self.assertEqual(2, len(factory.packs))
+        self.assertEqual(2, len(factory.packs))  # ensure 2 packs exist
         self.app.post_json('/repo/{}/repack'.format(self.repo_path),
                            {'prune': True, 'single': True})
         for filename in factory.packs:
