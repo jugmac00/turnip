@@ -5,8 +5,8 @@ from __future__ import (
     )
 
 from cStringIO import StringIO
+import json
 import os.path
-import pickle
 import tempfile
 import textwrap
 try:
@@ -417,12 +417,12 @@ class BaseHTTPAuthResource(resource.Resource):
             if cookie is not None:
                 content = self.signer.auth(cookie)
                 if content:
-                    return pickle.loads(decode_cookie(content))
+                    return json.loads(decode_cookie(content))
         return {}
 
     def _putSession(self, request, session):
         if self.signer is not None:
-            content = self.signer.sign(encode_cookie(pickle.dumps(session)))
+            content = self.signer.sign(encode_cookie(json.dumps(session)))
             cookie = '%s=%s; Path=/; secure;' % (self.cookie_name, content)
             request.setHeader(b'Set-Cookie', cookie.encode('UTF-8'))
 
