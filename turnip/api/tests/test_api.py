@@ -531,16 +531,18 @@ class ApiTestCase(TestCase):
         with chdir(packdir):
             subprocess.call(['git', 'gc', '-q'])  # pack first commit
             oid2 = factory.add_commit('bar', 'foobar.txt', [oid])
-            with open('revlist', 'w') as revlist:
-                revlist.write(oid2.hex)
-                subprocess.Popen(['git', 'pack-objects', 'pack2'],
-                                 stdout=revlist)
+            p = subprocess.Popen(['git', 'pack-objects', 'pack2'],
+                                stdin=subprocess.PIPE)
+            p.communicate(input=oid2.hex)[0]
+        # ensure 2 packs exist
+        self.assertEqual(2, len([file for filename in fnmatch.filter(
+            os.listdir(packdir), '*.pack')]))
         self.app.post_json('/repo/{}/repack'.format(self.repo_path),
                            {'prune': True, 'single': True})
         for filename in fnmatch.filter(os.listdir(packdir), '*.pack'):
             repacked_pack = os.path.join(packdir, filename)
-            out = subprocess.check_output(['git', 'verify-pack',
-                                           repacked_pack, '-v'])
+        out = subprocess.check_output(['git', 'verify-pack',
+                                       repacked_pack, '-v'])
         self.assertIn(oid.hex, out)
         self.assertIn(oid2.hex, out)
 
