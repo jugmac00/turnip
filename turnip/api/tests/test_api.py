@@ -531,15 +531,11 @@ class ApiTestCase(TestCase):
         with chdir(packdir):
             subprocess.call(['git', 'gc', '-q'])
             oid2 = factory.add_commit('bar', 'foobar.txt', [oid])
-            with open('revlist', 'w') as revlist:
-                revlist.write(oid2.hex)
-                subprocess.Popen(['git', 'pack-objects', 'pack2'],
-                                 stdout=revlist)
-                for filename in fnmatch.filter(os.listdir(packdir),
-                                               'pack2*.pack'):
-                    pack2 = os.path.join(packdir, filename)
-                    subprocess.call(['git', 'pack-objects' 'pack2'],
-                                    stdout=pack2)
+            for filename in fnmatch.filter(os.listdir(packdir),
+                                           'pack2*.pack'):
+                pack2 = os.path.join(packdir, filename)
+                subprocess.call(['git', 'pack-objects' 'pack2'],
+                                stdout=oid2.hex)
         self.app.post_json('/repo/{}/repack'.format(self.repo_path),
                            {'prune': True, 'single': True})
         for filename in fnmatch.filter(os.listdir(packdir), '*.pack'):
