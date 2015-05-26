@@ -582,10 +582,12 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
             error_code = http.FORBIDDEN
         elif e.faultCode in (3, 410):
             if 'user' in session:
-                error_code = http.UNAUTHORIZED
-                message = 'You are logged in as %s.' % session['user']
+                error_code = http.FORBIDDEN
+                message = (
+                    'You are logged in as %s, but do not have access to this '
+                    'repository.' % session['user'])
             elif self.signer is None:
-                error_code = http.UNAUTHORIZED
+                error_code = http.FORBIDDEN
                 message = 'Server does not support OpenID authentication.'
             else:
                 self._beginLogin(request, session)
