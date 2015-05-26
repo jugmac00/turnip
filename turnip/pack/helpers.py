@@ -14,6 +14,7 @@ from tempfile import (
     )
 
 from pygit2 import Repository
+import yaml
 
 import turnip.pack.hooks
 
@@ -104,10 +105,11 @@ def ensure_config(repo_root):
     pygit2.Config handles locking itself, so we don't need to think too hard
     about concurrency.
     """
-
+    config_file = open('git.config.yaml')
+    git_config_defaults = yaml.load(config_file)
     config = Repository(repo_root).config
-    config['core.logallrefupdates'] = True
-    config['repack.writeBitmaps'] = True
+    for key, val in git_config_defaults.iteritems():
+        config[key] = val
 
 
 def ensure_hooks(repo_root):

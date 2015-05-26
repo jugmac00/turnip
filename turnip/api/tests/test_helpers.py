@@ -1,5 +1,7 @@
 # Copyright 2015 Canonical Ltd.  All rights reserved.
 
+import contextlib
+import fnmatch
 import itertools
 import os
 import urllib
@@ -28,6 +30,17 @@ def open_repo(repo_path):
     return Repository(repo_path)
 
 
+@contextlib.contextmanager
+def chdir(dirname=None):
+    curdir = os.getcwd()
+    try:
+        if dirname is not None:
+            os.chdir(dirname)
+        yield
+    finally:
+        os.chdir(curdir)
+
+
 class RepoFactory():
     """Builds a git repository in a user defined state."""
 
@@ -41,6 +54,7 @@ class RepoFactory():
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_path = repo_path
+        self.pack_dir = os.path.join(repo_path, '.git', 'objects', 'pack')
         if clone_from:
             self.repo = self.clone_repo(clone_from)
         else:
@@ -51,6 +65,12 @@ class RepoFactory():
         """Walk repo from HEAD and returns list of commit objects."""
         last = self.repo[self.repo.head.target]
         return list(self.repo.walk(last.id, GIT_SORT_TIME))
+
+    @property
+    def packs(self):
+        """Return list of pack files."""
+        return [filename for filename in fnmatch.filter(
+            os.listdir(self.pack_dir), '*.pack')]
 
     def add_commit(self, blob_content, file_path, parents=[],
                    ref=None, author=None, committer=None):
@@ -66,10 +86,16 @@ class RepoFactory():
         tree_id = repo.index.write_tree()
         oid = repo.create_commit(ref, author, committer,
                                  blob_content, tree_id, parents)
+        self.set_head(oid)  # set master
         return oid
 
     def set_head(self, oid):
-        self.repo.create_reference('refs/heads/master', oid)
+        try:
+            master_ref = self.repo.lookup_reference('refs/heads/master')
+        except KeyError:
+            master_ref = self.repo.create_reference('refs/heads/master', oid)
+        finally:
+            master_ref.set_target(oid)
 
     def add_branch(self, name, oid):
         commit = self.repo.get(oid)

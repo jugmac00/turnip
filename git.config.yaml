@@ -1,0 +1,8 @@
+# Per-repository configuration
+# See http://git-scm.com/docs/git-config.html for more info
+
+core.logallrefupdates: True
+pack.depth: 100
+pack.window: 100
+pack.windowMemory: 2g
+repack.writeBitmaps: True
