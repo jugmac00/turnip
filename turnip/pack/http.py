@@ -351,7 +351,7 @@ class RobotsResource(static.Data):
         """).encode('US-ASCII')
 
     def __init__(self):
-        static.Data.__init__(self, self.robots_txt, 'text/plain')
+        static.Data.__init__(self, self.robots_txt, b'text/plain')
 
 
 class CGitScriptResource(twcgi.CGIScript):
@@ -678,6 +678,7 @@ class SmartHTTPFrontendResource(resource.Resource):
             self.putChild('static', static_resource)
             favicon = os.path.join(stdir, 'launchpad.png')
             self.putChild('favicon.ico', static.File(favicon))
+            self.putChild('robots.txt', RobotsResource())
         cgit_secret_path = config.get("cgit_secret_path")
         if cgit_secret_path:
             with open(cgit_secret_path, 'rb') as cgit_secret_file:
