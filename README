@@ -9,6 +9,8 @@ The various servers provide customisable virtual hosting, with flexible
 authentication and authorisation, and individual horizontal scaling from
 the frontend to the storage layer.
 
+None of the Python interfaces here should be considered stable.
+
 
 Architecture
 ------------
