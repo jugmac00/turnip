@@ -1,0 +1,5 @@
+include *.ini *.tac *.txt *.yaml
+recursive-include turnip *.py
+recursive-include turnip/pack/hooks post-receive pre-receive
+recursive-include turnip/pack/tests/data ssh*-key ssh*-key.pub
+recursive-include static *.css *.html *.png
