@@ -13,6 +13,8 @@ here = os.path.abspath(os.path.dirname(__file__))
 
 with open(os.path.join(here, 'README')) as f:
     README = f.read()
+with open(os.path.join(here, 'NEWS')) as f:
+    README += "\n\n" + f.read()
 
 requires = [
     'contextlib2',
