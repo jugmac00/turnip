@@ -1,4 +1,4 @@
-include *.ini *.tac *.txt *.yaml NEWS
+include *.ini *.tac *.txt *.yaml LICENSE NEWS
 recursive-include turnip *.py
 recursive-include turnip/pack/hooks post-receive pre-receive
 recursive-include turnip/pack/tests/data ssh*-key ssh*-key.pub
