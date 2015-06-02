@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
-# Copyright 2015 Canonical Ltd.  All rights reserved.
+# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# GNU Affero General Public License version 3 (see the file LICENSE).
 
 import os
 
@@ -46,8 +47,16 @@ setup(
     maintainer_email='lazr-developers@lists.launchpad.net',
     description='turnip',
     long_description=README,
+    license='AGPL v3',
     url='https://launchpad.net/turnip',
     download_url='https://launchpad.net/turnip/+download',
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: GNU Affero General Public License v3',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        ],
     install_requires=requires,
     tests_require=test_requires,
     extras_require=dict(
