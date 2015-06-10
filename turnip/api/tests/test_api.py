@@ -544,6 +544,78 @@ class ApiTestCase(TestCase):
         self.assertIn(oid.hex, out)
         self.assertIn(oid2.hex, out)
 
+    def test_repo_detect_merges_missing_target(self):
+        """A non-existent target OID returns HTTP 404."""
+        factory = RepoFactory(self.repo_store)
+        resp = self.app.post_json('/repo/{}/detect-merges/{}'.format(
+            self.repo_path, factory.nonexistent_oid()),
+            {'sources': []}, expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
+    def test_repo_detect_merges_missing_source(self):
+        """A non-existent source commit is ignored."""
+        factory = RepoFactory(self.repo_store)
+        # A---B
+        a = factory.add_commit('a\n', 'file')
+        b = factory.add_commit('b\n', 'file', parents=[a])
+        resp = self.app.post_json('/repo/{}/detect-merges/{}'.format(
+            self.repo_path, b),
+            {'sources': [factory.nonexistent_oid()]})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({}, resp.json)
+
+    def test_repo_detect_merges_unmerged(self):
+        """An unmerged commit is not returned."""
+        factory = RepoFactory(self.repo_store)
+        # A---B
+        #  \
+        #   C
+        a = factory.add_commit('a\n', 'file')
+        b = factory.add_commit('b\n', 'file', parents=[a])
+        c = factory.add_commit('c\n', 'file', parents=[a])
+        resp = self.app.post_json('/repo/{}/detect-merges/{}'.format(
+            self.repo_path, b),
+            {'sources': [c.hex]})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({}, resp.json)
+
+    def test_repo_detect_merges_pulled(self):
+        """Commits that were pulled (fast-forward) are their own merge
+        points."""
+        factory = RepoFactory(self.repo_store)
+        # A---B---C
+        a = factory.add_commit('a\n', 'file')
+        b = factory.add_commit('b\n', 'file', parents=[a])
+        c = factory.add_commit('c\n', 'file', parents=[b])
+        # The start commit would never be the source of a merge proposal,
+        # but include it anyway to test boundary conditions.
+        resp = self.app.post_json('/repo/{}/detect-merges/{}'.format(
+            self.repo_path, c),
+            {'sources': [a.hex, b.hex, c.hex]})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({a.hex: a.hex, b.hex: b.hex, c.hex: c.hex}, resp.json)
+
+    def test_repo_detect_merges_merged(self):
+        """Commits that were merged have sensible merge points."""
+        factory = RepoFactory(self.repo_store)
+        # A---C---D---G---H
+        #  \ /       /
+        #   B---E---F---I
+        a = factory.add_commit('a\n', 'file')
+        b = factory.add_commit('b\n', 'file', parents=[a])
+        c = factory.add_commit('c\n', 'file', parents=[a, b])
+        d = factory.add_commit('d\n', 'file', parents=[c])
+        e = factory.add_commit('e\n', 'file', parents=[b])
+        f = factory.add_commit('f\n', 'file', parents=[e])
+        g = factory.add_commit('g\n', 'file', parents=[d, f])
+        h = factory.add_commit('h\n', 'file', parents=[g])
+        i = factory.add_commit('i\n', 'file', parents=[f])
+        resp = self.app.post_json('/repo/{}/detect-merges/{}'.format(
+            self.repo_path, h),
+            {'sources': [b.hex, e.hex, i.hex]})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({b.hex: c.hex, e.hex: g.hex}, resp.json)
+
 
 if __name__ == '__main__':
     unittest.main()
