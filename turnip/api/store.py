@@ -19,6 +19,7 @@ from pygit2 import (
     GIT_OBJ_COMMIT,
     GIT_OBJ_TREE,
     GIT_OBJ_TAG,
+    GIT_SORT_TOPOLOGICAL,
     IndexEntry,
     init_repository,
     Repository,
@@ -341,3 +342,32 @@ def get_commits(repo_store, repo_name, commit_oids):
             except GitError:
                 pass
         return commits
+
+
+def detect_merges(repo_store, repo_name, target_oid, source_oids):
+    """Check whether each of the requested commits has been merged."""
+    with open_repo(repo_store, repo_name) as repo:
+        target = repo.get(target_oid)
+        if target is None:
+            raise GitError('Object {} does not exist in repository {}.'.format(
+                target_oid, repo_name))
+        if not source_oids:
+            return {}
+
+        search_oids = set(source_oids)
+        merge_info = {}
+        last_mainline = target_oid
+        next_mainline = target_oid
+        for commit in repo.walk(target_oid, GIT_SORT_TOPOLOGICAL):
+            if commit.id.hex == next_mainline:
+                last_mainline = commit.id.hex
+                if commit.parent_ids:
+                    next_mainline = commit.parent_ids[0].hex
+                else:
+                    next_mainline = None
+            if commit.id.hex in search_oids:
+                merge_info[commit.id.hex] = last_mainline
+                search_oids.remove(commit.id.hex)
+            if not search_oids:
+                break
+        return merge_info

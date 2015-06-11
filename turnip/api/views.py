@@ -289,3 +289,32 @@ class LogAPI(BaseAPI):
         except GitError:
             return exc.HTTPNotFound()
         return log
+
+
+@resource(path='/repo/{name}/detect-merges/{target}')
+class DetectMergesAPI(BaseAPI):
+    """Provides HTTP API for detecting merges."""
+
+    def __init__(self, request):
+        super(DetectMergesAPI, self).__init__()
+        self.request = request
+
+    @validate_path
+    def post(self, repo_store, repo_name):
+        """Check whether each of the requested commits has been merged.
+
+        The JSON request dictionary should contain a 'sources' key whose
+        value is a list of source commit OIDs.  The response is a dictionary
+        mapping merged source commit OIDs to the first commit OID in the
+        left-hand (first parent only) history of the target commit that is a
+        descendant of the corresponding source commit.  Unmerged commits are
+        omitted from the response.
+        """
+        target = self.request.matchdict['target']
+        sources = extract_json_data(self.request).get('sources')
+        try:
+            merges = store.detect_merges(
+                repo_store, repo_name, target, sources)
+        except GitError:
+            return exc.HTTPNotFound()
+        return merges
