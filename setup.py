@@ -37,7 +37,7 @@ test_requires = [
 
 setup(
     name='turnip',
-    version='0.1',
+    version='0.1.1',
     packages=[
         'turnip.%s' % package for package in
         find_packages('turnip', exclude=['*.tests', 'tests'])],
