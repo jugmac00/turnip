@@ -392,6 +392,15 @@ class ApiTestCase(TestCase):
             self.repo_path, c1, c1))
         self.assertEqual('', resp.json_body['patch'])
 
+    def test_repo_diff_merge_nonexistent(self):
+        """Diffing against a non-existent base OID returns HTTP 404."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'blah.txt')
+
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
+            self.repo_path, repo.nonexistent_oid(), c1), expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
         message = 'Computers make me angry.'

@@ -234,7 +234,7 @@ class DiffMergeAPI(BaseAPI):
             patch = store.get_merge_diff(
                 repo_store, repo_name, self.request.matchdict['base'],
                 self.request.matchdict['head'], context_lines)
-        except (ValueError, GitError):
+        except (KeyError, ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()
         return patch
