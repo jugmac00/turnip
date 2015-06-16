@@ -55,7 +55,7 @@ class RepoFactory():
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_path = repo_path
-        self.pack_dir = os.path.join(repo_path, '.git', 'objects', 'pack')
+        self.pack_dir = os.path.join(repo_path, 'objects', 'pack')
         if clone_from:
             self.repo = self.clone_repo(clone_from)
         else:
@@ -81,10 +81,7 @@ class RepoFactory():
             author = self.author
         if not committer:
             committer = self.committer
-        blob_oid = repo.create_blob(blob_content)
-        blob_entry = IndexEntry(file_path, blob_oid, GIT_FILEMODE_BLOB)
-        repo.index.add(blob_entry)
-        tree_id = repo.index.write_tree()
+        tree_id = self.stage(file_path, blob_content)
         oid = repo.create_commit(ref, author, committer,
                                  blob_content, tree_id, parents)
         self.set_head(oid)  # set master
@@ -114,21 +111,18 @@ class RepoFactory():
         """Return an author or committer signature."""
         return Signature(name, email, encoding=encoding)
 
-    def stage(self, file_path):
+    def stage(self, path, content):
         """Stage a file and return a tree id."""
-        repo = self.repo
-        repo.index.add(file_path)
-        repo.index.write()
-        return repo.index.write_tree()
+        self.repo.index.add(IndexEntry(
+            path, self.repo.create_blob(content), GIT_FILEMODE_BLOB))
+        return self.repo.index.write_tree()
 
     def generate_commits(self, num_commits, parents=[]):
         """Generate n number of commits."""
         for i in xrange(num_commits):
             blob_content = b'commit {} - {}'.format(i, uuid.uuid1())
             test_file = 'test.txt'
-            with open(os.path.join(self.repo_path, test_file), 'w') as f:
-                f.write(blob_content)
-            self.stage(test_file)
+            self.stage(test_file, blob_content)
             commit_oid = self.add_commit(blob_content, test_file, parents)
             self.commits.append(commit_oid)
             parents = [commit_oid]
@@ -167,13 +161,13 @@ class RepoFactory():
         raise Exception("repo appears to contain every possible OID!")
 
     def init_repo(self):
-        return init_repository(self.repo_path)
+        return init_repository(self.repo_path, bare=True)
 
     def clone_repo(self, repo_factory):
         """Return a pygit2 repo object cloned from an existing factory repo."""
         clone_from_url = urlparse.urljoin(
             'file:', urllib.pathname2url(repo_factory.repo.path))
-        return clone_repository(clone_from_url, self.repo_path)
+        return clone_repository(clone_from_url, self.repo_path, bare=True)
 
     def build(self):
         """Return a repo, optionally with generated commits and tags."""
