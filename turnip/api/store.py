@@ -146,9 +146,15 @@ def open_repo(repo_store, repo_name):
     """
     if ':' in repo_name:
         try:
-            # create ephemeral repo with alternates set from both
-            repos = [os.path.join(repo_store, repo)
-                     for repo in repo_name.split(':')]
+            # Create ephemeral repo with alternates set from both.
+            # Neither git nor libgit2 will respect a relative alternate
+            # path except in the root repo, so we explicitly include the
+            # turnip-subordinate for each repo. If it doesn't exist
+            # it'll just be ignored.
+            repos = list(itertools.chain(*(
+                (os.path.join(repo_store, repo),
+                 os.path.join(repo_store, repo, 'turnip-subordinate'))
+                for repo in repo_name.split(':'))))
             tmp_repo_path = os.path.join(repo_store,
                                          'ephemeral-' + uuid.uuid4().hex)
             ephemeral_repo_path = init_repo(

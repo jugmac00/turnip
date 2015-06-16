@@ -90,19 +90,26 @@ class InitTestCase(TestCase):
         """Opening a repo where a repo name contains ':' should return
         a new ephemeral repo.
         """
-        repo_names = ['one', 'two']
-        repos = []
-        for name in repo_names:
+        # Create repos one and two with distinct commits, and three which has
+        # no objects of its own but has a clone of two as its
+        # turnip-subordinate.
+        repos = {}
+        for name in ['one', 'two']:
             factory = RepoFactory(os.path.join(self.repo_store, name))
             factory.generate_branches(2, 2)
-            repos.append(factory.repo)
+            repos[name] = factory.repo
+        repos['three'] = store.init_repo(
+            os.path.join(self.repo_store, 'three'),
+            clone_from=os.path.join(self.repo_store, 'two'))
 
-        repo_name = ':'.join(repo_names)
-        alt_path = os.path.join(self.repo_store, repo_names[0])
+        # Opening the union of one and three includes the objects from
+        # two, as they're in three's turnip-subordinate.
+        repo_name = 'one:three'
+        alt_path = os.path.join(self.repo_store, 'one')
         with store.open_repo(self.repo_store, repo_name) as ephemeral_repo:
             self.assert_alternate_exists(alt_path, ephemeral_repo.path)
-            self.assertIn(repos[0].head.target, ephemeral_repo)
-            self.assertIn(repos[1].head.target, ephemeral_repo)
+            self.assertIn(repos['one'].head.target, ephemeral_repo)
+            self.assertIn(repos['two'].head.target, ephemeral_repo)
 
     def test_repo_with_alternates(self):
         """Ensure objects path is defined correctly in repo alternates."""
