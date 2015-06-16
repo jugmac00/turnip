@@ -32,7 +32,6 @@ class InitTestCase(TestCase):
         super(InitTestCase, self).setUp()
         self.repo_store = self.useFixture(TempDir()).path
         self.useFixture(EnvironmentVariable("REPO_STORE", self.repo_store))
-        self.repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
 
     def assertAllLinkCounts(self, link_count, path):
         count = 0
@@ -78,7 +77,7 @@ class InitTestCase(TestCase):
 
     def test_repo_config(self):
         """Assert repository is initialised with correct config defaults."""
-        repo_path = store.init_repo(self.repo_path)
+        repo_path = store.init_repo(os.path.join(self.repo_store, 'repo'))
         repo_config = pygit2.Repository(repo_path).config
         yaml_config = yaml.load(open('git.config.yaml'))
 
@@ -91,15 +90,23 @@ class InitTestCase(TestCase):
         """Opening a repo where a repo name contains ':' should return
         a new ephemeral repo.
         """
-        repos = [uuid.uuid4().hex, uuid.uuid4().hex]
-        repo_name = '{}:{}'.format(repos[0], repos[1])
-        alt_path = os.path.join(self.repo_store, repos[0])
-        with store.open_repo(self.repo_store, repo_name) as repo:
-            self.assert_alternate_exists(alt_path, repo.path)
+        repo_names = ['one', 'two']
+        repos = []
+        for name in repo_names:
+            factory = RepoFactory(os.path.join(self.repo_store, name))
+            factory.generate_branches(2, 2)
+            repos.append(factory.repo)
+
+        repo_name = ':'.join(repo_names)
+        alt_path = os.path.join(self.repo_store, repo_names[0])
+        with store.open_repo(self.repo_store, repo_name) as ephemeral_repo:
+            self.assert_alternate_exists(alt_path, ephemeral_repo.path)
+            self.assertIn(repos[0].head.target, ephemeral_repo)
+            self.assertIn(repos[1].head.target, ephemeral_repo)
 
     def test_repo_with_alternates(self):
         """Ensure objects path is defined correctly in repo alternates."""
-        factory = RepoFactory(self.repo_path)
+        factory = RepoFactory(os.path.join(self.repo_store, uuid.uuid1().hex))
         new_repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
         repo_path_with_alt = store.init_repo(
             new_repo_path, alternate_repo_paths=[factory.repo.path])
@@ -107,7 +114,7 @@ class InitTestCase(TestCase):
 
     def test_repo_alternates_objects_shared(self):
         """Ensure objects are shared from alternate repo."""
-        factory = RepoFactory(self.repo_path)
+        factory = RepoFactory(os.path.join(self.repo_store, uuid.uuid1().hex))
         commit_oid = factory.add_commit('foo', 'foobar.txt')
         new_repo_path = os.path.join(self.repo_store, uuid.uuid4().hex)
         repo_path_with_alt = store.init_repo(
