@@ -8,6 +8,7 @@ from __future__ import (
     )
 
 import os.path
+import re
 import subprocess
 import uuid
 
@@ -53,6 +54,12 @@ class InitTestCase(TestCase):
         for ref in absent:
             self.assertNotIn(absent, out)
 
+    def assertAlternates(self, alternate_paths, repo_path):
+        with open(store.alternates_path(repo_path)) as altf:
+            self.assertEqual(
+                set([path.rstrip('/') for path in alternate_paths]),
+                set([re.sub('/objects\n$', '', line) for line in altf]))
+
     def makeOrig(self):
         self.orig_path = os.path.join(self.repo_store, 'orig/')
         orig = RepoFactory(
@@ -60,14 +67,6 @@ class InitTestCase(TestCase):
         self.orig_refs = orig.listall_references()
         self.master_oid = orig.lookup_reference('refs/heads/master').target
         self.orig_objs = os.path.join(self.orig_path, '.git/objects')
-
-    def assert_alternate_exists(self, alternate_path, repo_path):
-        """Assert alternate_path exists in alternates at repo_path."""
-        objects_path = '{}\n'.format(
-            os.path.join(alternate_path, 'objects'))
-        with open(store.alternates_path(repo_path), 'r') as alts:
-            alts_content = alts.read()
-            self.assertIn(objects_path, alts_content)
 
     def test_from_scratch(self):
         path = os.path.join(self.repo_store, 'repo/')
@@ -90,26 +89,30 @@ class InitTestCase(TestCase):
         """Opening a repo where a repo name contains ':' should return
         a new ephemeral repo.
         """
-        # Create repos one and two with distinct commits, and three which has
-        # no objects of its own but has a clone of two as its
+        # Create repos A and B with distinct commits, and C which has no
+        # objects of its own but has a clone of B as its
         # turnip-subordinate.
         repos = {}
-        for name in ['one', 'two']:
+        for name in ['A', 'B']:
             factory = RepoFactory(os.path.join(self.repo_store, name))
             factory.generate_branches(2, 2)
             repos[name] = factory.repo
-        repos['three'] = store.init_repo(
-            os.path.join(self.repo_store, 'three'),
-            clone_from=os.path.join(self.repo_store, 'two'))
+        repos['C'] = pygit2.Repository(store.init_repo(
+            os.path.join(self.repo_store, 'C'),
+            clone_from=os.path.join(self.repo_store, 'B')))
 
         # Opening the union of one and three includes the objects from
         # two, as they're in three's turnip-subordinate.
-        repo_name = 'one:three'
-        alt_path = os.path.join(self.repo_store, 'one')
+        repo_name = 'A:C'
+
         with store.open_repo(self.repo_store, repo_name) as ephemeral_repo:
-            self.assert_alternate_exists(alt_path, ephemeral_repo.path)
-            self.assertIn(repos['one'].head.target, ephemeral_repo)
-            self.assertIn(repos['two'].head.target, ephemeral_repo)
+            self.assertAlternates(
+                [repos['A'].path, repos['C'].path,
+                 os.path.join(repos['A'].path, 'turnip-subordinate'),
+                 os.path.join(repos['C'].path, 'turnip-subordinate')],
+                ephemeral_repo.path)
+            self.assertIn(repos['A'].head.target, ephemeral_repo)
+            self.assertIn(repos['B'].head.target, ephemeral_repo)
 
     def test_repo_with_alternates(self):
         """Ensure objects path is defined correctly in repo alternates."""
@@ -117,7 +120,7 @@ class InitTestCase(TestCase):
         new_repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
         repo_path_with_alt = store.init_repo(
             new_repo_path, alternate_repo_paths=[factory.repo.path])
-        self.assert_alternate_exists(factory.repo.path, repo_path_with_alt)
+        self.assertAlternates([factory.repo_path], repo_path_with_alt)
 
     def test_repo_alternates_objects_shared(self):
         """Ensure objects are shared from alternate repo."""
