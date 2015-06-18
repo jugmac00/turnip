@@ -154,24 +154,25 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
             import_into_subordinate(
                 sub_path, os.path.join(clone_from, 'turnip-subordinate'))
         import_into_subordinate(sub_path, clone_from)
-        assert is_bare
-        alt_path = os.path.join(repo_path, 'objects/info/alternates')
-        with open(alt_path, 'w') as f:
-            f.write('../turnip-subordinate/objects\n')
 
-        if clone_refs:
-            # With the objects all accessible via the subordinate, we
-            # can just copy all refs from the origin. Unlike
-            # pygit2.clone_repository, this won't set up a remote.
-            # TODO: Filter out internal (eg. MP) refs.
-            from_repo = Repository(clone_from)
-            to_repo = Repository(repo_path)
-            for ref in from_repo.listall_references():
-                to_repo.create_reference(
-                    ref, from_repo.lookup_reference(ref).target)
-
+    new_alternates = []
     if alternate_repo_paths:
-        write_alternates(repo_path, alternate_repo_paths)
+        new_alternates.extend(alternate_repo_paths)
+    if clone_from:
+        new_alternates.append('../turnip-subordinate')
+    write_alternates(repo_path, new_alternates)
+
+    if clone_from and clone_refs:
+        # With the objects all accessible via the subordinate, we
+        # can just copy all refs from the origin. Unlike
+        # pygit2.clone_repository, this won't set up a remote.
+        # TODO: Filter out internal (eg. MP) refs.
+        from_repo = Repository(clone_from)
+        to_repo = Repository(repo_path)
+        for ref in from_repo.listall_references():
+            to_repo.create_reference(
+                ref, from_repo.lookup_reference(ref).target)
+
     ensure_config(repo_path)  # set repository configuration defaults
     return repo_path
 
