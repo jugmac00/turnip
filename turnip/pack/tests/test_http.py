@@ -7,7 +7,7 @@ from __future__ import (
     unicode_literals,
     )
 
-from cStringIO import StringIO
+from io import BytesIO
 
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
@@ -89,7 +89,7 @@ class ErrorTestMixin(object):
         """
         if service:
             self.request.addArg(b'service', service)
-        self.request.content = StringIO(b'boo')
+        self.request.content = BytesIO(b'boo')
         rendered = render_resource(self.makeResource(service), self.request)
         if backend_response is not None:
             yield self.root.backend_connected
