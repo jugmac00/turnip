@@ -7,6 +7,7 @@ from contextlib2 import (
     )
 import itertools
 import os
+import re
 import shutil
 import subprocess
 import uuid
@@ -101,6 +102,41 @@ def write_alternates(repo_path, alternate_repo_paths):
             f.write("{}\n".format(objects_path))
 
 
+object_dir_re = re.compile(r'\A[0-9a-f][0-9a-f]\Z')
+
+
+def import_into_subordinate(sub_root, from_root):
+    """Import all of a repo's objects and refs into another.
+
+    The refs may clobber existing ones."""
+    for dirname in os.listdir(os.path.join(from_root, 'objects')):
+        # We want to hardlink any children of the loose fanout or pack
+        # directories.
+        if (not os.path.isdir(os.path.join(from_root, 'objects', dirname))
+                or (dirname != 'pack' and not object_dir_re.match(dirname))):
+            continue
+
+        sub_dir = os.path.join(sub_root, 'objects', dirname)
+        if not os.path.exists(sub_dir):
+            os.makedirs(sub_dir)
+        for name in os.listdir(os.path.join(from_root, 'objects', dirname)):
+            from_path = os.path.join(from_root, 'objects', dirname, name)
+            sub_path = os.path.join(sub_root, 'objects', dirname, name)
+            if not os.path.isfile(from_path) or os.path.exists(sub_path):
+                continue
+            os.link(from_path, sub_path)
+
+    # Copy over the refs.
+    # TODO: This should ensure that we don't overwrite anything. The
+    # alternate's refs are only used as extra .haves on push, so it
+    # wouldn't hurt to mangle the names.
+    from_repo = Repository(from_root)
+    sub_repo = Repository(sub_root)
+    for ref in from_repo.listall_references():
+        sub_repo.create_reference(
+            ref, from_repo.lookup_reference(ref).target, force=True)
+
+
 def init_repo(repo_path, clone_from=None, clone_refs=False,
               alternate_repo_paths=None, is_bare=True):
     """Initialise a new git repository or clone from existing."""
@@ -113,7 +149,11 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         # repo. This lets git-receive-pack expose available commits as
         # extra haves without polluting refs in the real repo.
         sub_path = os.path.join(repo_path, 'turnip-subordinate')
-        clone_repository(clone_from, sub_path, True)
+        init_repository(sub_path, True)
+        if os.path.exists(os.path.join(clone_from, 'turnip-subordinate')):
+            import_into_subordinate(
+                sub_path, os.path.join(clone_from, 'turnip-subordinate'))
+        import_into_subordinate(sub_path, clone_from)
         assert is_bare
         alt_path = os.path.join(repo_path, 'objects/info/alternates')
         with open(alt_path, 'w') as f:
