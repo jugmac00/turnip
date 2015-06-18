@@ -48,9 +48,10 @@ class InitTestCase(TestCase):
         out, err = subprocess.Popen(
             ['git', 'receive-pack', '--advertise-refs', repo_path],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-        self.assertEqual('', err)
+        self.assertEqual(b'', err)
         for ref, hex in present:
-            self.assertIn('%s %s' % (hex, ref), out)
+            self.assertIn(
+                hex.encode('ascii') + b' ' + ref.encode('utf-8'), out)
         for ref in absent:
             self.assertNotIn(absent, out)
 
@@ -78,7 +79,8 @@ class InitTestCase(TestCase):
         """Assert repository is initialised with correct config defaults."""
         repo_path = store.init_repo(os.path.join(self.repo_store, 'repo'))
         repo_config = pygit2.Repository(repo_path).config
-        yaml_config = yaml.load(open('git.config.yaml'))
+        with open('git.config.yaml') as f:
+            yaml_config = yaml.load(f)
 
         self.assertEqual(bool(yaml_config['core.logallrefupdates']),
                          bool(repo_config['core.logallrefupdates']))

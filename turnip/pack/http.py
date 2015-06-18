@@ -7,7 +7,7 @@ from __future__ import (
     unicode_literals,
     )
 
-from cStringIO import StringIO
+import io
 import json
 import os.path
 import tempfile
@@ -321,7 +321,7 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
         content_encoding = request.requestHeaders.getRawHeaders(
             b'Content-Encoding')
         if content_encoding == [b'gzip']:
-            content = StringIO(
+            content = io.BytesIO(
                 zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
         d = self.connectToBackend(
             HTTPPackClientCommandFactory, self.service, self.path, content,

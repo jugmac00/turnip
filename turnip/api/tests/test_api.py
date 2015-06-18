@@ -264,8 +264,8 @@ class ApiTestCase(TestCase):
 
         path = '/repo/{}/compare/{}..{}'.format(self.repo_path, c1_oid, c2_oid)
         resp = self.app.get(path)
-        self.assertIn('-foo', resp.body)
-        self.assertIn('+bar', resp.body)
+        self.assertIn(b'-foo', resp.body)
+        self.assertIn(b'+bar', resp.body)
 
     def test_repo_diff_commits(self):
         """Ensure expected commits objects are returned in diff."""
@@ -531,7 +531,7 @@ class ApiTestCase(TestCase):
             pack = os.path.join(factory.pack_dir, filename)
         out = subprocess.check_output(['git', 'verify-pack', pack, '-v'])
         self.assertEqual(200, resp.status_code)
-        self.assertIn(oid.hex, out)
+        self.assertIn(oid.hex.encode('ascii'), out)
 
     def test_repo_repack_verify_commits_to_pack(self):
         """Ensure commits in different packs exist in merged pack."""
@@ -542,7 +542,7 @@ class ApiTestCase(TestCase):
             oid2 = factory.add_commit('bar', 'foobar.txt', [oid])
             p = subprocess.Popen(['git', 'pack-objects', '-q', 'pack2'],
                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-            p.communicate(input=oid2.hex)
+            p.communicate(input=oid2.hex.encode('ascii'))
         self.assertEqual(2, len(factory.packs))  # ensure 2 packs exist
         self.app.post_json('/repo/{}/repack'.format(self.repo_path),
                            {'prune': True, 'single': True})
@@ -550,8 +550,8 @@ class ApiTestCase(TestCase):
         repacked_pack = os.path.join(factory.pack_dir, factory.packs[0])
         out = subprocess.check_output(['git', 'verify-pack',
                                        repacked_pack, '-v'])
-        self.assertIn(oid.hex, out)
-        self.assertIn(oid2.hex, out)
+        self.assertIn(oid.hex.encode('ascii'), out)
+        self.assertIn(oid2.hex.encode('ascii'), out)
 
     def test_repo_detect_merges_missing_target(self):
         """A non-existent target OID returns HTTP 404."""

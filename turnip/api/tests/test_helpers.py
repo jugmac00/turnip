@@ -5,16 +5,15 @@ import contextlib
 import fnmatch
 import itertools
 import os
-import urllib
-import urlparse
 import uuid
+
+from six.moves import urllib
 
 from pygit2 import (
     clone_repository,
     init_repository,
     GIT_FILEMODE_BLOB,
     GIT_OBJ_COMMIT,
-    GIT_SORT_TIME,
     IndexEntry,
     Repository,
     Signature,
@@ -42,15 +41,15 @@ def chdir(dirname=None):
         os.chdir(curdir)
 
 
-class RepoFactory():
+class RepoFactory(object):
     """Builds a git repository in a user defined state."""
 
     def __init__(self, repo_path=None, num_commits=None,
                  num_branches=None, num_tags=None, clone_from=None):
         self.author = Signature('Test Author', 'author@bar.com')
         self.branches = []
-        self.committer = Signature('Test Commiter', 'committer@bar.com')
         self.commits = []
+        self.committer = Signature('Test Commiter', 'committer@bar.com')
         self.num_branches = num_branches
         self.num_commits = num_commits
         self.num_tags = num_tags
@@ -60,12 +59,6 @@ class RepoFactory():
             self.repo = self.clone_repo(clone_from)
         else:
             self.repo = self.init_repo()
-
-    @property
-    def commits(self):
-        """Walk repo from HEAD and returns list of commit objects."""
-        last = self.repo[self.repo.head.target]
-        return list(self.repo.walk(last.id, GIT_SORT_TIME))
 
     @property
     def packs(self):
@@ -119,8 +112,10 @@ class RepoFactory():
 
     def generate_commits(self, num_commits, parents=[]):
         """Generate n number of commits."""
-        for i in xrange(num_commits):
-            blob_content = b'commit {} - {}'.format(i, uuid.uuid1())
+        for i in range(num_commits):
+            blob_content = (
+                b'commit ' + str(i).encode('ascii') + b' - '
+                + uuid.uuid1().hex.encode('ascii'))
             test_file = 'test.txt'
             self.stage(test_file, blob_content)
             commit_oid = self.add_commit(blob_content, test_file, parents)
@@ -138,14 +133,14 @@ class RepoFactory():
         """Generate n number of tags."""
         repo = self.repo
         oid = repo.head.get_object().oid
-        for i in xrange(num_tags):
+        for i in range(num_tags):
             self.add_tag('tag{}'.format(i), 'tag message {}'.format(i), oid)
 
     def generate_branches(self, num_branches, num_commits):
         """Generate n number of branches with n commits."""
         repo = self.repo
         parents = []
-        for i in xrange(num_branches):
+        for i in range(num_branches):
             self.generate_commits(num_commits, parents)
             oid = repo.revparse_single('HEAD')
             branch = repo.create_branch('branch-{}'.format(i), oid)
@@ -165,8 +160,8 @@ class RepoFactory():
 
     def clone_repo(self, repo_factory):
         """Return a pygit2 repo object cloned from an existing factory repo."""
-        clone_from_url = urlparse.urljoin(
-            'file:', urllib.pathname2url(repo_factory.repo.path))
+        clone_from_url = urllib.parse.urljoin(
+            'file:', urllib.request.pathname2url(repo_factory.repo.path))
         return clone_repository(clone_from_url, self.repo_path, bare=True)
 
     def build(self):
