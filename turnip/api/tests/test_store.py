@@ -8,6 +8,7 @@ from __future__ import (
     )
 
 import os.path
+import re
 import subprocess
 import uuid
 
@@ -32,7 +33,6 @@ class InitTestCase(TestCase):
         super(InitTestCase, self).setUp()
         self.repo_store = self.useFixture(TempDir()).path
         self.useFixture(EnvironmentVariable("REPO_STORE", self.repo_store))
-        self.repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
 
     def assertAllLinkCounts(self, link_count, path):
         count = 0
@@ -55,6 +55,19 @@ class InitTestCase(TestCase):
         for ref in absent:
             self.assertNotIn(absent, out)
 
+    def assertAlternates(self, expected_paths, repo_path):
+        alt_path = store.alternates_path(repo_path)
+        if not os.path.exists(os.path.dirname(alt_path)):
+            raise Exception("No repo at %s." % repo_path)
+        actual_paths = []
+        if os.path.exists(alt_path):
+            with open(alt_path) as altf:
+                actual_paths = [
+                    re.sub('/objects\n$', '', line) for line in altf]
+        self.assertEqual(
+            set([path.rstrip('/') for path in expected_paths]),
+            set(actual_paths))
+
     def makeOrig(self):
         self.orig_path = os.path.join(self.repo_store, 'orig/')
         orig = RepoFactory(
@@ -62,14 +75,6 @@ class InitTestCase(TestCase):
         self.orig_refs = orig.listall_references()
         self.master_oid = orig.lookup_reference('refs/heads/master').target
         self.orig_objs = os.path.join(self.orig_path, '.git/objects')
-
-    def assert_alternate_exists(self, alternate_path, repo_path):
-        """Assert alternate_path exists in alternates at repo_path."""
-        objects_path = '{}\n'.format(
-            os.path.join(alternate_path, 'objects'))
-        with open(store.alternates_path(repo_path), 'r') as alts:
-            alts_content = alts.read()
-            self.assertIn(objects_path, alts_content)
 
     def test_from_scratch(self):
         path = os.path.join(self.repo_store, 'repo/')
@@ -79,7 +84,7 @@ class InitTestCase(TestCase):
 
     def test_repo_config(self):
         """Assert repository is initialised with correct config defaults."""
-        repo_path = store.init_repo(self.repo_path)
+        repo_path = store.init_repo(os.path.join(self.repo_store, 'repo'))
         repo_config = pygit2.Repository(repo_path).config
         with open('git.config.yaml') as f:
             yaml_config = yaml.load(f)
@@ -93,23 +98,42 @@ class InitTestCase(TestCase):
         """Opening a repo where a repo name contains ':' should return
         a new ephemeral repo.
         """
-        repos = [uuid.uuid4().hex, uuid.uuid4().hex]
-        repo_name = '{}:{}'.format(repos[0], repos[1])
-        alt_path = os.path.join(self.repo_store, repos[0])
-        with store.open_repo(self.repo_store, repo_name) as repo:
-            self.assert_alternate_exists(alt_path, repo.path)
+        # Create repos A and B with distinct commits, and C which has no
+        # objects of its own but has a clone of B as its
+        # turnip-subordinate.
+        repos = {}
+        for name in ['A', 'B']:
+            factory = RepoFactory(os.path.join(self.repo_store, name))
+            factory.generate_branches(2, 2)
+            repos[name] = factory.repo
+        repos['C'] = pygit2.Repository(store.init_repo(
+            os.path.join(self.repo_store, 'C'),
+            clone_from=os.path.join(self.repo_store, 'B')))
+
+        # Opening the union of one and three includes the objects from
+        # two, as they're in three's turnip-subordinate.
+        repo_name = 'A:C'
+
+        with store.open_repo(self.repo_store, repo_name) as ephemeral_repo:
+            self.assertAlternates(
+                [repos['A'].path, repos['C'].path,
+                 os.path.join(repos['A'].path, 'turnip-subordinate'),
+                 os.path.join(repos['C'].path, 'turnip-subordinate')],
+                ephemeral_repo.path)
+            self.assertIn(repos['A'].head.target, ephemeral_repo)
+            self.assertIn(repos['B'].head.target, ephemeral_repo)
 
     def test_repo_with_alternates(self):
         """Ensure objects path is defined correctly in repo alternates."""
-        factory = RepoFactory(self.repo_path)
+        factory = RepoFactory(os.path.join(self.repo_store, uuid.uuid1().hex))
         new_repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
         repo_path_with_alt = store.init_repo(
             new_repo_path, alternate_repo_paths=[factory.repo.path])
-        self.assert_alternate_exists(factory.repo.path, repo_path_with_alt)
+        self.assertAlternates([factory.repo_path], repo_path_with_alt)
 
     def test_repo_alternates_objects_shared(self):
         """Ensure objects are shared from alternate repo."""
-        factory = RepoFactory(self.repo_path)
+        factory = RepoFactory(os.path.join(self.repo_store, uuid.uuid1().hex))
         commit_oid = factory.add_commit('foo', 'foobar.txt')
         new_repo_path = os.path.join(self.repo_store, uuid.uuid4().hex)
         repo_path_with_alt = store.init_repo(
@@ -132,6 +156,7 @@ class InitTestCase(TestCase):
 
         # Internally, the packs are hardlinked into a subordinate
         # alternate repo, so minimal space is used by the clone.
+        self.assertAlternates(['../turnip-subordinate'], to_path)
         self.assertTrue(
             os.path.exists(
                 os.path.join(to_path, 'turnip-subordinate')))
@@ -156,6 +181,7 @@ class InitTestCase(TestCase):
 
         # Internally, the packs are hardlinked into a subordinate
         # alternate repo, so minimal space is used by the clone.
+        self.assertAlternates(['../turnip-subordinate'], to_path)
         self.assertTrue(
             os.path.exists(
                 os.path.join(to_path, 'turnip-subordinate')))
@@ -165,3 +191,33 @@ class InitTestCase(TestCase):
         # refs as extra haves.
         self.assertAdvertisedRefs(
             [('.have', self.master_oid.hex)], ['refs/'], to_path)
+
+    def test_clone_of_clone(self):
+        self.makeOrig()
+        orig_blob = pygit2.Repository(self.orig_path).create_blob(b'orig')
+
+        self.assertAllLinkCounts(1, self.orig_objs)
+        to_path = os.path.join(self.repo_store, 'to/')
+        store.init_repo(to_path, clone_from=self.orig_path)
+        self.assertAllLinkCounts(2, self.orig_objs)
+        to_blob = pygit2.Repository(to_path).create_blob(b'to')
+
+        too_path = os.path.join(self.repo_store, 'too/')
+        store.init_repo(too_path, clone_from=to_path)
+        self.assertAllLinkCounts(3, self.orig_objs)
+        too_blob = pygit2.Repository(too_path).create_blob(b'too')
+
+        # Each clone has just its subordinate as an alternate, and the
+        # subordinate has no alternates of its own.
+        for path in (to_path, too_path):
+            self.assertAlternates(['../turnip-subordinate'], path)
+            self.assertAlternates([], os.path.join(path, 'turnip-subordinate'))
+            self.assertIn(self.master_oid.hex, pygit2.Repository(path))
+            self.assertAdvertisedRefs(
+                [('.have', self.master_oid.hex)], [], path)
+
+        # Objects from all three repos are in the third.
+        too = pygit2.Repository(too_path)
+        self.assertIn(orig_blob, too)
+        self.assertIn(to_blob, too)
+        self.assertIn(too_blob, too)
