@@ -333,6 +333,13 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
 class SmartHTTPRootResource(resource.Resource):
     """HTTP resource to handle operations on the root path."""
 
+    def __init__(self, root):
+        self.root = root
+
+    def render_GET(self, request):
+        request.redirect(self.root.main_site_root)
+        return b''
+
     def render_OPTIONS(self, request):
         # Trivially respond to OPTIONS / for the sake of haproxy.
         return b''
@@ -656,7 +663,7 @@ class SmartHTTPFrontendResource(resource.Resource):
         self.openid_provider_root = config.get("openid_provider_root")
         self.site_name = config.get("site_name")
         self.main_site_root = config.get("main_site_root")
-        self.putChild('', SmartHTTPRootResource())
+        self.putChild('', SmartHTTPRootResource(self))
         cgit_data_path = config.get("cgit_data_path")
         if cgit_data_path is not None:
             static_resource = DirectoryWithoutListings(
