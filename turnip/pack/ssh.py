@@ -35,7 +35,7 @@ from twisted.python import (
     failure,
     )
 from twisted.web.xmlrpc import Proxy
-from zope.interface import implements
+from zope.interface import implementer
 
 from turnip.pack.git import (
     ERROR_PREFIX,
@@ -52,6 +52,7 @@ __all__ = [
     ]
 
 
+@implementer(IHalfCloseableProtocol)
 class SSHPackClientProtocol(PackProtocol):
     """Bridge between a Git pack connection and a smart SSH request.
 
@@ -61,8 +62,6 @@ class SSHPackClientProtocol(PackProtocol):
     Upon backend connection, all data is forwarded between backend and
     client.
     """
-
-    implements(IHalfCloseableProtocol)
 
     def __init__(self):
         self._closing = False
@@ -205,9 +204,8 @@ class SmartSSHAvatar(LaunchpadAvatar):
         self.subsystemLookup = {}
 
 
+@implementer(IRealm)
 class SmartSSHRealm:
-    implements(IRealm)
-
     def __init__(self, service, authentication_proxy):
         self.service = service
         self.authentication_proxy = authentication_proxy

@@ -15,13 +15,12 @@ from twisted.python import (
     log,
     logfile,
     )
-from zope.interface import implements
+from zope.interface import implementer
 
 
+@implementer(log.ILogObserver)
 class RotatableFileLogObserver:
     """A log observer that uses a log file and reopens it on SIGHUP."""
-
-    implements(log.ILogObserver)
 
     def __init__(self, logfilepath):
         """Set up the logfile and possible signal handler.
