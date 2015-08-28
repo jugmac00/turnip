@@ -177,14 +177,17 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
 
 
 @contextmanager
-def open_repo(repo_store, repo_name):
+def open_repo(repo_store, repo_name, force_ephemeral=False):
     """Open an existing git repository. Optionally create an ephemeral
-    repository with alternates if repo_path contains ':'.
+    repository with alternates if repo_name contains ':' or force_ephemeral
+    is True.
 
     :param repo_store: path to repository root.
     :param repo_name: repository name.
+    :param force_ephemeral: create an ephemeral repository even if repo_name
+        does not contain ':'.
     """
-    if ':' in repo_name:
+    if force_ephemeral or ':' in repo_name:
         try:
             # Create ephemeral repo with alternates set from both.
             # Neither git nor libgit2 will respect a relative alternate
@@ -297,28 +300,55 @@ def get_common_ancestor_diff(repo_store, repo_name, sha1_target, sha1_source,
                         sha1_source, context_lines)
 
 
+def _add_conflicted_files(repo, index):
+    """Add flattened versions of conflicted files in an index.
+
+    Any conflicted files will be merged using
+    `pygit2.Repository.merge_file_from_index` (thereby including conflict
+    markers); the resulting files will be added to the index and the
+    conflicts deleted.
+
+    :param repo: a `pygit2.Repository`.
+    :param index: a `pygit2.Index` to modify.
+    :return: a set of files that contain conflicts.
+    """
+    conflicts = set()
+    if index.conflicts is not None:
+        for conflict in list(index.conflicts):
+            path = [entry for entry in conflict
+                    if entry is not None][0].path
+            conflicts.add(path)
+            merged_file = repo.merge_file_from_index(*conflict)
+            blob_oid = repo.create_blob(merged_file)
+            index.add(IndexEntry(path, blob_oid, GIT_FILEMODE_BLOB))
+            del index.conflicts[path]
+    return conflicts
+
+
 def get_merge_diff(repo_store, repo_name, sha1_base,
-                   sha1_head, context_lines=3):
+                   sha1_head, context_lines=3, sha1_prerequisite=None):
     """Get diff of common ancestor and source diff.
 
     :param sha1_base: target sha1 for merge.
     :param sha1_head: source sha1 for merge.
     :param context_lines: num unchanged lines that define a hunk boundary.
+    :param sha1_prerequisite: if not None, sha1 of prerequisite commit to
+        merge into `sha1_target` before computing diff to `sha1_source`.
     """
-    with open_repo(repo_store, repo_name) as repo:
+    with open_repo(
+            repo_store, repo_name,
+            force_ephemeral=(sha1_prerequisite is not None)) as repo:
+        if sha1_prerequisite is not None:
+            prerequisite_index = repo.merge_commits(
+                sha1_base, sha1_prerequisite)
+            _add_conflicted_files(repo, prerequisite_index)
+            from_tree = repo[prerequisite_index.write_tree(repo=repo)]
+        else:
+            from_tree = repo[sha1_base].tree
         merged_index = repo.merge_commits(sha1_base, sha1_head)
-        conflicts = set()
-        if merged_index.conflicts is not None:
-            for conflict in list(merged_index.conflicts):
-                path = [entry for entry in conflict
-                        if entry is not None][0].path
-                conflicts.add(path)
-                merged_file = repo.merge_file_from_index(*conflict)
-                blob_oid = repo.create_blob(merged_file)
-                merged_index.add(IndexEntry(path, blob_oid, GIT_FILEMODE_BLOB))
-                del merged_index.conflicts[path]
+        conflicts = _add_conflicted_files(repo, merged_index)
         patch = merged_index.diff_to_tree(
-            repo[sha1_base].tree, context_lines=context_lines).patch
+            from_tree, context_lines=context_lines).patch
         if patch is None:
             patch = u''
         shas = [sha1_base, sha1_head]

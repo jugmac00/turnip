@@ -382,6 +382,24 @@ class ApiTestCase(TestCase):
             """), resp.json_body['patch'])
         self.assertEqual(['blah.txt'], resp.json_body['conflicts'])
 
+    def test_repo_diff_merge_with_prerequisite(self):
+        """Ensure that compare-merge handles prerequisites."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'blah.txt')
+        c2 = repo.add_commit('foo\nbar\n', 'blah.txt', parents=[c1])
+        c3 = repo.add_commit('foo\nbar\nbaz\n', 'blah.txt', parents=[c2])
+
+        resp = self.app.get(
+            '/repo/{}/compare-merge/{}:{}?sha1_prerequisite={}'.format(
+                self.repo_path, c1, c3, c2))
+        self.assertIn(dedent("""\
+            @@ -1,2 +1,3 @@
+             foo
+             bar
+            +baz
+            """), resp.json_body['patch'])
+        self.assertEqual([], resp.json_body['conflicts'])
+
     def test_repo_diff_merge_empty(self):
         """Ensure that diffing two identical commits returns an empty string
         as the patch, not None."""
