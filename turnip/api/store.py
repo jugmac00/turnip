@@ -289,6 +289,10 @@ def get_common_ancestor_diff(repo_store, repo_name, sha1_target, sha1_source,
     """
     with open_repo(repo_store, repo_name) as repo:
         common_ancestor = repo.merge_base(sha1_target, sha1_source)
+        if common_ancestor is None:
+            # We have no merge base.  Fall back to a ".."-style diff, just
+            # like "git diff" does.
+            common_ancestor = sha1_target
         return get_diff(repo_store, repo_name, common_ancestor,
                         sha1_source, context_lines)
 
