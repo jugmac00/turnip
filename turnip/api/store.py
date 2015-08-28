@@ -13,7 +13,6 @@ import subprocess
 import uuid
 
 from pygit2 import (
-    clone_repository,
     GitError,
     GIT_FILEMODE_BLOB,
     GIT_OBJ_BLOB,
