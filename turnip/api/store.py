@@ -315,12 +315,13 @@ def _add_conflicted_files(repo, index):
     conflicts = set()
     if index.conflicts is not None:
         for conflict in list(index.conflicts):
-            path = [entry for entry in conflict
-                    if entry is not None][0].path
+            conflict_entry = [
+                entry for entry in conflict if entry is not None][0]
+            path = conflict_entry.path
             conflicts.add(path)
             merged_file = repo.merge_file_from_index(*conflict)
             blob_oid = repo.create_blob(merged_file)
-            index.add(IndexEntry(path, blob_oid, GIT_FILEMODE_BLOB))
+            index.add(IndexEntry(path, blob_oid, conflict_entry.mode))
             del index.conflicts[path]
     return conflicts
 
