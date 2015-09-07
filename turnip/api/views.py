@@ -230,10 +230,12 @@ class DiffMergeAPI(BaseAPI):
     def get(self, repo_store, repo_name):
         """Returns diff of two commits."""
         context_lines = int(self.request.params.get('context_lines', 3))
+        sha1_prerequisite = self.request.params.get('sha1_prerequisite')
         try:
             patch = store.get_merge_diff(
                 repo_store, repo_name, self.request.matchdict['base'],
-                self.request.matchdict['head'], context_lines)
+                self.request.matchdict['head'], context_lines=context_lines,
+                sha1_prerequisite=sha1_prerequisite)
         except (KeyError, ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()
