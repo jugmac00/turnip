@@ -14,7 +14,6 @@ import uuid
 
 from pygit2 import (
     GitError,
-    GIT_FILEMODE_BLOB,
     GIT_OBJ_BLOB,
     GIT_OBJ_COMMIT,
     GIT_OBJ_TREE,
