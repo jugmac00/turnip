@@ -4,6 +4,7 @@ develop-eggs
 dist
 download-cache
 eggs
+env
 *.egg*
 *.egg-info
 .installed.cfg

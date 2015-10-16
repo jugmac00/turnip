@@ -1,0 +1,5 @@
+# This will be merged into requirements.txt once the turnip charm uses the
+# new tarball construction code.
+envdir==0.7
+gunicorn==19.3.0
+pygit2==0.22.1
