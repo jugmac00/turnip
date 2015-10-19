@@ -5,6 +5,7 @@ dist
 download-cache
 eggs
 env
+pip-cache
 *.egg*
 *.egg-info
 .installed.cfg

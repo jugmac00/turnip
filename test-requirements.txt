@@ -4,6 +4,7 @@ fixtures==1.0.0
 flake8==2.4.0
 linecache2==1.0.0
 mccabe==0.3
+pbr==1.8.1
 pep8==1.5.7
 pyflakes==0.8.1
 python-mimeparse==0.1.4
