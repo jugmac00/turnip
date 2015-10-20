@@ -60,9 +60,9 @@ lint: $(ENV)
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
 
-$(PIP_CACHE):
+$(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
-	pip install $(PIP_CACHE_ARGS) -d $(PIP_CACHE) \
+	$(ENV)/bin/pip install $(PIP_CACHE_ARGS) -d $(PIP_CACHE) \
 		-r bootstrap-requirements.txt \
 		-r requirements.txt \
 		-r deploy-requirements.txt \
@@ -78,7 +78,6 @@ endif
 	@echo "Creating deployment tarball at $(TARBALL_BUILD_PATH)"
 	rm -rf $(PIP_CACHE)
 	$(MAKE) $(PIP_CACHE)
-	$(MAKE) $(ENV) PIP_SOURCE_DIR=$(PIP_CACHE)
 	mkdir -p $(TARBALL_BUILD_DIR)
 	tar -czf $(TARBALL_BUILD_PATH) \
 		--exclude-vcs \
