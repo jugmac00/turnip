@@ -37,7 +37,8 @@ endif
 	$(ENV)/bin/pip install $(PIP_CACHE_ARGS) \
 		-r requirements.txt \
 		-r deploy-requirements.txt \
-		-r test-requirements.txt
+		-r test-requirements.txt \
+		-e .
 
 check: $(ENV)
 	$(PYTHON) -m unittest discover turnip
