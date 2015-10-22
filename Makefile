@@ -13,8 +13,9 @@ ifneq ($(PIP_SOURCE_DIR),)
 PIP_CACHE_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
 endif
 
-# Create archives in labelled directories (e.g. r182/$(PROJECT_NAME).tar.gz)
-TARBALL_BUILD_LABEL ?= r$(shell bzr revno)
+# Create archives in labelled directories (e.g.
+# <rev-id>/$(PROJECT_NAME).tar.gz)
+TARBALL_BUILD_LABEL ?= $(shell bzr log -rlast: --show-ids | sed -n 's/^revision-id: //p')
 TARBALL_FILE_NAME = turnip.tar.gz
 TARBALL_BUILDS_DIR ?= build
 TARBALL_BUILD_DIR = $(TARBALL_BUILDS_DIR)/$(TARBALL_BUILD_LABEL)
