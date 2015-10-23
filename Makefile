@@ -74,7 +74,7 @@ $(PIP_CACHE): $(ENV)
 build-tarball:
 ifeq ($(PIP_SOURCE_DIR),)
 	@echo "Set PIP_SOURCE_DIR to the path of a checkout of" >&2
-	@echo "lp:turnip-dependencies." >&2
+	@echo "lp:~canonical-launchpad-branches/turnip/dependencies." >&2
 	@exit 1
 endif
 	@echo "Creating deployment tarball at $(TARBALL_BUILD_PATH)"
