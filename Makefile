@@ -24,13 +24,16 @@ TARBALL_BUILD_PATH = $(TARBALL_BUILD_DIR)/$(TARBALL_FILE_NAME)
 build: $(ENV)
 
 $(ENV):
+ifeq ($(PIP_SOURCE_DIR),)
+	@echo "Set PIP_SOURCE_DIR to the path of a checkout of" >&2
+	@echo "lp:~canonical-launchpad-branches/turnip/dependencies." >&2
+	@exit 1
+endif
 	mkdir -p $(ENV)
-ifneq ($(PIP_SOURCE_DIR),)
 	(echo '[easy_install]'; \
 	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
-endif
 	virtualenv $(ENV)
 	$(ENV)/bin/pip install $(PIP_CACHE_ARGS) \
 		-r bootstrap-requirements.txt
@@ -72,11 +75,6 @@ $(PIP_CACHE): $(ENV)
 
 # XXX cjwatson 2015-10-16: limit to only interesting files
 build-tarball:
-ifeq ($(PIP_SOURCE_DIR),)
-	@echo "Set PIP_SOURCE_DIR to the path of a checkout of" >&2
-	@echo "lp:~canonical-launchpad-branches/turnip/dependencies." >&2
-	@exit 1
-endif
 	@echo "Creating deployment tarball at $(TARBALL_BUILD_PATH)"
 	rm -rf $(PIP_CACHE)
 	$(MAKE) $(PIP_CACHE)
