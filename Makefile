@@ -23,7 +23,10 @@ TARBALL_BUILD_PATH = $(TARBALL_BUILD_DIR)/$(TARBALL_FILE_NAME)
 
 build: $(ENV)
 
-$(ENV):
+turnip/version_info.py:
+	bzr version-info --format=python >$@
+
+$(ENV): turnip/version_info.py
 ifeq ($(PIP_SOURCE_DIR),)
 	@echo "Set PIP_SOURCE_DIR to the path of a checkout of" >&2
 	@echo "lp:~canonical-launchpad-branches/turnip/dependencies." >&2
@@ -49,6 +52,7 @@ check: $(ENV)
 clean:
 	find turnip -name '*.py[co]' -exec rm '{}' \;
 	rm -rf $(ENV) $(PIP_CACHE)
+	rm -f turnip/version_info.py
 
 dist:
 	python ./setup.py sdist
@@ -60,7 +64,7 @@ tags:
 	ctags -R turnip
 
 lint: $(ENV)
-	@$(FLAKE8) turnip
+	@$(FLAKE8) --exclude=__pycache__,version_info.py turnip
 
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload

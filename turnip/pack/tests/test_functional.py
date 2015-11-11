@@ -21,7 +21,10 @@ from fixtures import (
 from lazr.sshserver.auth import NoSuchPersonWithName
 from testtools import TestCase
 from testtools.content import text_content
-from testtools.deferredruntest import AsynchronousDeferredRunTest
+from testtools.deferredruntest import (
+    assert_fails_with,
+    AsynchronousDeferredRunTest,
+    )
 from testtools.matchers import StartsWith
 from twisted.internet import (
     defer,
@@ -29,6 +32,8 @@ from twisted.internet import (
     utils,
     )
 from twisted.web import (
+    client,
+    error,
     server,
     xmlrpc,
     )
@@ -44,6 +49,7 @@ from turnip.pack.hookrpc import (
     )
 from turnip.pack.http import SmartHTTPFrontendResource
 from turnip.pack.ssh import SmartSSHService
+from turnip.version_info import version_info
 
 
 class FakeAuthServerService(xmlrpc.XMLRPC):
@@ -362,6 +368,17 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
     def tearDown(self):
         yield super(TestSmartHTTPFrontendFunctional, self).tearDown()
         yield self.frontend_listener.stopListening()
+
+    @defer.inlineCallbacks
+    def test_root_revision_header(self):
+        factory = client.HTTPClientFactory(
+            b'http://localhost:%d/' % self.port, method=b'HEAD',
+            followRedirect=False)
+        reactor.connectTCP(b'localhost', self.port, factory)
+        yield assert_fails_with(factory.deferred, error.PageRedirect)
+        self.assertEqual(
+            [version_info['revno']],
+            factory.response_headers[b'x-turnip-revision'])
 
 
 class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
