@@ -377,7 +377,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         reactor.connectTCP(b'localhost', self.port, factory)
         yield assert_fails_with(factory.deferred, error.PageRedirect)
         self.assertEqual(
-            [version_info['revno']],
+            [version_info['revision_id']],
             factory.response_headers[b'x-turnip-revision'])
 
 

@@ -340,7 +340,8 @@ class SmartHTTPRootResource(resource.Resource):
         try:
             from turnip.version_info import version_info
             request.setHeader(
-                b'X-Turnip-Revision', version_info['revno'].encode('UTF-8'))
+                b'X-Turnip-Revision',
+                version_info['revision_id'].encode('UTF-8'))
         except ImportError:
             pass
         request.redirect(self.root.main_site_root)
