@@ -13,3 +13,4 @@ pip-cache
 parts
 tags
 TAGS
+turnip/version_info.py

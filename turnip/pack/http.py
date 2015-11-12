@@ -56,6 +56,10 @@ from turnip.pack.helpers import (
     encode_packet,
     encode_request,
     )
+try:
+    from turnip.version_info import version_info
+except ImportError:
+    version_info = {}
 # twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
 # bits of this module work.
 if sys.version_info.major < 3:
@@ -337,6 +341,10 @@ class SmartHTTPRootResource(resource.Resource):
         self.root = root
 
     def render_GET(self, request):
+        if 'revision_id' in version_info:
+            request.setHeader(
+                b'X-Turnip-Revision',
+                version_info['revision_id'].encode('UTF-8'))
         request.redirect(self.root.main_site_root)
         return b''
 
