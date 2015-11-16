@@ -94,7 +94,7 @@ class HookRPCHandler(object):
         del self.ref_paths[key]
 
     def listRefRules(self, proto, args):
-        return self.ref_rules[args['key']]
+        return [rule.decode('utf-8') for rule in self.ref_rules[args['key']]]
 
     @defer.inlineCallbacks
     def notifyPush(self, proto, args):

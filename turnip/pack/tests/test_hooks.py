@@ -28,7 +28,7 @@ class HookProcessProtocol(protocol.ProcessProtocol):
     def __init__(self, deferred, stdin):
         self.deferred = deferred
         self.stdin = stdin
-        self.stdout = self.stderr = ''
+        self.stdout = self.stderr = b''
 
     def connectionMade(self):
         self.transport.write(self.stdin)
@@ -81,7 +81,7 @@ class HookTestMixin(object):
 
     def encodeRefs(self, updates):
         return b'\n'.join(
-            b'%s %s %s' % (old, new, ref) for ref, old, new in updates)
+            old + b' ' + new + b' ' + ref for ref, old, new in updates)
 
     @defer.inlineCallbacks
     def invokeHook(self, input, rules):
