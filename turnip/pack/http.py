@@ -17,6 +17,7 @@ try:
 except ImportError:
     from urllib import urlencode
 import sys
+import uuid
 import zlib
 
 from openid.consumer import consumer
@@ -258,7 +259,10 @@ class BaseSmartHTTPResource(resource.Resource):
         The turnip-authenticated-user parameter is set to the username
         returned by the virt service, if any.
         """
-        params = {b'turnip-can-authenticate': b'yes'}
+        params = {
+            b'turnip-can-authenticate': b'yes',
+            b'turnip-request-id': str(uuid.uuid4()),
+            }
         authenticated_user, authenticated_uid = yield self.authenticateUser(
             request)
         if authenticated_user:

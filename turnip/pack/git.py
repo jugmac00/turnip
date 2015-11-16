@@ -12,12 +12,14 @@ import uuid
 
 from twisted.internet import (
     defer,
+    error,
     protocol,
     reactor,
     )
 from twisted.internet.interfaces import IHalfCloseableProtocol
 # twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
 # bits of this module work.
+from twisted.logger import Logger
 if sys.version_info.major < 3:  # noqa
     from twisted.web import xmlrpc
 from zope.interface import implementer
@@ -38,6 +40,15 @@ ERROR_PREFIX = b'ERR '
 VIRT_ERROR_PREFIX = b'turnip virt error: '
 
 SAFE_PARAMS = frozenset(['host'])
+
+
+class RequestIDLogger(Logger):
+
+    def emit(self, level, format=None, **kwargs):
+        request_id = getattr(self.source, 'request_id')
+        if format is not None and request_id is not None:
+            format = '[request-id=%s] %s' % (request_id, format)
+        super(RequestIDLogger, self).emit(level, format=format, **kwargs)
 
 
 class UnstoppableProducerWrapper(object):
@@ -149,6 +160,15 @@ class PackServerProtocol(PackProxyProtocol):
     got_request = False
     peer = None
 
+    request_id = None
+    log = RequestIDLogger()
+
+    def extractRequestMeta(self, command, pathname, params):
+        self.request_id = params.get(b'turnip-request-id', None)
+        self.log.info(
+            "Request received: '{command} {pathname}', params={params}",
+            command=command, pathname=pathname, params=params)
+
     def requestReceived(self, command, pathname, params):
         """Begin handling of a git pack protocol request.
 
@@ -180,7 +200,15 @@ class PackServerProtocol(PackProxyProtocol):
     def rawDataReceived(self, data):
         self.peer.sendRawData(data)
 
+    def connectionLost(self, reason):
+        if reason.check(error.ConnectionDone):
+            self.log.info('Connection closed.')
+        else:
+            self.log.failure('Connection closed.', failure=reason)
+        PackProxyProtocol.connectionLost(self, reason)
+
     def die(self, message):
+        self.log.info('Dying: {message}', message=message)
         self.sendPacket(ERROR_PREFIX + message + b'\n')
         self.transport.loseConnection()
 
@@ -291,6 +319,9 @@ class PackProxyServerProtocol(PackServerProtocol):
         self.command = command
         self.pathname = pathname
         self.params = params
+        self.log.info(
+            "Connecting to backend: {command} {pathname}, params={params}",
+            command=command, pathname=pathname, params=params)
         client = self.client_factory(self)
         reactor.connectTCP(
             self.factory.backend_host, self.factory.backend_port, client)
@@ -315,6 +346,8 @@ class PackBackendProtocol(PackServerProtocol):
     hookrpc_key = None
 
     def requestReceived(self, command, raw_pathname, params):
+        self.extractRequestMeta(command, raw_pathname, params)
+
         path = compose_path(self.factory.root, raw_pathname)
         if command == b'git-upload-pack':
             subcmd = b'upload-pack'
@@ -344,6 +377,7 @@ class PackBackendProtocol(PackServerProtocol):
             env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hookrpc_sock
             env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
 
+        self.log.info('Spawning {args}', args=args)
         self.peer = GitProcessProtocol(self)
         reactor.spawnProcess(self.peer, cmd, args, env=env)
 
@@ -380,16 +414,20 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
 
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, params):
+        self.extractRequestMeta(command, pathname, params)
         permission = b'read' if command == b'git-upload-pack' else b'write'
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint, allowNone=True)
         try:
             can_authenticate = (
                 params.get(b'turnip-can-authenticate') == b'yes')
             auth_uid = params.get(b'turnip-authenticated-uid')
+            self.log.info("Translating request.")
             translated = yield proxy.callRemote(
                 b'translatePath', pathname, permission,
                 int(auth_uid) if auth_uid is not None else None,
                 can_authenticate)
+            self.log.info(
+                "Translation result: {translated}", translated=translated)
             if 'trailing' in translated and translated['trailing']:
                 self.die(
                     VIRT_ERROR_PREFIX +
@@ -450,9 +488,14 @@ class PackFrontendServerProtocol(PackProxyServerProtocol):
     client_factory = PackFrontendClientFactory
 
     def requestReceived(self, command, pathname, params):
+        self.request_id = str(uuid.uuid4())
+        self.log.info(
+            "Request received: '{command} {pathname}', params={params}",
+            command=command, pathname=pathname, params=params)
         if set(params.keys()) - SAFE_PARAMS:
             self.die(b'Illegal request parameters')
             return
+        params[b'turnip-request-id'] = self.request_id
         self.connectToBackend(command, pathname, params)
 
 

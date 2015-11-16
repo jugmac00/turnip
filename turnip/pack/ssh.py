@@ -8,6 +8,7 @@ from __future__ import (
     )
 
 import shlex
+import uuid
 
 from lazr.sshserver.auth import (
     LaunchpadAvatar,
@@ -151,6 +152,7 @@ class SmartSSHSession(DoNothingSession):
         params = {
             b'turnip-authenticated-user': self.avatar.username.encode('utf-8'),
             b'turnip-authenticated-uid': str(self.avatar.user_id),
+            b'turnip-request-id': str(uuid.uuid4()),
             }
         d = defer.Deferred()
         client_factory = factory(service, path, params, ssh_protocol, d)
