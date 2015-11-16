@@ -17,9 +17,9 @@ from twisted.internet import (
     reactor,
     )
 from twisted.internet.interfaces import IHalfCloseableProtocol
+from twisted.logger import Logger
 # twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
 # bits of this module work.
-from twisted.logger import Logger
 if sys.version_info.major < 3:  # noqa
     from twisted.web import xmlrpc
 from zope.interface import implementer
