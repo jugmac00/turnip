@@ -1,12 +1,14 @@
 # Copyright 2005-2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-ENV = $(CURDIR)/env
+ENV := $(CURDIR)/env
 PIP_CACHE = $(CURDIR)/pip-cache
 
-PYTHON = $(ENV)/bin/python
-PSERVE = $(ENV)/bin/pserve
-FLAKE8 = $(ENV)/bin/flake8
+PYTHON := $(ENV)/bin/python
+PSERVE := $(ENV)/bin/pserve
+FLAKE8 := $(ENV)/bin/flake8
+PIP := $(ENV)/bin/pip
+VIRTUALENV := virtualenv
 
 PIP_CACHE_ARGS := -q --no-use-wheel
 ifneq ($(PIP_SOURCE_DIR),)
@@ -37,10 +39,10 @@ endif
 	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
-	virtualenv $(ENV)
-	$(ENV)/bin/pip install $(PIP_CACHE_ARGS) \
+	$(VIRTUALENV) $(ENV)
+	$(PIP) install $(PIP_CACHE_ARGS) \
 		-r bootstrap-requirements.txt
-	$(ENV)/bin/pip install $(PIP_CACHE_ARGS) \
+	$(PIP) install $(PIP_CACHE_ARGS) \
 		-r requirements.txt \
 		-r deploy-requirements.txt \
 		-r test-requirements.txt \
@@ -71,7 +73,7 @@ run-api: $(ENV)
 
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
-	$(ENV)/bin/pip install $(PIP_CACHE_ARGS) -d $(PIP_CACHE) \
+	$(PIP) install $(PIP_CACHE_ARGS) -d $(PIP_CACHE) \
 		-r bootstrap-requirements.txt \
 		-r requirements.txt \
 		-r deploy-requirements.txt \
