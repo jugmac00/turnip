@@ -204,7 +204,7 @@ class PackServerProtocol(PackProxyProtocol):
         if reason.check(error.ConnectionDone):
             self.log.info('Connection closed.')
         else:
-            self.log.failure('Connection closed.', failure=reason)
+            self.log.failure('Connection lost.', failure=reason)
         PackProxyProtocol.connectionLost(self, reason)
 
     def die(self, message):
@@ -270,6 +270,9 @@ class PackClientProtocol(PackProxyProtocol):
     """Dumb protocol which just forwards between two others."""
 
     def connectionMade(self):
+        self.peer.log.info(
+            "Backend connection established: {host} -> {peer}",
+            host=self.transport.getHost(), peer=self.transport.getPeer())
         self.peer.setPeer(self)
         self.peer.transport.registerProducer(self.transport, True)
         self.transport.registerProducer(self.peer.transport, True)
@@ -281,6 +284,13 @@ class PackClientProtocol(PackProxyProtocol):
 
     def rawDataReceived(self, data):
         self.peer.sendRawData(data)
+
+    def connectionLost(self, reason):
+        if reason.check(error.ConnectionDone):
+            self.peer.log.info('Backend connection closed.')
+        else:
+            self.peer.log.failure('Backend connection lost.', failure=reason)
+        PackProxyProtocol.connectionLost(self, reason)
 
     def die(self, message):
         # The error always goes to the other side.
@@ -295,13 +305,18 @@ class PackClientFactory(protocol.ClientFactory):
     def __init__(self, server):
         self.server = server
 
+    def startedConnecting(self, connector):
+        self.server.log.info(
+            "Connecting to backend: {dest}.", dest=connector.getDestination())
+
     def buildProtocol(self, *args, **kwargs):
         p = protocol.ClientFactory.buildProtocol(self, *args, **kwargs)
         p.setPeer(self.server)
         return p
 
     def clientConnectionFailed(self, connector, reason):
-        self.server.transport.loseConnection()
+        self.server.log.failure('Backend connection failed.', failure=reason)
+        self.server.die(b'Backend connection failed.')
 
 
 class PackProxyServerProtocol(PackServerProtocol):
@@ -319,9 +334,6 @@ class PackProxyServerProtocol(PackServerProtocol):
         self.command = command
         self.pathname = pathname
         self.params = params
-        self.log.info(
-            "Connecting to backend: {command} {pathname}, params={params}",
-            command=command, pathname=pathname, params=params)
         client = self.client_factory(self)
         reactor.connectTCP(
             self.factory.backend_host, self.factory.backend_port, client)
@@ -330,6 +342,10 @@ class PackProxyServerProtocol(PackServerProtocol):
         # Send our translated request and then open the gate to the
         # client.
         if not self.request_sent:
+            self.log.info(
+                "Forwarding request to backend: '{command} {pathname}', "
+                "params={params}", command=self.command,
+                pathname=self.pathname, params=self.params)
             self.request_sent = True
             self.peer.sendPacket(
                 encode_request(
@@ -445,7 +461,6 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             self.die(VIRT_ERROR_PREFIX + fault_type + b' ' + e.faultString)
         except Exception as e:
             self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + str(e))
-            return
         else:
             self.connectToBackend(command, pathname, params)
 
