@@ -21,8 +21,10 @@ requires = [
     'contextlib2',
     'cornice',
     'lazr.sshserver',
+    'Paste',
     # Should be 0.22.1 once released; for the time being we carry cherry-picks.
     'pygit2>=0.22.0,<0.23.0',
+    'python-openid',
     'PyYAML',
     'Twisted',
     'waitress',
