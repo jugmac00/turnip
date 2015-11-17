@@ -40,12 +40,8 @@ endif
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
 	$(VIRTUALENV) $(ENV)
-	$(PIP) install $(PIP_CACHE_ARGS) \
-		-r bootstrap-requirements.txt
-	$(PIP) install $(PIP_CACHE_ARGS) \
-		-r requirements.txt \
-		-r test-requirements.txt \
-		-e .
+	$(PIP) install $(PIP_CACHE_ARGS) -r bootstrap-requirements.txt
+	$(PIP) install $(PIP_CACHE_ARGS) -c requirements.txt -e '.[test]'
 
 check: $(ENV)
 	$(PYTHON) -m unittest discover turnip
@@ -74,8 +70,7 @@ $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
 	$(PIP) install $(PIP_CACHE_ARGS) -d $(PIP_CACHE) \
 		-r bootstrap-requirements.txt \
-		-r requirements.txt \
-		-r test-requirements.txt
+		-r requirements.txt
 
 # XXX cjwatson 2015-10-16: limit to only interesting files
 build-tarball:
