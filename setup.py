@@ -36,6 +36,10 @@ test_requires = [
     'testtools',
     'webtest',
     ]
+deploy_requires = [
+    'envdir',
+    'gunicorn',
+    ]
 
 setup(
     name='turnip',
@@ -62,7 +66,8 @@ setup(
     install_requires=requires,
     tests_require=test_requires,
     extras_require=dict(
-        test=test_requires),
+        test=test_requires,
+        deploy=deploy_requires),
     test_suite='turnip',
     entry_points="""\
     [paste.app_factory]

@@ -41,7 +41,8 @@ endif
 		>$(ENV)/.pydistutils.cfg
 	$(VIRTUALENV) $(ENV)
 	$(PIP) install $(PIP_CACHE_ARGS) -r bootstrap-requirements.txt
-	$(PIP) install $(PIP_CACHE_ARGS) -c requirements.txt -e '.[test]'
+	$(PIP) install $(PIP_CACHE_ARGS) -c requirements.txt \
+		-e '.[test,deploy]'
 
 check: $(ENV)
 	$(PYTHON) -m unittest discover turnip
