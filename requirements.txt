@@ -1,10 +1,13 @@
 contextlib2==0.4.0
 cornice==0.19.0
+envdir==0.7
+gunicorn==19.3.0
 lazr.sshserver==0.1.1
 Paste==2.0.2
 PasteDeploy==1.5.2
 pyasn1==0.1.7
 pycrypto==2.6.1
+pygit2==0.22.1
 pyramid==1.5.4
 # XXX: deryck 2012-08-10
 # See lp:~deryck/python-openid/python-openid-fix1034376 which

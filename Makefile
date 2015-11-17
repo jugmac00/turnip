@@ -44,7 +44,6 @@ endif
 		-r bootstrap-requirements.txt
 	$(PIP) install $(PIP_CACHE_ARGS) \
 		-r requirements.txt \
-		-r deploy-requirements.txt \
 		-r test-requirements.txt \
 		-e .
 
@@ -76,7 +75,6 @@ $(PIP_CACHE): $(ENV)
 	$(PIP) install $(PIP_CACHE_ARGS) -d $(PIP_CACHE) \
 		-r bootstrap-requirements.txt \
 		-r requirements.txt \
-		-r deploy-requirements.txt \
 		-r test-requirements.txt
 
 # XXX cjwatson 2015-10-16: limit to only interesting files
