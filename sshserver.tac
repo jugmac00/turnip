@@ -34,7 +34,8 @@ def getSmartSSHService():
         # information to the main log?  Requires lazr.sshserver changes.
         main_log='turnip', access_log=os.path.join(log_path, 'turnip.access'),
         access_log_path=os.path.join(log_path, 'turnip-access.log'),
-        strport=b'tcp:{}'.format(config.get('smart_ssh_port')))
+        strport=b'tcp:{}'.format(config.get('smart_ssh_port')),
+        moduli_path=config.get('moduli_path'))
 
 
 options = ServerOptions()

@@ -20,7 +20,7 @@ with open(os.path.join(here, 'NEWS')) as f:
 requires = [
     'contextlib2',
     'cornice',
-    'lazr.sshserver',
+    'lazr.sshserver>=0.1.2',
     'Paste',
     'pygit2>=0.22.1,<0.23.0',
     'python-openid',

@@ -66,7 +66,8 @@ smartssh_service = SmartSSHService(
     public_key_path=config.get('public_ssh_key_path'),
     main_log='turnip', access_log=os.path.join(LOG_PATH, 'turnip.access'),
     access_log_path=os.path.join(LOG_PATH, 'turnip-access.log'),
-    strport=b'tcp:{}'.format(config.get('smart_ssh_port')))
+    strport=b'tcp:{}'.format(config.get('smart_ssh_port')),
+    moduli_path=config.get('moduli_path'))
 smartssh_service.startService()
 
 reactor.run()

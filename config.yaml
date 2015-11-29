@@ -7,6 +7,7 @@ public_ssh_key_path: ./turnip/pack/tests/data/ssh-host-key.pub
 repo_api_port: 19417
 smart_http_port: 9419
 smart_ssh_port: 9422
+moduli_path: /etc/ssh/moduli
 repo_store: /var/tmp/git.launchpad.dev
 turnip_log_dir: ./
 virtinfo_endpoint: http://xmlrpc-private.launchpad.dev:8087/git
