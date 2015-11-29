@@ -10,7 +10,7 @@ FLAKE8 := $(ENV)/bin/flake8
 PIP := $(ENV)/bin/pip
 VIRTUALENV := virtualenv
 
-PIP_CACHE_ARGS := -q --no-use-wheel
+PIP_CACHE_ARGS := -q
 ifneq ($(PIP_SOURCE_DIR),)
 PIP_CACHE_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
 endif
