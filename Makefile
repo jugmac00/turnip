@@ -17,7 +17,7 @@ endif
 
 # Create archives in labelled directories (e.g.
 # <rev-id>/$(PROJECT_NAME).tar.gz)
-TARBALL_BUILD_LABEL ?= $(shell bzr log -rlast: --show-ids | sed -n 's/^revision-id: //p')
+TARBALL_BUILD_LABEL ?= $(shell git rev-parse HEAD)
 TARBALL_FILE_NAME = turnip.tar.gz
 TARBALL_BUILDS_DIR ?= build
 TARBALL_BUILD_DIR = $(TARBALL_BUILDS_DIR)/$(TARBALL_BUILD_LABEL)
@@ -26,7 +26,7 @@ TARBALL_BUILD_PATH = $(TARBALL_BUILD_DIR)/$(TARBALL_FILE_NAME)
 build: $(ENV)
 
 turnip/version_info.py:
-	bzr version-info --format=python >$@
+	echo 'version_info = {"revision_id": "$(TARBALL_BUILD_LABEL)"}' >$@
 
 $(ENV): turnip/version_info.py
 ifeq ($(PIP_SOURCE_DIR),)
