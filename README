@@ -84,7 +84,9 @@ The HTTP API can be started with:
 Deployment
 ----------
 
-Turnip is deployed with the turnip juju charm, available from bzr branch lp:~canonical-launchpad-branches/charms/trusty/turnip/devel.
+Turnip is deployed with the turnip juju charm, available from:
+
+   git clone https://git.launchpad.net/~canonical-launchpad-branches/charms/+source/turnip
 
 To deploy with the local provider:
 
