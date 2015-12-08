@@ -30,8 +30,8 @@ turnip/version_info.py:
 
 $(ENV): turnip/version_info.py
 ifeq ($(PIP_SOURCE_DIR),)
-	@echo "Set PIP_SOURCE_DIR to the path of a checkout of" >&2
-	@echo "lp:~canonical-launchpad-branches/turnip/dependencies." >&2
+	@echo "Set PIP_SOURCE_DIR to the path of a clone of" >&2
+	@echo "lp:~canonical-launchpad-branches/turnip/+git/dependencies." >&2
 	@exit 1
 endif
 	mkdir -p $(ENV)
