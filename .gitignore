@@ -11,6 +11,7 @@ pip-cache
 .installed.cfg
 *.log
 parts
+*.pyc
 tags
 TAGS
 turnip/version_info.py
