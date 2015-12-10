@@ -458,7 +458,10 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                 fault_type = b'UNAUTHORIZED'
             else:
                 fault_type = b'INTERNAL_SERVER_ERROR'
-            self.die(VIRT_ERROR_PREFIX + fault_type + b' ' + e.faultString)
+            fault_string = e.faultString
+            if not isinstance(fault_string, bytes):
+                fault_string = fault_string.encode('UTF-8')
+            self.die(VIRT_ERROR_PREFIX + fault_type + b' ' + fault_string)
         except Exception as e:
             self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + str(e))
         else:

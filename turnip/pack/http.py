@@ -115,7 +115,8 @@ class HTTPPackClientProtocol(PackProtocol):
             # This is probably a system error (bad auth, not found,
             # repository corruption, etc.), so fail the request.
             self.factory.http_request.setResponseCode(error_code)
-            self.factory.http_request.setHeader(b'Content-Type', b'text/plain')
+            self.factory.http_request.setHeader(
+                b'Content-Type', b'text/plain; charset=UTF-8')
             self.factory.http_request.write(msg)
             self.factory.http_request.unregisterProducer()
             self.factory.http_request.finish()

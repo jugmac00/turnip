@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
@@ -312,6 +313,23 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             (b'git', b'push', b'origin', b'master'), path=clone1)
         self.assertEqual(
             [self.internal_name], self.virtinfo.push_notifications)
+
+    @defer.inlineCallbacks
+    def test_unicode_fault(self):
+        def fake_translatePath(pathname, permission, authenticated_uid,
+                               can_authenticate):
+            raise xmlrpc.Fault(2, u"홍길동 is not a member of Project Team.")
+
+        test_root = self.useFixture(TempDir()).path
+        self.virtinfo.xmlrpc_translatePath = fake_translatePath
+        output = yield utils.getProcessOutput(
+            b'git',
+            (b'clone', b'%s://localhost:%d/fail' % (self.scheme, self.port)),
+            env=os.environ, path=test_root, errortoo=True)
+        self.assertIn(
+            b"Cloning into 'fail'...\n" + self.early_error +
+            u"홍길동 is not a member of Project Team.".encode("UTF-8"),
+            output)
 
 
 class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
