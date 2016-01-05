@@ -67,6 +67,20 @@ if sys.version_info.major < 3:
     from twisted.web import xmlrpc
 
 
+def fail_request(request, message, code=http.INTERNAL_SERVER_ERROR):
+    if not request.startedWriting:
+        request.setResponseCode(code)
+        request.setHeader(b'Content-Type', b'text/plain; charset=UTF-8')
+        if not isinstance(message, bytes):
+            message = message.encode('UTF-8')
+        request.write(message)
+    request.unregisterProducer()
+    request.finish()
+    # Some callsites want to be able to return from render_*, so make
+    # that possible.
+    return b''
+
+
 class HTTPPackClientProtocol(PackProtocol):
     """Abstract bridge between a Git pack connection and a smart HTTP request.
 
@@ -114,12 +128,7 @@ class HTTPPackClientProtocol(PackProtocol):
         if error_code is not None:
             # This is probably a system error (bad auth, not found,
             # repository corruption, etc.), so fail the request.
-            self.factory.http_request.setResponseCode(error_code)
-            self.factory.http_request.setHeader(
-                b'Content-Type', b'text/plain; charset=UTF-8')
-            self.factory.http_request.write(msg)
-            self.factory.http_request.unregisterProducer()
-            self.factory.http_request.finish()
+            fail_request(self.factory.http_request, msg, error_code)
             return True
         # We don't know it was a system error, so just send it back to
         # the client as a remote error and proceed to forward data
@@ -168,13 +177,8 @@ class HTTPPackClientProtocol(PackProtocol):
     def connectionLost(self, reason):
         self.factory.http_request.unregisterProducer()
         if not self.factory.http_request.finished:
-            if not self.raw:
-                self.factory.http_request.setResponseCode(
-                    http.INTERNAL_SERVER_ERROR)
-                self.factory.http_request.setHeader(
-                    b'Content-Type', b'text/plain')
-                self.factory.http_request.write(b'Backend connection lost.')
-            self.factory.http_request.finish()
+            fail_request(
+                self.factory.http_request, b'Backend connection lost.')
 
 
 class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
@@ -239,15 +243,7 @@ class BaseSmartHTTPResource(resource.Resource):
         log.err(failure, msg)
         if request.finished:
             return
-        request.write(self.error(request, msg))
-        request.unregisterProducer()
-        request.finish()
-
-    def error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
-        """Prepare for an error response and return the body."""
-        request.setResponseCode(code)
-        request.setHeader(b'Content-Type', b'text/plain')
-        return message
+        fail_request(request, msg)
 
     @defer.inlineCallbacks
     def authenticateUser(self, request):
@@ -296,12 +292,12 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
         try:
             service = request.args['service'][0]
         except (KeyError, IndexError):
-            return self.error(
+            return fail_request(
                 request, b'Only git smart HTTP clients are supported.',
                 code=http.NOT_FOUND)
 
         if service not in self.root.allowed_services:
-            return self.error(
+            return fail_request(
                 request, b'Unsupported service.', code=http.FORBIDDEN)
 
         d = self.connectToBackend(
@@ -326,7 +322,7 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
     def render_POST(self, request):
         content_type = request.requestHeaders.getRawHeaders(b'Content-Type')
         if content_type != [b'application/x-%s-request' % self.service]:
-            return self.error(
+            return fail_request(
                 request, b'Invalid Content-Type for service.',
                 code=http.BAD_REQUEST)
 
@@ -472,11 +468,6 @@ class BaseHTTPAuthResource(resource.Resource):
         request.setResponseCode(code)
         request.setHeader(b'Content-Type', b'text/plain')
 
-    def _error(self, request, message, code=http.INTERNAL_SERVER_ERROR):
-        self._setErrorCode(request, code=code)
-        request.write(message.encode('UTF-8'))
-        request.finish()
-
     def _makeConsumer(self, session):
         """Build an OpenID `Consumer` object with standard arguments."""
         # Multiple instances need to share a store or not use one at all (in
@@ -585,30 +576,28 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
 
     def _translatePathCallback(self, translated, request):
         if 'path' not in translated:
-            self._error(request, 'translatePath response did not include path')
-            return
+            return fail_request(
+                request, 'translatePath response did not include path')
         repo_url = request.path.rstrip('/')
         # cgit simply parses configuration values up to the end of a line
         # following the first '=', so almost anything is safe, but
         # double-check that there are no newlines to confuse things.
         if '\n' in repo_url:
-            self._error(request, 'repository URL may not contain newlines')
-            return
+            return fail_request(
+                request, 'repository URL may not contain newlines')
         try:
             repo_path = compose_path(self.root.repo_store, translated['path'])
         except ValueError as e:
-            self._error(request, str(e))
-            return
+            return fail_request(request, str(e))
         trailing = translated.get('trailing')
         if trailing:
             if not trailing.startswith('/'):
                 trailing = '/' + trailing
             if not repo_url.endswith(trailing):
-                self._error(
+                return fail_request(
                     request,
                     'translatePath returned inconsistent response: '
                     '"%s" does not end with "%s"' % (repo_url, trailing))
-                return
             repo_url = repo_url[:-len(trailing)]
         repo_url = repo_url.strip('/')
         cgit_resource = CGitScriptResource(
@@ -619,7 +608,7 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         if failure.check(xmlrpc.Fault) is not None:
             code, message = failure.value.faultCode, failure.value.faultString
         else:
-            code, message = None, "Unexpected error in translatePath."
+            code, message = None, 'Unexpected error in translatePath.'
         if code in (1, 290):
             error_code = http.NOT_FOUND
         elif code in (2, 310):
@@ -639,7 +628,7 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         else:
             log.err(failure, "Unexpected error in translatePath")
             error_code = http.INTERNAL_SERVER_ERROR
-        self._error(request, message, code=error_code)
+        fail_request(request, message, code=error_code)
 
     def render_GET(self, request):
         session = self._getSession(request)

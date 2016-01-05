@@ -24,9 +24,15 @@ from turnip.pack import (
 
 class LessDummyRequest(requesthelper.DummyRequest):
 
+    startedWriting = 0
+
     @property
     def value(self):
         return "".join(self.written)
+
+    def write(self, data):
+        self.startedWriting = 1
+        super(LessDummyRequest, self).write(data)
 
     def registerProducer(self, prod, s):
         # Avoid DummyRequest.registerProducer calling resumeProducing
