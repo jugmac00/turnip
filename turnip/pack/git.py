@@ -302,8 +302,9 @@ class PackClientFactory(protocol.ClientFactory):
 
     protocol = PackClientProtocol
 
-    def __init__(self, server):
+    def __init__(self, server, deferred):
         self.server = server
+        self.deferred = deferred
 
     def startedConnecting(self, connector):
         self.server.log.info(
@@ -315,8 +316,7 @@ class PackClientFactory(protocol.ClientFactory):
         return p
 
     def clientConnectionFailed(self, connector, reason):
-        self.server.log.failure('Backend connection failed.', failure=reason)
-        self.server.die(b'Backend connection failed.')
+        self.deferred.errback(reason)
 
 
 class PackProxyServerProtocol(PackServerProtocol):
@@ -334,9 +334,11 @@ class PackProxyServerProtocol(PackServerProtocol):
         self.command = command
         self.pathname = pathname
         self.params = params
-        client = self.client_factory(self)
+        d = defer.Deferred()
+        client = self.client_factory(self, d)
         reactor.connectTCP(
             self.factory.backend_host, self.factory.backend_port, client)
+        return d
 
     def resumeProducing(self):
         # Send our translated request and then open the gate to the
@@ -465,7 +467,11 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
         except Exception as e:
             self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + str(e))
         else:
-            self.connectToBackend(command, pathname, params)
+            try:
+                yield self.connectToBackend(command, pathname, params)
+            except Exception as e:
+                self.server.log.failure('Backend connection failed.')
+                self.server.die(b'Backend connection failed.')
 
 
 class PackVirtFactory(protocol.Factory):

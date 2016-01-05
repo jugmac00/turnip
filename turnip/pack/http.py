@@ -133,6 +133,7 @@ class HTTPPackClientProtocol(PackProtocol):
 
     def connectionMade(self):
         """Forward the request and the client's payload to the backend."""
+        self.factory.deferred.callback(None)
         self.factory.http_request.notifyFinish().addBoth(self._finish)
         self.factory.http_request.registerProducer(
             self.transport, True)
@@ -206,12 +207,16 @@ class HTTPPackClientCommandProtocol(HTTPPackClientProtocol):
 
 class HTTPPackClientFactory(protocol.ClientFactory):
 
-    def __init__(self, command, pathname, params, body, http_request):
+    def __init__(self, command, pathname, params, body, http_request, d):
         self.command = command
         self.pathname = pathname
         self.params = params
         self.body = body
         self.http_request = http_request
+        self.deferred = d
+
+    def clientConnectionFailed(self, connector, reason):
+        self.deferred.errback(reason)
 
 
 class HTTPPackClientCommandFactory(HTTPPackClientFactory):
@@ -229,12 +234,12 @@ class BaseSmartHTTPResource(resource.Resource):
 
     extra_params = {}
 
-    def errback(self, failure, request):
+    def errback(self, failure, request, msg):
         """Handle a Twisted failure by returning an HTTP error."""
-        failure.printTraceback()
+        log.err(failure, msg)
         if request.finished:
             return
-        request.write(self.error(request, repr(failure)))
+        request.write(self.error(request, msg))
         request.unregisterProducer()
         request.finish()
 
@@ -270,8 +275,10 @@ class BaseSmartHTTPResource(resource.Resource):
             params[b'turnip-authenticated-user'] = authenticated_user
             params[b'turnip-authenticated-uid'] = str(authenticated_uid)
         params.update(self.extra_params)
-        client_factory = factory(service, path, params, content, request)
+        d = defer.Deferred()
+        client_factory = factory(service, path, params, content, request, d)
         self.root.connectToBackend(client_factory)
+        yield d
 
 
 class SmartHTTPRefsResource(BaseSmartHTTPResource):
@@ -300,7 +307,7 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
         d = self.connectToBackend(
             HTTPPackClientRefsFactory, service, self.path, request.content,
             request)
-        d.addErrback(self.errback, request)
+        d.addErrback(self.errback, request, b'Backend connection failed')
         return server.NOT_DONE_YET
 
 
@@ -335,7 +342,7 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
         d = self.connectToBackend(
             HTTPPackClientCommandFactory, self.service, self.path, content,
             request)
-        d.addErrback(self.errback, request)
+        d.addErrback(self.errback, request, b'Backend connection failed')
         return server.NOT_DONE_YET
 
 
