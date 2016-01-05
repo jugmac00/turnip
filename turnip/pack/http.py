@@ -609,13 +609,15 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         request.render(cgit_resource)
 
     def _translatePathErrback(self, failure, request, session):
-        e = failure.value
-        message = e.faultString
-        if e.faultCode in (1, 290):
+        if failure.check(xmlrpc.Fault) is not None:
+            code, message = failure.value.faultCode, failure.value.faultString
+        else:
+            code, message = None, "Unexpected error in translatePath."
+        if code in (1, 290):
             error_code = http.NOT_FOUND
-        elif e.faultCode in (2, 310):
+        elif code in (2, 310):
             error_code = http.FORBIDDEN
-        elif e.faultCode in (3, 410):
+        elif code in (3, 410):
             if 'user' in session:
                 error_code = http.FORBIDDEN
                 message = (
@@ -628,6 +630,7 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
                 self._beginLogin(request, session)
                 return
         else:
+            log.err(failure, "Unexpected error in translatePath")
             error_code = http.INTERNAL_SERVER_ERROR
         self._error(request, message, code=error_code)
 
