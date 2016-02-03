@@ -368,16 +368,18 @@ class ApiTestCase(TestCase):
         """Ensure that compare-merge returns conflicts information."""
         repo = RepoFactory(self.repo_store)
         c1 = repo.add_commit('foo\n', 'blah.txt')
-        c2_left = repo.add_commit('foo\nbar\n', 'blah.txt', parents=[c1])
-        c2_right = repo.add_commit('foo\nbaz\n', 'blah.txt', parents=[c1])
+        c2_left = repo.add_commit(
+            u'foo\nbar\u2603\n'.encode('utf-8'), 'blah.txt', parents=[c1])
+        c2_right = repo.add_commit(
+            u'foo\nbaz\u263c\n'.encode('utf-8'), 'blah.txt', parents=[c1])
 
         resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, c2_left, c2_right))
-        self.assertIn(dedent("""\
+        self.assertIn(dedent(u"""\
             +<<<<<<< blah.txt
-             bar
+             bar\u2603
             +=======
-            +baz
+            +baz\u263c
             +>>>>>>> blah.txt
             """), resp.json_body['patch'])
         self.assertEqual(['blah.txt'], resp.json_body['conflicts'])

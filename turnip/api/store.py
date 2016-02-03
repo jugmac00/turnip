@@ -319,7 +319,9 @@ def _add_conflicted_files(repo, index):
             path = conflict_entry.path
             conflicts.add(path)
             merged_file = repo.merge_file_from_index(*conflict)
-            blob_oid = repo.create_blob(merged_file)
+            # merge_file_from_index gratuitously decodes as UTF-8, so
+            # encode it back again.
+            blob_oid = repo.create_blob(merged_file.encode('utf-8'))
             index.add(IndexEntry(path, blob_oid, conflict_entry.mode))
             del index.conflicts[path]
     return conflicts
