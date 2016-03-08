@@ -645,6 +645,44 @@ class ApiTestCase(TestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual({b.hex: c.hex, e.hex: g.hex}, resp.json)
 
+    def test_repo_blob(self):
+        """Getting an existing blob works."""
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('a\n', 'dir/file')
+        factory.add_commit('b\n', 'dir/file', parents=[c1])
+        resp = self.app.get('/repo/{}/blob/dir/file'.format(self.repo_path))
+        self.assertEqual({'size': 2, 'data': 'b\n'}, resp.json)
+        resp = self.app.get('/repo/{}/blob/dir/file?rev=master'.format(
+            self.repo_path))
+        self.assertEqual({'size': 2, 'data': 'b\n'}, resp.json)
+        resp = self.app.get('/repo/{}/blob/dir/file?rev={}'.format(
+            self.repo_path, c1.hex))
+        self.assertEqual({'size': 2, 'data': 'a\n'}, resp.json)
+
+    def test_repo_blob_missing_commit(self):
+        """Trying to get a blob from a non-existent commit returns HTTP 404."""
+        factory = RepoFactory(self.repo_store)
+        factory.add_commit('a\n', 'dir/file')
+        resp = self.app.get('/repo/{}/blob/dir/file?rev={}'.format(
+            self.repo_path, factory.nonexistent_oid()), expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
+    def test_repo_blob_missing_file(self):
+        """Trying to get a blob with a non-existent name returns HTTP 404."""
+        factory = RepoFactory(self.repo_store)
+        factory.add_commit('a\n', 'dir/file')
+        resp = self.app.get('/repo/{}/blob/nonexistent'.format(
+            self.repo_path), expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
+    def test_repo_blob_directory(self):
+        """Trying to get a blob referring to a directory returns HTTP 404."""
+        factory = RepoFactory(self.repo_store)
+        factory.add_commit('a\n', 'dir/file')
+        resp = self.app.get('/repo/{}/blob/dir'.format(
+            self.repo_path), expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
 
 if __name__ == '__main__':
     unittest.main()

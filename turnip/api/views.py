@@ -320,3 +320,27 @@ class DetectMergesAPI(BaseAPI):
         except GitError:
             return exc.HTTPNotFound()
         return merges
+
+
+@resource(path='/repo/{name}/blob/{filename:.*}')
+class BlobAPI(BaseAPI):
+    """Provides HTTP API for fetching blobs."""
+
+    def __init__(self, request):
+        super(BlobAPI, self).__init__()
+        self.request = request
+
+    @validate_path
+    def get(self, repo_store, repo_name):
+        """Get blob by file name.
+
+        If supplied, the 'rev' request parameter identifies the revision (in
+        gitrevisions(7) syntax) where the blob should be looked up.  It
+        defaults to 'HEAD'.
+        """
+        filename = self.request.matchdict['filename']
+        rev = self.request.params.get('rev', 'HEAD')
+        try:
+            return store.get_blob(repo_store, repo_name, rev, filename)
+        except (KeyError, GitError):
+            return exc.HTTPNotFound()

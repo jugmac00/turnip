@@ -72,6 +72,17 @@ def format_signature(signature):
         }
 
 
+def format_blob(blob):
+    """Return a formatted blob dict."""
+    if blob.type != GIT_OBJ_BLOB:
+        raise GitError('Invalid type: object {} is not a blob.'.format(
+            blob.oid.hex))
+    return {
+        'size': blob.size,
+        'data': blob.data,
+        }
+
+
 def is_bare_repo(repo_path):
     return not os.path.exists(os.path.join(repo_path, '.git'))
 
@@ -453,3 +464,13 @@ def detect_merges(repo_store, repo_name, target_oid, source_oids):
             if not search_oids:
                 break
         return merge_info
+
+
+def get_blob(repo_store, repo_name, rev, filename):
+    """Return a blob from a revision and file name."""
+    with open_repo(repo_store, repo_name) as repo:
+        commit = repo.revparse_single(rev)
+        if commit.type != GIT_OBJ_COMMIT:
+            raise GitError('Invalid type: object {} is not a commit.'.format(
+                commit.oid.hex))
+        return format_blob(repo[commit.tree[filename].id])
