@@ -282,7 +282,9 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
 
     isLeaf = True
 
-    extra_params = {b'turnip-advertise-refs': b'yes'}
+    extra_params = {
+        b'turnip-stateless-rpc': b'yes',
+        b'turnip-advertise-refs': b'yes'}
 
     def __init__(self, root, path):
         self.root = root
