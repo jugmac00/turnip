@@ -1,6 +1,7 @@
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+import base64
 from contextlib2 import (
     contextmanager,
     ExitStack,
@@ -79,7 +80,7 @@ def format_blob(blob):
             blob.oid.hex))
     return {
         'size': blob.size,
-        'data': blob.data,
+        'data': base64.b64encode(blob.data),
         }
 
 

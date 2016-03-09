@@ -5,6 +5,7 @@
 
 from __future__ import print_function
 
+import base64
 import os
 import subprocess
 from textwrap import dedent
@@ -651,13 +652,16 @@ class ApiTestCase(TestCase):
         c1 = factory.add_commit('a\n', 'dir/file')
         factory.add_commit('b\n', 'dir/file', parents=[c1])
         resp = self.app.get('/repo/{}/blob/dir/file'.format(self.repo_path))
-        self.assertEqual({'size': 2, 'data': 'b\n'}, resp.json)
+        self.assertEqual(2, resp.json['size'])
+        self.assertEqual('b\n', base64.b64decode(resp.json['data']))
         resp = self.app.get('/repo/{}/blob/dir/file?rev=master'.format(
             self.repo_path))
-        self.assertEqual({'size': 2, 'data': 'b\n'}, resp.json)
+        self.assertEqual(2, resp.json['size'])
+        self.assertEqual('b\n', base64.b64decode(resp.json['data']))
         resp = self.app.get('/repo/{}/blob/dir/file?rev={}'.format(
             self.repo_path, c1.hex))
-        self.assertEqual({'size': 2, 'data': 'a\n'}, resp.json)
+        self.assertEqual(2, resp.json['size'])
+        self.assertEqual('a\n', base64.b64decode(resp.json['data']))
 
     def test_repo_blob_missing_commit(self):
         """Trying to get a blob from a non-existent commit returns HTTP 404."""
@@ -682,6 +686,15 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}/blob/dir'.format(
             self.repo_path), expect_errors=True)
         self.assertEqual(404, resp.status_code)
+
+    def test_repo_blob_non_ascii(self):
+        """Blobs may contain non-ASCII (and indeed non-UTF-8) data."""
+        factory = RepoFactory(self.repo_store)
+        factory.add_commit(b'\x80\x81\x82\x83', 'dir/file')
+        resp = self.app.get('/repo/{}/blob/dir/file'.format(self.repo_path))
+        self.assertEqual(4, resp.json['size'])
+        self.assertEqual(
+            b'\x80\x81\x82\x83', base64.b64decode(resp.json['data']))
 
 
 if __name__ == '__main__':
