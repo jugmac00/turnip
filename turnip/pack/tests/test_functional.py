@@ -207,6 +207,32 @@ class FunctionalTestMixin(object):
         self.assertIn(b'Another test', out)
 
     @defer.inlineCallbacks
+    def test_clone_shallow(self):
+        # Test a shallow clone. This makes the negotation a little more
+        # complicated, and tests some weird edge cases in the HTTP protocol.
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+        clone2 = os.path.join(test_root, 'clone2')
+
+        # Push a commit that we can try to clone.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+
+        # Try to shallow clone.
+        yield self.assertCommandSuccess(
+            (b'git', b'clone', '--depth=1', self.url, clone2))
+        out = yield self.assertCommandSuccess(
+            (b'git', b'log', b'--oneline', b'-n', b'1'), path=clone2)
+        self.assertIn(b'Committed test', out)
+
+    @defer.inlineCallbacks
     def test_no_repo(self):
         test_root = self.useFixture(TempDir()).path
         output = yield utils.getProcessOutput(
