@@ -130,7 +130,6 @@ class PackProtocol(protocol.Protocol):
         self.transport.stopProducing()
 
 
-@implementer(IHalfCloseableProtocol)
 class PackProxyProtocol(PackProtocol):
 
     peer = None
@@ -144,18 +143,12 @@ class PackProxyProtocol(PackProtocol):
     def die(self, message):
         raise NotImplementedError()
 
-    def readConnectionLost(self):
-        if self.peer is not None:
-            self.peer.transport.loseWriteConnection()
-
-    def writeConnectionLost(self):
-        pass
-
     def connectionLost(self, reason):
         if self.peer is not None:
             self.peer.transport.loseConnection()
 
 
+@implementer(IHalfCloseableProtocol)
 class PackServerProtocol(PackProxyProtocol):
 
     got_request = False
@@ -200,6 +193,14 @@ class PackServerProtocol(PackProxyProtocol):
 
     def rawDataReceived(self, data):
         self.peer.sendRawData(data)
+
+    def readConnectionLost(self):
+        # Implementations need to forward the stdin down the stack,
+        # otherwise the backend will never know its work is done.
+        raise NotImplementedError()
+
+    def writeConnectionLost(self):
+        pass
 
     def connectionLost(self, reason):
         if reason.check(error.ConnectionDone):
@@ -355,6 +356,11 @@ class PackProxyServerProtocol(PackServerProtocol):
                     self.command, self.pathname, self.params))
         PackServerProtocol.resumeProducing(self)
 
+    def readConnectionLost(self):
+        # Forward the closed stdin down the stack.
+        if self.peer is not None:
+            self.peer.transport.loseWriteConnection()
+
 
 class PackBackendProtocol(PackServerProtocol):
     """Filesystem-backed turnip-flavoured Git pack protocol implementation.
@@ -401,12 +407,9 @@ class PackBackendProtocol(PackServerProtocol):
         reactor.spawnProcess(self.peer, cmd, args, env=env)
 
     def readConnectionLost(self):
+        # Forward the closed stdin down the stack.
         if self.peer is not None:
             self.peer.loseWriteConnection()
-
-    def writeConnectionLost(self):
-        if self.peer is not None:
-            self.peer.loseReadConnection()
 
     def connectionLost(self, reason):
         if self.hookrpc_key:
