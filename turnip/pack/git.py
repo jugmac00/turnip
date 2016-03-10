@@ -47,7 +47,8 @@ class RequestIDLogger(Logger):
     def emit(self, level, format=None, **kwargs):
         request_id = getattr(self.source, 'request_id')
         if format is not None and request_id is not None:
-            format = '[request-id=%s] %s' % (request_id, format)
+            format = '[request-id=%s] [%s] %s' % (
+                request_id, self.source.__class__.__name__, format)
         super(RequestIDLogger, self).emit(level, format=format, **kwargs)
 
 
