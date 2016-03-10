@@ -221,6 +221,7 @@ class GitProcessProtocol(protocol.ProcessProtocol):
 
     def __init__(self, peer):
         self.peer = peer
+        self.out_started = False
 
     def connectionMade(self):
         self.peer.setPeer(self)
@@ -230,16 +231,32 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.peer.resumeProducing()
 
     def outReceived(self, data):
+        self.out_started = True
         self.peer.sendRawData(data)
 
     def errReceived(self, data):
-        # Just store it up so we can forward it as a single ERR packet
-        # when the process is done.
+        # Just store it up so we can forward and/or log it when the
+        # process is done.
         self._err_buffer += data
 
     def outConnectionLost(self):
         if self._err_buffer:
-            self.peer.die(self._err_buffer)
+            # Originally we'd always return stderr as an ERR packet for
+            # debugging, but it breaks HTTP shallow clones: the second
+            # HTTP request causes the backend to die when it tries to
+            # read more than was sent, but the reference
+            # git-http-backend conveniently just sends the error to the
+            # server log so the client doesn't notice. So now we always
+            # log any stderr, but only forward it to the client if the
+            # subprocess never wrote to stdout.
+            if not self.out_started:
+                self.peer.log.info(
+                    'git wrote to stderr first; returning to client: {buf}',
+                    buf=repr(self._err_buffer))
+                self.peer.sendPacket(ERROR_PREFIX + self._err_buffer + b'\n')
+            else:
+                self.peer.log.info(
+                    "git wrote to stderr: {buf}", buf=repr(self._err_buffer))
 
     def sendPacket(self, data):
         self.sendRawData(encode_packet(data))
