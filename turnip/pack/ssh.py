@@ -30,7 +30,6 @@ from twisted.internet.error import (
     ConnectionDone,
     ProcessTerminated,
     )
-from twisted.internet.interfaces import IHalfCloseableProtocol
 from twisted.python import (
     components,
     failure,
@@ -53,7 +52,6 @@ __all__ = [
     ]
 
 
-@implementer(IHalfCloseableProtocol)
 class SSHPackClientProtocol(PackProtocol):
     """Bridge between a Git pack connection and a smart SSH request.
 
@@ -65,7 +63,6 @@ class SSHPackClientProtocol(PackProtocol):
     """
 
     def __init__(self):
-        self._closing = False
         self._closed = False
 
     def backendConnectionFailed(self, msg):
@@ -100,16 +97,6 @@ class SSHPackClientProtocol(PackProtocol):
 
     def rawDataReceived(self, data):
         self.factory.ssh_protocol.outReceived(data)
-
-    def readConnectionLost(self):
-        if self._closing:
-            self.connectionLost(ConnectionDone("Connection done"))
-        self._closing = True
-
-    def writeConnectionLost(self):
-        if self._closing:
-            self.connectionLost(ConnectionDone("Connection done"))
-        self._closing = True
 
     def connectionLost(self, reason):
         if not self._closed:
