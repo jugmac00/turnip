@@ -151,6 +151,8 @@ class HTTPPackClientProtocol(PackProtocol):
                 self.factory.command, self.factory.pathname,
                 self.factory.params))
         self.sendRawData(self.factory.body.read())
+        if hasattr(self.transport, 'loseWriteConnection'):
+            self.transport.loseWriteConnection()
 
     def packetReceived(self, data):
         """Check and forward the first packet from the backend.
