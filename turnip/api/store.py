@@ -22,6 +22,7 @@ from pygit2 import (
     GIT_SORT_TOPOLOGICAL,
     IndexEntry,
     init_repository,
+    Oid,
     Repository,
     )
 
@@ -414,15 +415,21 @@ def get_log(repo_store, repo_name, start=None, limit=None, stop=None):
         return [format_commit(commit) for commit in walker]
 
 
-def get_commit(repo_store, repo_name, commit_oid, repo=None):
-    """Return a single commit object from an oid."""
+def get_commit(repo_store, repo_name, revision, repo=None):
+    """Return a single commit object from a revision."""
     with ExitStack() as stack:
         if not repo:
             repo = stack.enter_context(open_repo(repo_store, repo_name))
-        git_object = repo.get(commit_oid)
-        if git_object is None:
+        try:
+            if isinstance(revision, Oid):
+                git_object = repo.get(revision)
+                if git_object is None:
+                    raise KeyError
+            else:
+                git_object = repo.revparse_single(revision)
+        except KeyError:
             raise GitError('Object {} does not exist in repository {}.'.format(
-                commit_oid, repo_name))
+                revision, repo_name))
         return format_commit(git_object)
 
 

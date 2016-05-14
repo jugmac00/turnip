@@ -345,6 +345,17 @@ class ApiTestCase(TestCase):
             self.repo_path, c1, c1))
         self.assertEqual('', resp.json_body['patch'])
 
+    def test_repo_get_diff_extended_revision(self):
+        """get_diff can take general git revisions, not just sha1s."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'foobar.txt')
+        c2 = repo.add_commit('bar\n', 'foobar.txt', parents=[c1])
+
+        path = '/repo/{}/compare/{}^..{}'.format(self.repo_path, c2, c2)
+        resp = self.app.get(path)
+        self.assertIn(b'-foo', resp.body)
+        self.assertIn(b'+bar', resp.body)
+
     def test_repo_diff_merge(self):
         """Ensure expected changes exist in diff patch."""
         repo = RepoFactory(self.repo_store)
