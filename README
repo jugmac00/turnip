@@ -1,3 +1,4 @@
+======
 turnip
 ======
 
@@ -12,7 +13,7 @@ None of the Python interfaces here should be considered stable.
 
 
 Architecture
-------------
+============
 
 turnip's architecture is designed to maximise simplicity, scalability
 and robustness. Each server provides roughly one service, and an
@@ -44,7 +45,7 @@ Backends:
 
 
 Internal protocol
------------------
+=================
 
 turnip uses an extension of the Git pack protocol for most communication
 between its servers. The only change is that turnip requests can specify
@@ -69,7 +70,7 @@ the smart HTTP server to proxy to the standard pack protocol.
 
 
 Development
------------
+===========
 
 Pack smart-http/ssh services can be started with:
 
@@ -81,7 +82,7 @@ The HTTP API can be started with:
 
 
 Deployment
-----------
+==========
 
 Turnip is deployed with the turnip juju charm, available from:
 
