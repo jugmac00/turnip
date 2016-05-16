@@ -26,10 +26,7 @@ from twisted.internet import (
     protocol,
     reactor,
     )
-from twisted.internet.error import (
-    ConnectionDone,
-    ProcessTerminated,
-    )
+from twisted.internet.error import ProcessTerminated
 from twisted.python import (
     components,
     failure,
