@@ -1,0 +1,7 @@
+git
+make
+python-pip
+python-virtualenv
+python-dev
+libffi-dev
+libgit2-dev
