@@ -13,7 +13,7 @@ None of the Python interfaces here should be considered stable.
 
 
 Architecture
-------------
+============
 
 turnip's architecture is designed to maximise simplicity, scalability
 and robustness. Each server provides roughly one service, and an
@@ -45,24 +45,24 @@ Backends:
 
 
 Internal protocol
------------------
+=================
 
 turnip uses an extension of the Git pack protocol for most communication
 between its servers. The only change is that turnip requests can specify
 arbitrary named parameters, not just a hostname.
 
 The relevant part of the Git pack protocol's git-proto-request is
-represented in ABNF as follows:
+represented in ABNF as follows::
 
    git-proto-request = request-command SP pathname NUL [ host-parameter NUL ]
    host-parameter = "host=" hostname [ ":" port ]
 
-turnip-proto-request alters it to this:
+turnip-proto-request alters it to this::
 
-   turnip-proto-request = request-command SP pathname NUL *( param NUL )
+   turnip-proto-request = request-command SP pathname NUL \*( param NUL )
    param = param-name "=" param-value
-   param-name = *( %x01-3C / %x3E-FF ) ; exclude NUL and =
-   param-value = *%x01-FF ; exclude NUL
+   param-name = \*( %x01-3C / %x3E-FF ) ; exclude NUL and =
+   param-value = \*%x01-FF ; exclude NUL
 
 The only additional parameters implemented today are
 'turnip-stateless-rpc' and 'turnip-advertise-refs', which are used by
@@ -70,7 +70,7 @@ the smart HTTP server to proxy to the standard pack protocol.
 
 
 Development
------------
+===========
 
 Pack smart-http/ssh services can be started with:
 
@@ -82,7 +82,7 @@ The HTTP API can be started with:
 
 
 Deployment
-----------
+==========
 
 Turnip is deployed with the turnip juju charm, available from:
 

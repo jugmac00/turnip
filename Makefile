@@ -63,6 +63,7 @@ tags:
 
 lint: $(ENV)
 	@$(FLAKE8) --exclude=__pycache__,version_info.py turnip
+	$(PYTHON) setup.py check --restructuredtext --strict
 
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
