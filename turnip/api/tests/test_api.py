@@ -10,6 +10,10 @@ import os
 import subprocess
 from textwrap import dedent
 import unittest
+try:
+    from urllib.parse import quote
+except ImportError:
+    from urllib import quote
 import uuid
 
 from fixtures import (
@@ -351,7 +355,8 @@ class ApiTestCase(TestCase):
         c1 = repo.add_commit('foo\n', 'foobar.txt')
         c2 = repo.add_commit('bar\n', 'foobar.txt', parents=[c1])
 
-        path = '/repo/{}/compare/{}^..{}'.format(self.repo_path, c2, c2)
+        path = '/repo/{}/compare/{}..{}'.format(
+            self.repo_path, quote('{}^'.format(c2)), c2)
         resp = self.app.get(path)
         self.assertIn(b'-foo', resp.body)
         self.assertIn(b'+bar', resp.body)
