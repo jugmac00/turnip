@@ -72,6 +72,23 @@ the smart HTTP server to proxy to the standard pack protocol.
 Development
 ===========
 
+Setup
+-----
+
+Create a trusty container (optional)::
+
+       sudo lxc-create -t ubuntu -n turnip.trusty -- -r trusty -a amd64 -b $USER
+
+Run the following::
+
+        sudo add-apt-repository ppa:launchpad/ppa
+        sudo apt-get update
+        cat system-dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
+
+
+Running
+-------
+
 Pack smart-http/ssh services can be started with:
 
     python turnipserver.py
