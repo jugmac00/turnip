@@ -71,7 +71,7 @@ class FakeRoot(object):
         self.backend_connected = defer.Deferred()
 
     def authenticateWithPassword(self, user, password):
-        return None, None
+        return {}
 
     def connectToBackend(self, client_factory):
         self.backend_transport = (

@@ -250,28 +250,27 @@ class BaseSmartHTTPResource(resource.Resource):
     @defer.inlineCallbacks
     def authenticateUser(self, request):
         """Attempt authentication of the request with the virt service."""
-        if request.getUser():
-            user, uid = yield self.root.authenticateWithPassword(
+        if request.getUser() or request.getPassword():
+            params = yield self.root.authenticateWithPassword(
                 request.getUser(), request.getPassword())
-            defer.returnValue((user, uid))
-        defer.returnValue((None, None))
+            defer.returnValue(params)
+        defer.returnValue({})
 
     @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, content, request):
         """Establish a pack connection to the backend.
 
-        The turnip-authenticated-user parameter is set to the username
-        returned by the virt service, if any.
+        The turnip-authenticated-* parameters are set to the values returned
+        by the virt service, if any.
         """
         params = {
             b'turnip-can-authenticate': b'yes',
             b'turnip-request-id': str(uuid.uuid4()),
             }
-        authenticated_user, authenticated_uid = yield self.authenticateUser(
-            request)
-        if authenticated_user:
-            params[b'turnip-authenticated-user'] = authenticated_user
-            params[b'turnip-authenticated-uid'] = str(authenticated_uid)
+        authenticated_params = yield self.authenticateUser(request)
+        for key, value in authenticated_params.items():
+            encoded_key = ('turnip-authenticated-' + key).encode('utf-8')
+            params[encoded_key] = str(value)
         params.update(self.extra_params)
         d = defer.Deferred()
         client_factory = factory(service, path, params, content, request, d)
@@ -759,4 +758,4 @@ class SmartHTTPFrontendResource(resource.Resource):
                 defer.returnValue((None, None))
             else:
                 raise
-        defer.returnValue((translated['user'], translated['uid']))
+        defer.returnValue(translated)
