@@ -166,6 +166,8 @@ class FunctionalTestMixin(object):
         # Clone the empty repo from the backend and commit to it.
         yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
         yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
             (b'git', b'config', b'user.email', b'test@example.com'),
             path=clone1)
         yield self.assertCommandSuccess(
@@ -193,6 +195,8 @@ class FunctionalTestMixin(object):
 
         # Commit and push from the second clone.
         yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone2)
+        yield self.assertCommandSuccess(
             (b'git', b'config', b'user.email', b'test@example.com'),
             path=clone2)
         yield self.assertCommandSuccess(
@@ -216,6 +220,8 @@ class FunctionalTestMixin(object):
 
         # Push a commit that we can try to clone.
         yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
         yield self.assertCommandSuccess(
             (b'git', b'config', b'user.email', b'test@example.com'),
             path=clone1)
@@ -311,6 +317,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         # Create a read-only clone.
         yield self.assertCommandSuccess(
             (b'git', b'clone', self.ro_url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
         yield self.assertCommandSuccess(
             (b'git', b'config', b'user.email', b'test@example.com'),
             path=clone1)
