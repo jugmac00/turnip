@@ -457,14 +457,19 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
         permission = b'read' if command == b'git-upload-pack' else b'write'
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint, allowNone=True)
         try:
-            can_authenticate = (
-                params.get(b'turnip-can-authenticate') == b'yes')
-            auth_uid = params.get(b'turnip-authenticated-uid')
+            auth_params = {}
+            for key, value in params.items():
+                if key.startswith(b'turnip-authenticated-'):
+                    decoded_key = key[len(b'turnip-authenticated-'):].decode(
+                        'utf-8')
+                    auth_params[decoded_key] = value
+            if 'uid' in auth_params:
+                auth_params['uid'] = int(auth_params['uid'])
+            if params.get(b'turnip-can-authenticate') == b'yes':
+                auth_params['can-authenticate'] = True
             self.log.info("Translating request.")
             translated = yield proxy.callRemote(
-                b'translatePath', pathname, permission,
-                int(auth_uid) if auth_uid is not None else None,
-                can_authenticate)
+                b'translatePath', pathname, permission, auth_params)
             self.log.info(
                 "Translation result: {translated}", translated=translated)
             if 'trailing' in translated and translated['trailing']:

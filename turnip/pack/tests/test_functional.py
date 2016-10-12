@@ -14,6 +14,16 @@ import os
 import shutil
 import stat
 import tempfile
+try:
+    from urllib.parse import (
+        urlsplit,
+        urlunsplit,
+        )
+except ImportError:
+    from urlparse import (
+        urlsplit,
+        urlunsplit,
+        )
 
 from fixtures import (
     EnvironmentVariable,
@@ -91,10 +101,16 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
 
     def __init__(self, *args, **kwargs):
         xmlrpc.XMLRPC.__init__(self, *args, **kwargs)
+        self.require_auth = False
+        self.translations = []
+        self.authentications = []
         self.push_notifications = []
 
-    def xmlrpc_translatePath(self, pathname, permission, authenticated_uid,
-                             can_authenticate):
+    def xmlrpc_translatePath(self, pathname, permission, auth_params):
+        if self.require_auth and 'user' not in auth_params:
+            raise xmlrpc.Fault(3, "Unauthorized")
+
+        self.translations.append((pathname, permission, auth_params))
         writable = False
         if pathname.startswith('/+rw'):
             writable = True
@@ -105,6 +121,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         return {'path': hashlib.sha256(pathname).hexdigest()}
 
     def xmlrpc_authenticateWithPassword(self, username, password):
+        self.authentications.append((username, password))
         return {'user': username}
 
     def xmlrpc_notify(self, path):
@@ -241,9 +258,11 @@ class FunctionalTestMixin(object):
     @defer.inlineCallbacks
     def test_no_repo(self):
         test_root = self.useFixture(TempDir()).path
+        parsed_url = list(urlsplit(self.url))
+        parsed_url[2] = b'/fail'
+        fail_url = urlunsplit(parsed_url)
         output = yield utils.getProcessOutput(
-            b'git',
-            (b'clone', b'%s://localhost:%d/fail' % (self.scheme, self.port)),
+            b'git', (b'clone', fail_url),
             env=os.environ, path=test_root, errortoo=True)
         self.assertIn(
             b"Cloning into 'fail'...\n" + self.early_error + b'fatal: ',
@@ -350,8 +369,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
     @defer.inlineCallbacks
     def test_unicode_fault(self):
-        def fake_translatePath(pathname, permission, authenticated_uid,
-                               can_authenticate):
+        def fake_translatePath(pathname, permission, auth_params):
             raise xmlrpc.Fault(2, u"홍길동 is not a member of Project Team.")
 
         test_root = self.useFixture(TempDir()).path
@@ -431,6 +449,32 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         self.assertEqual(
             [version_info['revision_id']],
             factory.response_headers[b'x-turnip-revision'])
+
+
+class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
+
+    @defer.inlineCallbacks
+    def setUp(self):
+        yield super(TestSmartHTTPFrontendWithAuthFunctional, self).setUp()
+
+        self.virtinfo.require_auth = True
+        self.url = (
+            b'http://test-user:test-password@localhost:%d/+rw/test' %
+            self.port)
+        self.ro_url = (
+            b'http://test-user:test-password@localhost:%d/test' % self.port)
+
+    @defer.inlineCallbacks
+    def test_authenticated(self):
+        test_root = self.useFixture(TempDir()).path
+        clone = os.path.join(test_root, 'clone')
+        yield self.assertCommandSuccess((b'git', b'clone', self.ro_url, clone))
+        self.assertEqual(
+            [(b'test-user', b'test-password')], self.virtinfo.authentications)
+        self.assertEqual(
+            [(b'/test', b'read',
+              {b'can-authenticate': True, b'user': b'test-user'})],
+            self.virtinfo.translations)
 
 
 class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
