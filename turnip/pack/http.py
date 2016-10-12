@@ -755,7 +755,7 @@ class SmartHTTPFrontendResource(resource.Resource):
                 b'authenticateWithPassword', user, password)
         except xmlrpc.Fault as e:
             if e.faultCode in (3, 410):
-                defer.returnValue((None, None))
+                defer.returnValue({})
             else:
                 raise
         defer.returnValue(translated)
