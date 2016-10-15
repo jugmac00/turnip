@@ -638,7 +638,8 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         identity_url = session.get('identity_url', self.anonymous_id)
         proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint, allowNone=True)
         d = proxy.callRemote(
-            b'translatePath', request.path, b'read', identity_url, True)
+            b'translatePath', request.path, b'read',
+            {'uid': identity_url, 'can-authenticate': True})
         d.addCallback(self._translatePathCallback, request)
         d.addErrback(self._translatePathErrback, request, session)
         return server.NOT_DONE_YET
