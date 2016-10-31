@@ -680,7 +680,8 @@ class HTTPAuthResource(resource.Resource):
 class SmartHTTPFrontendResource(resource.Resource):
     """HTTP resource to translate Git smart HTTP requests to pack protocol."""
 
-    allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
+    allowed_services = frozenset((
+        b'git-upload-pack', b'git-receive-pack', b'turnip-set-symbolic-ref'))
 
     def __init__(self, backend_host, config):
         resource.Resource.__init__(self)
@@ -737,7 +738,9 @@ class SmartHTTPFrontendResource(resource.Resource):
         content_type = request.getHeader(b'Content-Type')
         if content_type is None:
             return False
-        return content_type.startswith(b'application/x-git-')
+        return (
+            content_type.startswith(b'application/x-git-') or
+            content_type.startswith(b'application/x-turnip-'))
 
     def getChild(self, path, request):
         if self._isGitRequest(request):

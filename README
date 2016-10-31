@@ -68,6 +68,22 @@ The only additional parameters implemented today are
 'turnip-stateless-rpc' and 'turnip-advertise-refs', which are used by
 the smart HTTP server to proxy to the standard pack protocol.
 
+turnip implements one externally-visible extension: a
+'turnip-set-symbolic-ref' service that sets a symbolic ref (currently only
+'HEAD' is permitted) to a given target. This may be used over the various
+protocols (git, SSH, smart HTTP), requesting the service in the same way as
+the existing 'git-upload-pack' and 'git-receive-pack' services.
+
+   turnip-set-symbolic-ref-request = set-symbolic-ref-line
+                                     flush-pkt
+   set-symbolic-ref-line           = PKT-LINE(refname SP refname)
+
+The server replies with an ACK indicating the symbolic ref name that was
+changed, or an error message.
+
+   turnip-set-symbolic-ref-response = set-symbolic-ref-ack / error-line
+   set-symbolic-ref-ack             = PKT-LINE("ACK" SP refname)
+
 
 Development
 ===========

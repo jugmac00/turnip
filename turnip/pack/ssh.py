@@ -120,7 +120,8 @@ class SSHPackClientFactory(protocol.ClientFactory):
 class SmartSSHSession(DoNothingSession):
     """SSH session allowing only Git smart SSH requests."""
 
-    allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
+    allowed_services = frozenset((
+        b'git-upload-pack', b'git-receive-pack', b'turnip-set-symbolic-ref'))
 
     def __init__(self, *args, **kwargs):
         super(SmartSSHSession, self).__init__(*args, **kwargs)

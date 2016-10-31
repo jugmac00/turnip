@@ -126,11 +126,15 @@ class HookRPCHandler(object):
         return [rule.decode('utf-8') for rule in self.ref_rules[args['key']]]
 
     @defer.inlineCallbacks
+    def notify(self, path):
+        proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
+        yield proxy.callRemote(b'notify', path)
+
+    @defer.inlineCallbacks
     def notifyPush(self, proto, args):
         """Notify the virtinfo service about a push."""
         path = self.ref_paths[args['key']]
-        proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        yield proxy.callRemote(b'notify', path)
+        yield self.notify(path)
 
 
 class HookRPCServerFactory(RPCServerFactory):
