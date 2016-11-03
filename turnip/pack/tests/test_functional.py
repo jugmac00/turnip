@@ -35,10 +35,7 @@ from fixtures import (
 from lazr.sshserver.auth import NoSuchPersonWithName
 from testtools import TestCase
 from testtools.content import text_content
-from testtools.deferredruntest import (
-    assert_fails_with,
-    AsynchronousDeferredRunTest,
-    )
+from testtools.deferredruntest import AsynchronousDeferredRunTest
 from testtools.matchers import StartsWith
 from twisted.internet import (
     defer,
@@ -47,7 +44,6 @@ from twisted.internet import (
     )
 from twisted.web import (
     client,
-    error,
     http_headers,
     server,
     xmlrpc,
