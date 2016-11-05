@@ -10,6 +10,8 @@ FLAKE8 := $(ENV)/bin/flake8
 PIP := $(ENV)/bin/pip
 VIRTUALENV := virtualenv
 
+DEPENDENCIES_URL := https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
+
 PIP_CACHE_ARGS := -q
 ifneq ($(PIP_SOURCE_DIR),)
 PIP_CACHE_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
@@ -25,13 +27,21 @@ TARBALL_BUILD_PATH = $(TARBALL_BUILD_DIR)/$(TARBALL_FILE_NAME)
 
 build: $(ENV)
 
+bootstrap:
+	if [ -d dependencies ]; then \
+		git -C dependencies pull; \
+	else \
+		git clone $(DEPENDENCIES_URL) dependencies; \
+	fi
+	$(MAKE) PIP_SOURCE_DIR=dependencies
+
 turnip/version_info.py:
 	echo 'version_info = {"revision_id": "$(TARBALL_BUILD_LABEL)"}' >$@
 
 $(ENV): turnip/version_info.py
 ifeq ($(PIP_SOURCE_DIR),)
 	@echo "Set PIP_SOURCE_DIR to the path of a clone of" >&2
-	@echo "lp:~canonical-launchpad-branches/turnip/+git/dependencies." >&2
+	@echo "$(DEPENDENCIES_URL)." >&2
 	@exit 1
 endif
 	mkdir -p $(ENV)
@@ -45,7 +55,7 @@ endif
 		-e '.[test,deploy]'
 
 check: $(ENV)
-	$(PYTHON) -m unittest discover turnip
+	$(PYTHON) -m unittest discover $(ARGS) turnip
 
 clean:
 	find turnip -name '*.py[co]' -exec rm '{}' \;

@@ -1,0 +1,7 @@
+build-essential
+cgit
+git
+libffi-dev
+libgit2-dev
+python-dev
+python-virtualenv
