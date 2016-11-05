@@ -271,7 +271,13 @@ class GitProcessProtocol(protocol.ProcessProtocol):
     def loseWriteConnection(self):
         self.transport.closeChildFD(0)
 
-    def processEnded(self, status):
+    def processEnded(self, reason):
+        if reason.check(error.ProcessDone) and reason.value.exitCode != 0:
+            code = reason.value.exitCode
+            self.peer.log.info(
+                'git exited {code} with no output; synthesising an error',
+                code=code)
+            self.peer.sendPacket(ERROR_PREFIX + 'backend exited %d' % code)
         self.peer.transport.loseConnection()
 
     def pauseProducing(self):

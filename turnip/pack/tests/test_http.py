@@ -109,11 +109,10 @@ class ErrorTestMixin(object):
 
     @defer.inlineCallbacks
     def test_backend_immediately_dies(self):
-        # If the backend disappears before it says anything, that's an
-        # internal server error.
+        # If the backend disappears before it says anything, that's OK.
         yield self.performRequest('')
-        self.assertEqual(500, self.request.responseCode)
-        self.assertEqual('Backend connection lost.', self.request.value)
+        self.assertEqual(200, self.request.responseCode)
+        self.assertEqual('', self.request.value)
 
     @defer.inlineCallbacks
     def test_backend_virt_error(self):

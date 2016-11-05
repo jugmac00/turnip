@@ -32,6 +32,7 @@ from paste.auth.cookie import (
     )
 from twisted.internet import (
     defer,
+    error,
     protocol,
     reactor,
     )
@@ -98,9 +99,13 @@ class HTTPPackClientProtocol(PackProtocol):
 
     user_error_possible = True
 
+    def startGoodResponse(self):
+        """Prepare the HTTP response for forwarding from the backend."""
+        raise NotImplementedError()
+
     def backendConnected(self):
         """Called when the backend is connected and has sent a good packet."""
-        raise NotImplementedError()
+        self.startGoodResponse()
 
     def backendConnectionFailed(self, msg):
         """Called when the backend fails to connect or returns an error."""
@@ -179,8 +184,16 @@ class HTTPPackClientProtocol(PackProtocol):
     def connectionLost(self, reason):
         self.factory.http_request.unregisterProducer()
         if not self.factory.http_request.finished:
-            fail_request(
-                self.factory.http_request, b'Backend connection lost.')
+            if reason.check(error.ConnectionDone):
+                # We assume that the backend will have sent an error if
+                # necessary; otherwise an empty response is permitted (and
+                # needed by git's probe_rpc mechanism).
+                if not self.paused and not self.raw:
+                    self.startGoodResponse()
+                self.factory.http_request.finish()
+            else:
+                fail_request(
+                    self.factory.http_request, b'Backend connection lost.')
 
 
 class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
@@ -190,12 +203,15 @@ class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
     # failure from repository corruption or similar.
     user_error_possible = False
 
-    def backendConnected(self):
+    def startGoodResponse(self):
         """Prepare the HTTP response for forwarding from the backend."""
         self.factory.http_request.setResponseCode(http.OK)
         self.factory.http_request.setHeader(
             b'Content-Type',
             b'application/x-%s-advertisement' % self.factory.command)
+
+    def backendConnected(self):
+        HTTPPackClientProtocol.backendConnected(self)
         self.rawDataReceived(
             encode_packet(b'# service=%s\n' % self.factory.command))
         self.rawDataReceived(encode_packet(None))
@@ -203,7 +219,7 @@ class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
 
 class HTTPPackClientCommandProtocol(HTTPPackClientProtocol):
 
-    def backendConnected(self):
+    def startGoodResponse(self):
         """Prepare the HTTP response for forwarding from the backend."""
         self.factory.http_request.setResponseCode(http.OK)
         self.factory.http_request.setHeader(
