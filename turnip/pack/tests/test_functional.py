@@ -523,7 +523,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
             b'HEAD refs/heads/new-head')
         self.assertEqual(200, response.code)
         body = yield client.readBody(response)
-        self.assertEqual((b'ACK HEAD', ''), helpers.decode_packet(body))
+        self.assertEqual((b'ACK HEAD\n', ''), helpers.decode_packet(body))
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/new-head', head_target)
 

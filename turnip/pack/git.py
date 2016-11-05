@@ -488,7 +488,7 @@ class PackBackendProtocol(PackServerProtocol):
             if reason.check(error.ProcessDone):
                 try:
                     yield self.factory.hookrpc_handler.notify(self.path)
-                    self.sendPacket(b'ACK %s' % self.symbolic_ref_name)
+                    self.sendPacket(b'ACK %s\n' % self.symbolic_ref_name)
                 except Exception as e:
                     message = str(e)
             else:
