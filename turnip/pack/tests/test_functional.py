@@ -11,6 +11,7 @@ from __future__ import (
 from collections import defaultdict
 import hashlib
 import os
+import random
 import shutil
 import stat
 import tempfile
@@ -268,6 +269,44 @@ class FunctionalTestMixin(object):
             b"Cloning into 'fail'...\n" + self.early_error + b'fatal: ',
             output)
         self.assertIn(b'does not appear to be a git repository', output)
+
+    @defer.inlineCallbacks
+    def test_large_push(self):
+        # Test a large push, which behaves a bit differently with some
+        # frontends.  For example, when doing a large push, as an
+        # optimisation, git-remote-http first probes to find out whether it
+        # is permitted to write to the repository before sending large
+        # packfile data.  It does this by sending a request containing just
+        # a flush-pkt, which causes git-receive-pack to exit successfully
+        # with no output.
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+        clone2 = os.path.join(test_root, 'clone2')
+
+        # Push a commit large enough to generate a pack that exceeds git's
+        # allocated buffer for HTTP pushes, thereby triggering 'probe_rpc'.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        with open(os.path.join(clone1, 'bigfile'), 'w') as bigfile:
+            # Use random contents to defeat compression.
+            bigfile.write(bytearray(
+                random.getrandbits(8) for _ in range(1024 * 1024)))
+        yield self.assertCommandSuccess(
+            (b'git', b'add', b'bigfile'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'-m', b'Add big file'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'--all', b'origin'), path=clone1)
+
+        # Clone it again and make sure it's there.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone2))
+        out = yield self.assertCommandSuccess(
+            (b'git', b'log', b'--oneline', b'-n', b'1'), path=clone2)
+        self.assertIn(b'Add big file', out)
 
 
 class TestBackendFunctional(FunctionalTestMixin, TestCase):
