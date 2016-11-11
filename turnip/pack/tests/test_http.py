@@ -64,7 +64,8 @@ def render_resource(resource, request):
 
 class FakeRoot(object):
 
-    allowed_services = frozenset((b'git-upload-pack', b'git-receive-pack'))
+    allowed_services = frozenset((
+        b'git-upload-pack', b'git-receive-pack', b'turnip-set-symbolic-ref'))
 
     def __init__(self):
         self.backend_transport = None

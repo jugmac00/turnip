@@ -8,8 +8,10 @@ from __future__ import (
     unicode_literals,
     )
 
+import base64
 from collections import defaultdict
 import hashlib
+import io
 import os
 import random
 import shutil
@@ -33,10 +35,7 @@ from fixtures import (
 from lazr.sshserver.auth import NoSuchPersonWithName
 from testtools import TestCase
 from testtools.content import text_content
-from testtools.deferredruntest import (
-    assert_fails_with,
-    AsynchronousDeferredRunTest,
-    )
+from testtools.deferredruntest import AsynchronousDeferredRunTest
 from testtools.matchers import StartsWith
 from twisted.internet import (
     defer,
@@ -45,11 +44,12 @@ from twisted.internet import (
     )
 from twisted.web import (
     client,
-    error,
+    http_headers,
     server,
     xmlrpc,
     )
 
+from turnip.pack import helpers
 from turnip.pack.git import (
     PackBackendFactory,
     PackFrontendFactory,
@@ -480,14 +480,68 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def test_root_revision_header(self):
-        factory = client.HTTPClientFactory(
-            b'http://localhost:%d/' % self.port, method=b'HEAD',
-            followRedirect=False)
-        reactor.connectTCP(b'localhost', self.port, factory)
-        yield assert_fails_with(factory.deferred, error.PageRedirect)
+        response = yield client.Agent(reactor).request(
+            b'HEAD', b'http://localhost:%d/' % self.port)
+        self.assertEqual(302, response.code)
         self.assertEqual(
             [version_info['revision_id']],
-            factory.response_headers[b'x-turnip-revision'])
+            response.headers.getRawHeaders(b'X-Turnip-Revision'))
+
+    def make_set_symbolic_ref_request(self, line):
+        parsed_url = urlsplit(self.url)
+        url = urlunsplit([
+            parsed_url.scheme,
+            b'%s:%d' % (parsed_url.hostname, parsed_url.port),
+            parsed_url.path + b'/turnip-set-symbolic-ref', b'', b''])
+        headers = {
+            b'Content-Type': [
+                b'application/x-turnip-set-symbolic-ref-request',
+                ],
+            }
+        if parsed_url.username:
+            headers[b'Authorization'] = [
+                b'Basic ' + base64.b64encode(
+                    b'%s:%s' % (parsed_url.username, parsed_url.password)),
+                ]
+        data = helpers.encode_packet(line) + helpers.encode_packet(None)
+        return client.Agent(reactor).request(
+            b'POST', url, headers=http_headers.Headers(headers),
+            bodyProducer=client.FileBodyProducer(io.BytesIO(data)))
+
+    @defer.inlineCallbacks
+    def get_symbolic_ref(self, path, name):
+        out = yield utils.getProcessOutput(
+            b'git', (b'symbolic-ref', name), env=os.environ, path=path)
+        defer.returnValue(out.rstrip(b'\n'))
+
+    @defer.inlineCallbacks
+    def test_turnip_set_symbolic_ref(self):
+        repo = os.path.join(self.root, self.internal_name)
+        head_target = yield self.get_symbolic_ref(repo, b'HEAD')
+        self.assertEqual(b'refs/heads/master', head_target)
+        response = yield self.make_set_symbolic_ref_request(
+            b'HEAD refs/heads/new-head')
+        self.assertEqual(200, response.code)
+        body = yield client.readBody(response)
+        self.assertEqual((b'ACK HEAD\n', ''), helpers.decode_packet(body))
+        head_target = yield self.get_symbolic_ref(repo, b'HEAD')
+        self.assertEqual(b'refs/heads/new-head', head_target)
+
+    @defer.inlineCallbacks
+    def test_turnip_set_symbolic_ref_error(self):
+        repo = os.path.join(self.root, self.internal_name)
+        head_target = yield self.get_symbolic_ref(repo, b'HEAD')
+        self.assertEqual(b'refs/heads/master', head_target)
+        response = yield self.make_set_symbolic_ref_request(b'HEAD --evil')
+        # This is a little weird since an error occurred, but it's
+        # consistent with other HTTP pack protocol responses.
+        self.assertEqual(200, response.code)
+        body = yield client.readBody(response)
+        self.assertEqual(
+            (b'ERR Symbolic ref target may not start with "-"\n', ''),
+            helpers.decode_packet(body))
+        head_target = yield self.get_symbolic_ref(repo, b'HEAD')
+        self.assertEqual(b'refs/heads/master', head_target)
 
 
 class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):

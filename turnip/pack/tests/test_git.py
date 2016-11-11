@@ -7,13 +7,23 @@ from __future__ import (
     unicode_literals,
     )
 
+import os.path
+
+from fixtures import TempDir
+from pygit2 import init_repository
 from testtools import TestCase
+from testtools.matchers import (
+    ContainsDict,
+    Equals,
+    MatchesListwise,
+    )
 from twisted.test import proto_helpers
 
 from turnip.pack import (
     git,
     helpers,
     )
+from turnip.pack.tests.test_hooks import MockHookRPCHandler
 
 
 class DummyPackServerProtocol(git.PackServerProtocol):
@@ -87,3 +97,111 @@ class TestPackServerProtocol(TestCase):
         # dropped.
         self.proto.dataReceived(b'0000')
         self.assertKilledWith(b'Bad request: flush-pkt instead')
+
+
+class DummyPackBackendProtocol(git.PackBackendProtocol):
+
+    test_process = None
+
+    def spawnProcess(self, cmd, args, env=None):
+        if self.test_process is not None:
+            raise AssertionError('Process already spawned.')
+        self.test_process = (cmd, args, env)
+
+
+class TestPackBackendProtocol(TestCase):
+    """Test the Git pack backend protocol."""
+
+    def setUp(self):
+        super(TestPackBackendProtocol, self).setUp()
+        self.root = self.useFixture(TempDir()).path
+        self.hookrpc_handler = MockHookRPCHandler()
+        self.hookrpc_sock = os.path.join(self.root, 'hookrpc_sock')
+        self.factory = git.PackBackendFactory(
+            self.root, self.hookrpc_handler, self.hookrpc_sock)
+        self.proto = DummyPackBackendProtocol()
+        self.proto.factory = self.factory
+        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport.protocol = self.proto
+        self.proto.makeConnection(self.transport)
+
+    def assertKilledWith(self, message):
+        self.assertFalse(self.transport.connected)
+        self.assertEqual(
+            (b'ERR ' + message + b'\n', b''),
+            helpers.decode_packet(self.transport.value()))
+
+    def test_git_upload_pack_calls_spawnProcess(self):
+        # If the command is git-upload-pack, requestReceived calls
+        # spawnProcess with appropriate arguments.
+        self.proto.requestReceived(
+            b'git-upload-pack', b'/foo.git', {b'host': b'example.com'})
+        self.assertEqual(
+            (b'git',
+             [b'git', b'upload-pack', os.path.join(self.root, b'foo.git')],
+             {}),
+            self.proto.test_process)
+
+    def test_git_receive_pack_calls_spawnProcess(self):
+        # If the command is git-receive-pack, requestReceived calls
+        # spawnProcess with appropriate arguments.
+        repo_dir = os.path.join(self.root, 'foo.git')
+        init_repository(repo_dir, bare=True)
+        self.proto.requestReceived(
+            b'git-receive-pack', b'/foo.git', {b'host': b'example.com'})
+        self.assertThat(
+            self.proto.test_process, MatchesListwise([
+                Equals(b'git'),
+                Equals([b'git', b'receive-pack', repo_dir.encode('utf-8')]),
+                ContainsDict(
+                    {b'TURNIP_HOOK_RPC_SOCK': Equals(self.hookrpc_sock)})]))
+
+    def test_turnip_set_symbolic_ref_calls_spawnProcess(self):
+        # If the command is turnip-set-symbolic-ref, requestReceived does
+        # not spawn a process, but packetReceived calls spawnProcess with
+        # appropriate arguments.
+        repo_dir = os.path.join(self.root, 'foo.git')
+        init_repository(repo_dir, bare=True)
+        self.proto.requestReceived(b'turnip-set-symbolic-ref', b'/foo.git', {})
+        self.assertIsNone(self.proto.test_process)
+        self.proto.packetReceived(b'HEAD refs/heads/master')
+        self.assertThat(
+            self.proto.test_process, MatchesListwise([
+                Equals(b'git'),
+                Equals([
+                    b'git', b'-C', repo_dir.encode('utf-8'), b'symbolic-ref',
+                    b'HEAD', b'refs/heads/master']),
+                ContainsDict(
+                    {b'TURNIP_HOOK_RPC_SOCK': Equals(self.hookrpc_sock)})]))
+
+    def test_turnip_set_symbolic_ref_requires_valid_line(self):
+        # The turnip-set-symbolic-ref command requires a valid
+        # set-symbolic-ref-line packet.
+        self.proto.requestReceived(b'turnip-set-symbolic-ref', b'/foo.git', {})
+        self.assertIsNone(self.proto.test_process)
+        self.proto.packetReceived(b'HEAD')
+        self.assertKilledWith(b'Invalid set-symbolic-ref-line')
+
+    def test_turnip_set_symbolic_ref_name_must_be_HEAD(self):
+        # The turnip-set-symbolic-ref command's "name" parameter must be
+        # "HEAD".
+        self.proto.requestReceived(b'turnip-set-symbolic-ref', b'/foo.git', {})
+        self.assertIsNone(self.proto.test_process)
+        self.proto.packetReceived(b'another-symref refs/heads/master')
+        self.assertKilledWith(b'Symbolic ref name must be "HEAD"')
+
+    def test_turnip_set_symbolic_ref_target_not_option(self):
+        # The turnip-set-symbolic-ref command's "target" parameter may not
+        # start with "-".
+        self.proto.requestReceived(b'turnip-set-symbolic-ref', b'/foo.git', {})
+        self.assertIsNone(self.proto.test_process)
+        self.proto.packetReceived(b'HEAD --evil')
+        self.assertKilledWith(b'Symbolic ref target may not start with "-"')
+
+    def test_turnip_set_symbolic_ref_target_no_space(self):
+        # The turnip-set-symbolic-ref command's "target" parameter may not
+        # contain " ".
+        self.proto.requestReceived(b'turnip-set-symbolic-ref', b'/foo.git', {})
+        self.assertIsNone(self.proto.test_process)
+        self.proto.packetReceived(b'HEAD evil lies')
+        self.assertKilledWith(b'Symbolic ref target may not contain " "')

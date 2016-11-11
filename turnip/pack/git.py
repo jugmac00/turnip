@@ -278,7 +278,7 @@ class GitProcessProtocol(protocol.ProcessProtocol):
                 'git exited {code} with no output; synthesising an error',
                 code=code)
             self.peer.sendPacket(ERROR_PREFIX + 'backend exited %d' % code)
-        self.peer.transport.loseConnection()
+        self.peer.processEnded(reason)
 
     def pauseProducing(self):
         self.transport.pauseProducing()
@@ -392,42 +392,116 @@ class PackBackendProtocol(PackServerProtocol):
     """
 
     hookrpc_key = None
+    expect_set_symbolic_ref = False
 
     def requestReceived(self, command, raw_pathname, params):
         self.extractRequestMeta(command, raw_pathname, params)
+        self.command = command
+        self.raw_pathname = raw_pathname
+        self.path = compose_path(self.factory.root, self.raw_pathname)
 
-        path = compose_path(self.factory.root, raw_pathname)
+        if command == b'turnip-set-symbolic-ref':
+            self.expect_set_symbolic_ref = True
+            self.resumeProducing()
+            return
+
+        write_operation = False
         if command == b'git-upload-pack':
             subcmd = b'upload-pack'
         elif command == b'git-receive-pack':
             subcmd = b'receive-pack'
+            write_operation = True
         else:
             self.die(b'Unsupported command in request')
             return
 
-        cmd = b'git'
-        args = [b'git', subcmd]
+        args = []
         if params.pop(b'turnip-stateless-rpc', None):
             args.append(b'--stateless-rpc')
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
-        args.append(path)
+        args.append(self.path)
+        self.spawnGit(subcmd, args, write_operation=write_operation)
+
+    def spawnGit(self, subcmd, extra_args, write_operation=False,
+                 send_path_as_option=False):
+        cmd = b'git'
+        args = [b'git']
+        if send_path_as_option:
+            args.extend([b'-C', self.path])
+        args.append(subcmd)
+        args.extend(extra_args)
 
         env = {}
-        if subcmd == b'receive-pack' and self.factory.hookrpc_handler:
+        if write_operation and self.factory.hookrpc_handler:
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.
-            ensure_config(path)
+            ensure_config(self.path)
             self.hookrpc_key = str(uuid.uuid4())
             self.factory.hookrpc_handler.registerKey(
-                self.hookrpc_key, raw_pathname, [])
-            ensure_hooks(path)
+                self.hookrpc_key, self.raw_pathname, [])
+            ensure_hooks(self.path)
             env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hookrpc_sock
             env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
 
         self.log.info('Spawning {args}', args=args)
         self.peer = GitProcessProtocol(self)
+        self.spawnProcess(cmd, args, env=env)
+
+    def spawnProcess(self, cmd, args, env=None):
         reactor.spawnProcess(self.peer, cmd, args, env=env)
+
+    def packetReceived(self, data):
+        if self.expect_set_symbolic_ref:
+            if data is None:
+                self.die(b'Bad request: flush-pkt instead')
+                return
+            self.pauseProducing()
+            self.expect_set_symbolic_ref = False
+            if b' ' not in data:
+                self.die(b'Invalid set-symbolic-ref-line')
+                return
+            name, target = data.split(b' ', 1)
+            # Be careful about extending this to anything other than HEAD.
+            # We use "git symbolic-ref" because it gives us locking and
+            # logging, but it doesn't prevent writing a ref to ../something.
+            # Fortunately it does at least refuse to point HEAD outside of
+            # refs/.
+            if name != b'HEAD':
+                self.die(b'Symbolic ref name must be "HEAD"')
+                return
+            if target.startswith(b'-'):
+                self.die(b'Symbolic ref target may not start with "-"')
+                return
+            elif b' ' in target:
+                self.die(b'Symbolic ref target may not contain " "')
+                return
+            self.symbolic_ref_name = name
+            self.spawnGit(
+                b'symbolic-ref', [name, target], write_operation=True,
+                send_path_as_option=True)
+            return
+
+        PackServerProtocol.packetReceived(self, data)
+
+    @defer.inlineCallbacks
+    def processEnded(self, reason):
+        message = None
+        if self.command == b'turnip-set-symbolic-ref':
+            if reason.check(error.ProcessDone):
+                try:
+                    yield self.factory.hookrpc_handler.notify(self.path)
+                    self.sendPacket(b'ACK %s\n' % self.symbolic_ref_name)
+                except Exception as e:
+                    message = str(e)
+            else:
+                message = (
+                    'git symbolic-ref exited with status %d' %
+                    reason.value.exitCode)
+        if message is None:
+            self.transport.loseConnection()
+        else:
+            self.die(message)
 
     def readConnectionLost(self):
         # Forward the closed stdin down the stack.
