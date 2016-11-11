@@ -82,7 +82,7 @@ The server replies with an ACK indicating the symbolic ref name that was
 changed, or an error message.
 
    turnip-set-symbolic-ref-response = set-symbolic-ref-ack / error-line
-   set-symbolic-ref-ack             = PKT-LINE("ACK" SP refname LF)
+   set-symbolic-ref-ack             = PKT-LINE("ACK" SP refname)
 
 
 Development
