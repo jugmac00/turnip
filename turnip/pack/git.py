@@ -490,7 +490,8 @@ class PackBackendProtocol(PackServerProtocol):
         if self.command == b'turnip-set-symbolic-ref':
             if reason.check(error.ProcessDone):
                 try:
-                    yield self.factory.hookrpc_handler.notify(self.path)
+                    yield self.factory.hookrpc_handler.notify(
+                        self.raw_pathname)
                     self.sendPacket(b'ACK %s\n' % self.symbolic_ref_name)
                 except Exception as e:
                     message = str(e)
