@@ -473,6 +473,9 @@ class PackBackendProtocol(PackServerProtocol):
             if target.startswith(b'-'):
                 self.die(b'Symbolic ref target may not start with "-"')
                 return
+            elif b' ' in target:
+                self.die(b'Symbolic ref target may not contain " "')
+                return
             self.symbolic_ref_name = name
             self.spawnGit(
                 b'symbolic-ref', [name, target], write_operation=True,

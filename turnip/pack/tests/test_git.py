@@ -197,3 +197,11 @@ class TestPackBackendProtocol(TestCase):
         self.assertIsNone(self.proto.test_process)
         self.proto.packetReceived(b'HEAD --evil')
         self.assertKilledWith(b'Symbolic ref target may not start with "-"')
+
+    def test_turnip_set_symbolic_ref_target_no_space(self):
+        # The turnip-set-symbolic-ref command's "target" parameter may not
+        # contain " ".
+        self.proto.requestReceived(b'turnip-set-symbolic-ref', b'/foo.git', {})
+        self.assertIsNone(self.proto.test_process)
+        self.proto.packetReceived(b'HEAD evil lies')
+        self.assertKilledWith(b'Symbolic ref target may not contain " "')
