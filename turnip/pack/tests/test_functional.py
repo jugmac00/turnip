@@ -526,6 +526,8 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         self.assertEqual((b'ACK HEAD\n', ''), helpers.decode_packet(body))
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/new-head', head_target)
+        self.assertEqual(
+            [self.internal_name], self.virtinfo.push_notifications)
 
     @defer.inlineCallbacks
     def test_turnip_set_symbolic_ref_error(self):
