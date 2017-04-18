@@ -20,7 +20,7 @@ pyasn1==0.1.7
 pycparser==2.10
 pycrypto==2.6.1
 pyflakes==0.8.1
-pygit2==0.22.1
+pygit2==0.24.2
 pyramid==1.5.4
 python-mimeparse==0.1.4
 # XXX: deryck 2012-08-10
