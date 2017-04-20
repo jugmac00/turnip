@@ -2,6 +2,6 @@ build-essential
 cgit
 git
 libffi-dev
-libgit2-dev
+libgit2-24
 python-dev
 python-virtualenv
