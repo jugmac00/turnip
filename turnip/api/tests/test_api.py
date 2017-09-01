@@ -361,6 +361,19 @@ class ApiTestCase(TestCase):
         self.assertIn(b'-foo', resp.body)
         self.assertIn(b'+bar', resp.body)
 
+    def test_repo_diff_detects_renames(self):
+        """get_diff finds renamed files."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'foo.txt')
+        repo.repo.index.remove('foo.txt')
+        c2 = repo.add_commit('foo\n', 'bar.txt', parents=[c1])
+
+        path = '/repo/{}/compare/{}..{}'.format(
+            self.repo_path, quote('{}^'.format(c2)), c2)
+        resp = self.app.get(path)
+        self.assertIn(
+            b'diff --git a/foo.txt b/bar.txt\n', resp.json_body['patch'])
+
     def test_repo_diff_merge(self):
         """Ensure expected changes exist in diff patch."""
         repo = RepoFactory(self.repo_store)
@@ -437,6 +450,18 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, repo.nonexistent_oid(), c1), expect_errors=True)
         self.assertEqual(404, resp.status_code)
+
+    def test_repo_diff_merge_detects_renames(self):
+        """get_merge_diff finds renamed files."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'foo.txt')
+        repo.repo.index.remove('foo.txt')
+        c2 = repo.add_commit('foo\n', 'bar.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
+            self.repo_path, c1, c2))
+        self.assertIn(
+            b'diff --git a/foo.txt b/bar.txt\n', resp.json_body['patch'])
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
