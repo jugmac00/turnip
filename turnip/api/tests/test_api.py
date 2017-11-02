@@ -414,6 +414,51 @@ class ApiTestCase(TestCase):
             """), resp.json_body['patch'])
         self.assertEqual(['blah.txt'], resp.json_body['conflicts'])
 
+    def test_repo_diff_merge_with_modify_delete_conflict(self):
+        """compare-merge handles modify/delete conflicts."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'foo.txt')
+        c2_left = repo.add_commit('foo\nbar\n', 'foo.txt', parents=[c1])
+        repo.repo.index.remove('foo.txt')
+        c2_right = repo.add_commit('', 'bar.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
+            self.repo_path, c2_left, c2_right))
+        self.assertIn(dedent(u"""\
+            --- a/foo.txt
+            +++ b/foo.txt
+            @@ -1,2 +1,5 @@
+            +<<<<<<< foo.txt
+             foo
+             bar
+            +=======
+            +>>>>>>> foo.txt
+            """), resp.json_body['patch'])
+        self.assertEqual(['foo.txt'], resp.json_body['conflicts'])
+
+    def test_repo_diff_merge_with_delete_modify_conflict(self):
+        """compare-merge handles delete/modify conflicts."""
+        repo = RepoFactory(self.repo_store)
+        c1 = repo.add_commit('foo\n', 'foo.txt')
+        repo.repo.index.remove('foo.txt')
+        c2_left = repo.add_commit('', 'bar.txt', parents=[c1])
+        repo.repo.index.remove('bar.txt')
+        c2_right = repo.add_commit('foo\nbar\n', 'foo.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
+            self.repo_path, c2_left, c2_right))
+        self.assertIn(dedent(u"""\
+            --- /dev/null
+            +++ b/foo.txt
+            @@ -0,0 +1,5 @@
+            +<<<<<<< foo.txt
+            +=======
+            +foo
+            +bar
+            +>>>>>>> foo.txt
+            """), resp.json_body['patch'])
+        self.assertEqual(['foo.txt'], resp.json_body['conflicts'])
+
     def test_repo_diff_merge_with_prerequisite(self):
         """Ensure that compare-merge handles prerequisites."""
         repo = RepoFactory(self.repo_store)
