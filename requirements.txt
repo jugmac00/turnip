@@ -17,7 +17,7 @@ gunicorn==19.3.0
 idna==2.6
 incremental==17.5.0
 ipaddress==1.0.19
-lazr.sshserver==0.1.4
+lazr.sshserver==0.1.7
 linecache2==1.0.0
 mccabe==0.3
 Paste==2.0.2
