@@ -3,5 +3,6 @@ cgit
 git
 libffi-dev
 libgit2-24
+libssl-dev
 python-dev
 python-virtualenv
