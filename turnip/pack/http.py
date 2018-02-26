@@ -182,8 +182,8 @@ class HTTPPackClientProtocol(PackProtocol):
             self.factory.http_request.write(data)
 
     def connectionLost(self, reason):
-        self.factory.http_request.unregisterProducer()
         if not self.factory.http_request.finished:
+            self.factory.http_request.unregisterProducer()
             if reason.check(error.ConnectionDone):
                 # We assume that the backend will have sent an error if
                 # necessary; otherwise an empty response is permitted (and
