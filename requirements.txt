@@ -20,7 +20,7 @@ hyperlink==18.0.0
 idna==2.6
 incremental==17.5.0
 ipaddress==1.0.19
-lazr.sshserver==0.1.7
+lazr.sshserver==0.1.8
 linecache2==1.0.0
 m2r==0.1.14
 mccabe==0.3
