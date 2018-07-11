@@ -57,4 +57,4 @@ WebTest==2.0.18
 zope.component==4.2.1
 zope.deprecation==4.1.2
 zope.event==4.0.3
-zope.interface==4.1.2
+zope.interface==4.5.0
