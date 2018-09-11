@@ -46,7 +46,10 @@ hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT)
 hookrpc_path = os.path.join(REPO_STORE, 'hookrpc_sock_%d' % PACK_BACKEND_PORT)
 reactor.listenTCP(
     PACK_BACKEND_PORT,
-    PackBackendFactory(REPO_STORE, hookrpc_handler, hookrpc_path))
+    PackBackendFactory(REPO_STORE,
+                       hookrpc_handler,
+                       hookrpc_path,
+                       VIRTINFO_ENDPOINT))
 if os.path.exists(hookrpc_path):
     os.unlink(hookrpc_path)
 reactor.listenUNIX(hookrpc_path, HookRPCServerFactory(hookrpc_handler))

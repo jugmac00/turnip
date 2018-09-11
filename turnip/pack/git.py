@@ -421,10 +421,16 @@ class PackBackendProtocol(PackServerProtocol):
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
         args.append(self.path)
-        self.spawnGit(subcmd, args, write_operation=write_operation)
+        auth_params = {'uid': params['turnip-authenticated-uid'],
+                       'user': params['turnip-authenticated-user']}
+        self.spawnGit(subcmd,
+                      args,
+                      write_operation=write_operation,
+                      auth_params=auth_params)
 
+    @defer.inlineCallbacks
     def spawnGit(self, subcmd, extra_args, write_operation=False,
-                 send_path_as_option=False):
+                 send_path_as_option=False, auth_params=None):
         cmd = b'git'
         args = [b'git']
         if send_path_as_option:
@@ -434,12 +440,24 @@ class PackBackendProtocol(PackServerProtocol):
 
         env = {}
         if write_operation and self.factory.hookrpc_handler:
+            # Request the ref rules for 'branch permissions'.
+            proxy = xmlrpc.Proxy(
+                self.factory.virtinfo_endpoint, allowNone=True)
+            try:
+                ref_rules = yield proxy.callRemote(
+                    b'listRefRules',
+                    self.path,
+                    auth_params)
+                print(ref_rules)
+            except Exception as e:
+                print(e)
+                import pdb; pdb.set_trace()
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.
             ensure_config(self.path)
             self.hookrpc_key = str(uuid.uuid4())
             self.factory.hookrpc_handler.registerKey(
-                self.hookrpc_key, self.raw_pathname, [])
+                self.hookrpc_key, self.raw_pathname, ref_rules)
             ensure_hooks(self.path)
             env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hookrpc_sock
             env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
@@ -519,10 +537,15 @@ class PackBackendFactory(protocol.Factory):
 
     protocol = PackBackendProtocol
 
-    def __init__(self, root, hookrpc_handler=None, hookrpc_sock=None):
+    def __init__(self,
+                 root,
+                 hookrpc_handler=None,
+                 hookrpc_sock=None,
+                 virtinfo_endpoint=None):
         self.root = root
         self.hookrpc_handler = hookrpc_handler
         self.hookrpc_sock = hookrpc_sock
+        self.virtinfo_endpoint = virtinfo_endpoint
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):
