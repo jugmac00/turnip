@@ -123,7 +123,12 @@ class HookRPCHandler(object):
 
     def listRefRules(self, proto, args):
         """Get forbidden ref path patterns (as Unicode)."""
-        return [rule.decode('utf-8') for rule in self.ref_rules[args['key']]]
+        ref_rules = []
+        for rule in self.ref_rules[args['key']]:
+            new_rule = rule.copy()
+            new_rule['pattern'] = new_rule['pattern'].decode('utf-8')
+            ref_rules.append(new_rule)
+        return ref_rules
 
     @defer.inlineCallbacks
     def notify(self, path):

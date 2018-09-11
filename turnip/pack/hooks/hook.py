@@ -26,15 +26,48 @@ def glob_to_re(s):
 
 
 def match_rules(rule_lines, ref_lines):
-    rules = [re.compile(glob_to_re(l.rstrip(b'\n'))) for l in rule_lines]
+    #rules = [re.compile(glob_to_re(l.rstrip(b'\n'))) for l in rule_lines]
+    rules = []
+    for rule in rule_lines:
+        new_rule = {
+            'reg_pattern': re.compile(glob_to_re(rule['pattern'].rstrip(b'\n'))),
+            'permissions': rule['permissions']
+        }
+        rules.append(new_rule)
     # Match each ref against each rule.
-    errors = []
     for ref_line in ref_lines:
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
-        if any(rule.match(ref) for rule in rules):
-            errors.append(b"You can't push to %s." % ref)
-    return errors
+        sys.stderr.write(old + '\n')
+        sys.stderr.write(new + '\n')
+        sys.stderr.write(ref + '\n')
+        return determine_permissions_outcome(old, ref, rules)
+    return []
 
+def determine_permissions_outcome(old, ref, rules):
+    creation_ref = '0000000000000000000000000000000000000000'
+    for rule in rules:
+        match = rule['reg_pattern'].match(ref)
+        # If we don't match this ref, move on
+        if not match:
+            continue
+        # If we match, but empty permissions array, user has no write access
+        if not rule['permissions']:
+            return [b'You do not have permissions to push to %s' % ref]
+        # We are creating a new ref and have the correct permission
+        if 'create' in rule['permissions'] and old == creation_ref:
+            return []
+        # We are creating a new ref, but we don't have permission
+        if 'create' not in rule['permissions'] and old == creation_ref:
+            return [b'You do not have permissions to create ref %s' % ref]
+        # We have push permission, everything is okay
+        # force_push is checked later (in update-hook)
+        if 'push' in rule['permissions']:
+            return []
+        # We have force-push permission, implies push, therefore okay
+        if 'force_push' in rule['permissions']:
+            return []
+    # If we're here, there are no matching rules
+    return [b'There are no matching permissions for %s' % ref]
 
 def netstring_send(sock, s):
     sock.send(b'%d:%s,' % (len(s), s))
