@@ -443,15 +443,10 @@ class PackBackendProtocol(PackServerProtocol):
             # Request the ref rules for 'branch permissions'.
             proxy = xmlrpc.Proxy(
                 self.factory.virtinfo_endpoint, allowNone=True)
-            try:
-                ref_rules = yield proxy.callRemote(
-                    b'listRefRules',
-                    self.path,
-                    auth_params)
-                print(ref_rules)
-            except Exception as e:
-                print(e)
-                import pdb; pdb.set_trace()
+            ref_rules = yield proxy.callRemote(
+                b'listRefRules',
+                self.path,
+                auth_params)
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.
             ensure_config(self.path)

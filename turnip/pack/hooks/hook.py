@@ -15,6 +15,8 @@ import re
 import socket
 import sys
 
+import pygit2
+
 
 def glob_to_re(s):
     """Convert a glob to a regular expression.
@@ -26,27 +28,48 @@ def glob_to_re(s):
 
 
 def match_rules(rule_lines, ref_lines):
-    #rules = [re.compile(glob_to_re(l.rstrip(b'\n'))) for l in rule_lines]
-    rules = []
     for rule in rule_lines:
-        new_rule = {
-            'reg_pattern': re.compile(glob_to_re(rule['pattern'].rstrip(b'\n'))),
-            'permissions': rule['permissions']
-        }
-        rules.append(new_rule)
+        rule['pattern'] = re.compile(glob_to_re(rule['pattern'].rstrip(b'\n')))
     # Match each ref against each rule.
     for ref_line in ref_lines:
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
-        sys.stderr.write(old + '\n')
-        sys.stderr.write(new + '\n')
-        sys.stderr.write(ref + '\n')
-        return determine_permissions_outcome(old, ref, rules)
+        return determine_permissions_outcome(old, ref, rule_lines)
     return []
+
+
+def match_update_rules(rule_lines, ref_line):
+
+    ref, old, new = ref_line
+
+    # Find the repo we're concerned about
+    repo_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        os.pardir)
+    repo = pygit2.Repository(repo_path)
+
+    # Find common ancestors: if there aren't any, it's a none-fast-forward
+    base = repo.merge_base(old, new)
+    if base and base.hex == old:
+        # This is a fast-forwardable merge
+        return []
+
+    # If it's not fast forwardable, check that user has permissions
+    for rule in rule_lines:
+        rule['pattern'] = re.compile(glob_to_re(rule['pattern'].rstrip(b'\n')))
+        match = rule['pattern'].match(ref)
+        if not match:
+            continue
+        if 'force_push' in rule['permissions']:
+            return []
+        # We only check the first matching rule
+        break
+    return [b'You are not allowed to force push to %s' % ref]
+
 
 def determine_permissions_outcome(old, ref, rules):
     creation_ref = '0000000000000000000000000000000000000000'
     for rule in rules:
-        match = rule['reg_pattern'].match(ref)
+        match = rule['pattern'].match(ref)
         # If we don't match this ref, move on
         if not match:
             continue
@@ -64,10 +87,15 @@ def determine_permissions_outcome(old, ref, rules):
         if 'push' in rule['permissions']:
             return []
         # We have force-push permission, implies push, therefore okay
+        # This is confirmed in match_update_rules
         if 'force_push' in rule['permissions']:
             return []
+
+        # We only check the first matching rule
+        break
     # If we're here, there are no matching rules
     return [b'There are no matching permissions for %s' % ref]
+
 
 def netstring_send(sock, s):
     sock.send(b'%d:%s,' % (len(s), s))
@@ -119,6 +147,12 @@ if __name__ == '__main__':
         if sys.stdin.readlines():
             rule_lines = rpc_invoke(sock, b'notify_push', {'key': rpc_key})
         sys.exit(0)
+    elif hook == 'update':
+        rule_lines = rpc_invoke(sock, b'list_ref_rules', {'key': rpc_key})
+        errors = match_update_rules(rule_lines, sys.argv[1:4])
+        for error in errors:
+            sys.stdout.write(error + b'\n')
+        sys.exit(1 if errors else 0)
     else:
         sys.stderr.write(b'Invalid hook name: %s' % hook)
         sys.exit(1)

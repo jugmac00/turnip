@@ -123,7 +123,7 @@ def ensure_hooks(repo_root):
     directories will cause an exception.
     """
 
-    wanted_hooks = ('pre-receive', 'post-receive')
+    wanted_hooks = ('pre-receive', 'update', 'post-receive')
     target_name = 'hook.py'
 
     def hook_path(name):
