@@ -54,6 +54,9 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
     def notifyPush(self, proto, args):
         self.notifications.append(self.ref_paths[args['key']])
 
+    def listRefRules(self, path, auth_params):
+        return {}
+
 
 class HookTestMixin(object):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
@@ -110,6 +113,9 @@ class HookTestMixin(object):
         code, out, err = yield self.invokeHook(self.encodeRefs(updates), rules)
         self.assertEqual((1, message, b''), (code, out, err))
 
+    def make_permissions_pattern(self, ref, permissions):
+        return [{'pattern': ref, 'permissions': permissions}]
+
 
 class TestPreReceiveHook(HookTestMixin, TestCase):
     """Tests for the git pre-receive hook."""
@@ -121,7 +127,7 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
         # A single valid ref is accepted.
         yield self.assertAccepted(
             [(b'refs/heads/master', self.old_sha1, self.new_sha1)],
-            [])
+            make_permissions_pattern('refs/heads/master', ['push']))
 
     @defer.inlineCallbacks
     def test_rejected(self):

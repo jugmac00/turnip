@@ -97,4 +97,7 @@ build-tarball:
 		--exclude env \
 		./
 
+test: $($ENV)
+	$(PYTHON) -m unittest discover -v turnip
+
 .PHONY: build check clean dist lint run-api build-tarball
