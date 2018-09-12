@@ -108,6 +108,9 @@ class DummyPackBackendProtocol(git.PackBackendProtocol):
             raise AssertionError('Process already spawned.')
         self.test_process = (cmd, args, env)
 
+    def getRules(self, auth_params):
+        return []
+
 
 class TestPackBackendProtocol(TestCase):
     """Test the Git pack backend protocol."""
@@ -139,7 +142,7 @@ class TestPackBackendProtocol(TestCase):
         self.assertEqual(
             (b'git',
              [b'git', b'upload-pack', os.path.join(self.root, b'foo.git')],
-             {}),
+            {}),
             self.proto.test_process)
 
     def test_git_receive_pack_calls_spawnProcess(self):

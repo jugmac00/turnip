@@ -54,9 +54,6 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
     def notifyPush(self, proto, args):
         self.notifications.append(self.ref_paths[args['key']])
 
-    def listRefRules(self, path, auth_params):
-        return {}
-
 
 class HookTestMixin(object):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)

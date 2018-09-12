@@ -439,13 +439,7 @@ class PackBackendProtocol(PackServerProtocol):
 
         env = {}
         if write_operation and self.factory.hookrpc_handler:
-            # Request the ref rules for 'branch permissions'.
-            proxy = xmlrpc.Proxy(
-                self.factory.virtinfo_endpoint, allowNone=True)
-            ref_rules = yield proxy.callRemote(
-                b'listRefRules',
-                self.path,
-                auth_params)
+            ref_rules = yield self.getRules(auth_params)
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.
             ensure_config(self.path)
@@ -462,6 +456,16 @@ class PackBackendProtocol(PackServerProtocol):
 
     def spawnProcess(self, cmd, args, env=None):
         reactor.spawnProcess(self.peer, cmd, args, env=env)
+
+    def getRules(self, auth_params):
+        # Request the ref rules for 'branch permissions'.
+        proxy = xmlrpc.Proxy(
+            self.factory.virtinfo_endpoint, allowNone=True)
+        return proxy.callRemote(
+            b'listRefRules',
+            self.path,
+            auth_params)
+
 
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
