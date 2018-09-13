@@ -182,6 +182,16 @@ class FunctionalTestMixin(object):
         defer.returnValue(out)
 
     @defer.inlineCallbacks
+    def assertCommandFailure(self, command, path='.'):
+        out, err, code = yield utils.getProcessOutputAndValue(
+            command[0], command[1:], env=os.environ, path=path)
+        if code == 0:
+            self.addDetail('stdout', text_content(out))
+            self.addDetail('stderr', text_content(err))
+            self.assertNotEqual(0, code)
+        defer.returnValue((out, err))
+
+    @defer.inlineCallbacks
     def test_clone_and_push(self):
         # Test a full clone, commit, push, clone, commit, push, pull
         # cycle using the backend server.
@@ -277,6 +287,51 @@ class FunctionalTestMixin(object):
             b"Cloning into 'fail'...\n" + self.early_error + b'fatal: ',
             output)
         self.assertIn(b'does not appear to be a git repository', output)
+
+    @defer.inlineCallbacks
+    def test_no_permissions(self):
+        # Update the test ref_rules
+        self.virtinfo.ref_rules = [
+            {'pattern': 'refs/heads/master', 'permissions': ['push']}]
+
+        # Test a push fails if the user has no permissions to that ref
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+        clone2 = os.path.join(test_root, 'clone2')
+
+        # Clone the empty repo from the backend and commit to it.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+
+        # This should fail to push.
+        output, error = yield self.assertCommandFailure(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+        self.assertIn(
+            b'You do not have permissions to create ref refs/heads/master',
+            error)
+
+        # add create, disable push
+        self.virtinfo.ref_rules = [
+            {'pattern': 'refs/heads/master', 'permissions': ['create']}]
+        # Can now create the ref
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+
+        # But can't push a new commit.
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Second test'),
+            path=clone1)
+        output, error = yield self.assertCommandFailure(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+        self.assertIn(b"You can't push to refs/heads/master", error)
+
 
     @defer.inlineCallbacks
     def test_large_push(self):
