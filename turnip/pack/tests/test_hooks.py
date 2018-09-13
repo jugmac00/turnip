@@ -110,9 +110,6 @@ class HookTestMixin(object):
         code, out, err = yield self.invokeHook(self.encodeRefs(updates), rules)
         self.assertEqual((1, message, b''), (code, out, err))
 
-    def make_permissions_pattern(self, ref, permissions):
-        return [{'pattern': ref, 'permissions': permissions}]
-
 
 class TestPreReceiveHook(HookTestMixin, TestCase):
     """Tests for the git pre-receive hook."""
@@ -124,14 +121,14 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
         # A single valid ref is accepted.
         yield self.assertAccepted(
             [(b'refs/heads/master', self.old_sha1, self.new_sha1)],
-            make_permissions_pattern('refs/heads/master', ['push']))
+            [{'pattern': 'refs/heads/master', 'permissions': ['push']}])
 
     @defer.inlineCallbacks
     def test_rejected(self):
         # An invalid ref is rejected.
         yield self.assertRejected(
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1)],
-            [b'refs/heads/verboten'],
+            [{'pattern': 'refs/heads/verboten', 'permissions': []}],
             b"You can't push to refs/heads/verboten.\n")
 
     @defer.inlineCallbacks
@@ -142,8 +139,10 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
              (b'refs/tags/bar', self.old_sha1, self.new_sha1),
              (b'refs/tags/foo', self.old_sha1, self.new_sha1),
              (b'refs/baz/quux', self.old_sha1, self.new_sha1)],
-            [b'refs/*/foo', b'refs/baz/*'],
+            [{'pattern': 'refs/*/foo', 'permissions': []},
+             {'pattern': 'refs/baz/*', 'permissions': []}],
             b"You can't push to refs/heads/foo.\n"
+            b"You can't push to refs/tags/bar.\n"
             b"You can't push to refs/tags/foo.\n"
             b"You can't push to refs/baz/quux.\n")
 
@@ -154,7 +153,9 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1),
              (b'refs/heads/master', self.old_sha1, self.new_sha1),
              (b'refs/heads/super-verboten', self.old_sha1, self.new_sha1)],
-            [b'refs/heads/verboten', b'refs/heads/super-verboten'],
+            [{'pattern': 'refs/heads/verboten', 'permissions': []},
+             {'pattern': 'refs/heads/super-verboten', 'permissions': []},
+             {'pattern': 'refs/heads/master', 'permissions': ['push']}],
             b"You can't push to refs/heads/verboten.\n"
             b"You can't push to refs/heads/super-verboten.\n")
 

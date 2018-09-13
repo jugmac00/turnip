@@ -106,6 +106,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.translations = []
         self.authentications = []
         self.push_notifications = []
+        self.ref_rules =  []
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
@@ -128,6 +129,9 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     def xmlrpc_notify(self, path):
         self.push_notifications.append(path)
 
+    def xmlrpc_listRefRules(self, proto, args):
+        return self.ref_rules
+
 
 class FunctionalTestMixin(object):
 
@@ -142,6 +146,9 @@ class FunctionalTestMixin(object):
         self.virtinfo_port = self.virtinfo_listener.getHost().port
         self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
         self.addCleanup(self.virtinfo_listener.stopListening)
+        self.virtinfo.ref_rules = [
+            {'pattern': 'refs/heads/master',
+            'permissions': ['create', 'push']}]
 
     def startHookRPC(self):
         self.hookrpc_handler = HookRPCHandler(self.virtinfo_url)
@@ -159,7 +166,8 @@ class FunctionalTestMixin(object):
         self.backend_listener = reactor.listenTCP(
             0,
             PackBackendFactory(
-                self.root, self.hookrpc_handler, self.hookrpc_path))
+                self.root, self.hookrpc_handler, self.hookrpc_path,
+                virtinfo_endpoint=self.virtinfo_url))
         self.backend_port = self.backend_listener.getHost().port
         self.addCleanup(self.backend_listener.stopListening)
 
@@ -359,6 +367,9 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             PackVirtFactory(
                 b'localhost', self.backend_port, self.virtinfo_url))
         self.virt_port = self.virt_listener.getHost().port
+        self.virtinfo.ref_rules = [
+            {'pattern': 'refs/heads/master',
+            'permissions': ['create', 'push']}]
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -367,7 +378,10 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         yield self.authserver_listener.stopListening()
 
     @defer.inlineCallbacks
-    def test_read_only(self):
+    def test_read_only_foo(self):
+        self.virtinfo.ref_rules = [
+            {'pattern': 'refs/heads/master',
+            'permissions': ['create', 'push']}]
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
         clone2 = os.path.join(test_root, 'clone2')

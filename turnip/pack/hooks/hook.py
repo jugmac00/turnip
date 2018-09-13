@@ -18,6 +18,9 @@ import sys
 import pygit2
 
 
+CREATION_REF = '0000000000000000000000000000000000000000'
+
+
 def glob_to_re(s):
     """Convert a glob to a regular expression.
 
@@ -28,13 +31,16 @@ def glob_to_re(s):
 
 
 def match_rules(rule_lines, ref_lines):
+    result = []
     for rule in rule_lines:
         rule['pattern'] = re.compile(glob_to_re(rule['pattern'].rstrip(b'\n')))
     # Match each ref against each rule.
     for ref_line in ref_lines:
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
-        return determine_permissions_outcome(old, ref, rule_lines)
-    return []
+        outcome = determine_permissions_outcome(old, ref, rule_lines)
+        if outcome:
+            result.append(outcome)
+    return result
 
 
 def match_update_rules(rule_lines, ref_line):
@@ -46,6 +52,10 @@ def match_update_rules(rule_lines, ref_line):
         os.path.dirname(os.path.realpath(__file__)),
         os.pardir)
     repo = pygit2.Repository(repo_path)
+
+    # If it's a create, the old ref doesn't exist
+    if old == CREATION_REF:
+        return []
 
     # Find common ancestors: if there aren't any, it's a none-fast-forward
     base = repo.merge_base(old, new)
@@ -67,7 +77,6 @@ def match_update_rules(rule_lines, ref_line):
 
 
 def determine_permissions_outcome(old, ref, rules):
-    creation_ref = '0000000000000000000000000000000000000000'
     for rule in rules:
         match = rule['pattern'].match(ref)
         # If we don't match this ref, move on
@@ -75,26 +84,26 @@ def determine_permissions_outcome(old, ref, rules):
             continue
         # If we match, but empty permissions array, user has no write access
         if not rule['permissions']:
-            return [b'You do not have permissions to push to %s' % ref]
+            return b"You can't push to %s." % ref
         # We are creating a new ref and have the correct permission
-        if 'create' in rule['permissions'] and old == creation_ref:
-            return []
+        if 'create' in rule['permissions'] and old == CREATION_REF:
+            return
         # We are creating a new ref, but we don't have permission
-        if 'create' not in rule['permissions'] and old == creation_ref:
-            return [b'You do not have permissions to create ref %s' % ref]
+        if 'create' not in rule['permissions'] and old == CREATION_REF:
+            return b'You do not have permissions to create ref %s.' % ref
         # We have push permission, everything is okay
         # force_push is checked later (in update-hook)
         if 'push' in rule['permissions']:
-            return []
+            return
         # We have force-push permission, implies push, therefore okay
         # This is confirmed in match_update_rules
         if 'force_push' in rule['permissions']:
-            return []
+            return
 
         # We only check the first matching rule
         break
     # If we're here, there are no matching rules
-    return [b'There are no matching permissions for %s' % ref]
+    return b"You can't push to %s." % ref
 
 
 def netstring_send(sock, s):
