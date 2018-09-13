@@ -29,6 +29,7 @@ def glob_to_re(s):
     return b'^%s\Z' % (
         b''.join(b'[^/]*' if c == b'*' else re.escape(c) for c in s))
 
+
 def get_repo():
     # Find the repo we're concerned about
     repo_path = os.path.join(
@@ -36,6 +37,7 @@ def get_repo():
         os.pardir)
     repo = pygit2.Repository(repo_path)
     return repo
+
 
 def make_regex(pattern):
     return re.compile(glob_to_re(pattern.rstrip(b'\n')))
@@ -71,7 +73,7 @@ def match_update_rules(rule_lines, ref_line):
 
     # If it's not fast forwardable, check that user has permissions
     for rule in rule_lines:
-        match = pattern.match(make_regex(rule['pattern']))
+        match = make_regex(rule['pattern']).match(ref)
         if not match:
             continue
         if 'force_push' in rule['permissions']:

@@ -56,6 +56,21 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
         self.notifications.append(self.ref_paths[args['key']])
 
 
+class MockRef(object):
+
+    def __init__(self, hex):
+        self.hex = hex
+
+
+class MockRepo(object):
+
+    def __init__(self, hex):
+        self.hex = hex
+
+    def merge_base(self, old, new):
+        return MockRef(self.hex)
+
+
 class HookTestMixin(object):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
 
@@ -178,20 +193,6 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         # No notification is sent for an empty push.
         yield self.assertAccepted([], [])
         self.assertEqual([], self.hookrpc_handler.notifications)
-
-
-class MockRef(object):
-
-    def __init__(self, hex):
-        self.hex = hex
-
-class MockRepo(object):
-
-    def __init__(self, hex):
-        self.hex = hex
-
-    def merge_base(self, old, new):
-        return MockRef(self.hex)
 
 
 class TestUpdateHook(TestCase):

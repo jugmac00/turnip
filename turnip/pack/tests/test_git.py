@@ -142,7 +142,7 @@ class TestPackBackendProtocol(TestCase):
         self.assertEqual(
             (b'git',
              [b'git', b'upload-pack', os.path.join(self.root, b'foo.git')],
-            {}),
+             {}),
             self.proto.test_process)
 
     def test_git_receive_pack_calls_spawnProcess(self):

@@ -466,7 +466,6 @@ class PackBackendProtocol(PackServerProtocol):
             self.path,
             auth_params)
 
-
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
             if data is None:
