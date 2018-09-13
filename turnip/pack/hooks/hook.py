@@ -37,11 +37,14 @@ def get_repo():
     repo = pygit2.Repository(repo_path)
     return repo
 
+def make_regex(pattern):
+    return re.compile(glob_to_re(pattern.rstrip(b'\n')))
+
 
 def match_rules(rule_lines, ref_lines):
     result = []
     for rule in rule_lines:
-        rule['pattern'] = re.compile(glob_to_re(rule['pattern'].rstrip(b'\n')))
+        rule['pattern'] = make_regex(rule['pattern'])
     # Match each ref against each rule.
     for ref_line in ref_lines:
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
@@ -68,8 +71,7 @@ def match_update_rules(rule_lines, ref_line):
 
     # If it's not fast forwardable, check that user has permissions
     for rule in rule_lines:
-        pattern = re.compile(glob_to_re(rule['pattern'].rstrip(b'\n')))
-        match = pattern.match(ref)
+        match = pattern.match(make_regex(rule['pattern']))
         if not match:
             continue
         if 'force_push' in rule['permissions']:
@@ -88,6 +90,10 @@ def determine_permissions_outcome(old, ref, rules):
         # If we match, but empty permissions array, user has no write access
         if not rule['permissions']:
             return b"You can't push to %s." % ref
+        # We have force-push permission, implies push, therefore okay
+        # This is confirmed in match_update_rules
+        if 'force_push' in rule['permissions']:
+            return
         # We are creating a new ref and have the correct permission
         if 'create' in rule['permissions'] and old == CREATION_REF:
             return
@@ -98,11 +104,6 @@ def determine_permissions_outcome(old, ref, rules):
         # force_push is checked later (in update-hook)
         if 'push' in rule['permissions']:
             return
-        # We have force-push permission, implies push, therefore okay
-        # This is confirmed in match_update_rules
-        if 'force_push' in rule['permissions']:
-            return
-
         # We only check the first matching rule
         break
     # If we're here, there are no matching rules
