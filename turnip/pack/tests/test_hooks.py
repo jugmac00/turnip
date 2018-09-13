@@ -21,6 +21,7 @@ from twisted.internet import (
 
 from turnip.pack import hookrpc
 import turnip.pack.hooks
+from turnip.pack.hooks import hook
 
 
 class HookProcessProtocol(protocol.ProcessProtocol):
@@ -177,3 +178,77 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         # No notification is sent for an empty push.
         yield self.assertAccepted([], [])
         self.assertEqual([], self.hookrpc_handler.notifications)
+
+
+class MockRef(object):
+
+    def __init__(self, hex):
+        self.hex = hex
+
+class MockRepo(object):
+
+    def __init__(self, hex):
+        self.hex = hex
+
+    def merge_base(self, old, new):
+        return MockRef(self.hex)
+
+
+class TestUpdateHook(TestCase):
+    """Tests for the git update hook"""
+
+    def patch_repo(self, hex):
+        hook.get_repo = lambda: MockRepo(hex)
+
+    def setUp(self):
+        super(TestUpdateHook, self).setUp()
+
+    def test_create(self):
+        """Creation is determined by an all 0 base sha"""
+        self.patch_repo('')
+        self.assertEqual(
+            [], hook.match_update_rules([], ['ref', '0'*40, 'new']))
+
+    def test_fast_forward(self):
+        """If the old sha is a merge ancestor of the new"""
+        self.patch_repo('somehex')
+        self.assertEqual(
+            [], hook.match_update_rules([], ['ref', 'somehex', 'new']))
+
+    def test_rules_fall_through(self):
+        """The default is to deny"""
+        self.patch_repo('somehex')
+        output = hook.match_update_rules([], ['ref', 'old', 'new'])
+        self.assertEqual(
+            [b'You are not allowed to force push to ref'], output)
+
+    def test_no_matching_ref(self):
+        """No matches means deny by default"""
+        self.patch_repo('somehex')
+        output = hook.match_update_rules(
+            [{'pattern': 'notamatch', 'permissions': []}],
+            ['ref', 'old', 'new'])
+        self.assertEqual(
+            [b'You are not allowed to force push to ref'], output)
+
+    def test_matching_ref(self):
+        self.patch_repo('somehex')
+        output = hook.match_update_rules(
+            [{'pattern': 'ref', 'permissions': ['force_push']}],
+            ['ref', 'old', 'new'])
+        self.assertEqual([], output)
+
+    def test_wildcard_ref(self):
+        self.patch_repo('somehex')
+        output = hook.match_update_rules(
+            [{'pattern': 'refs/heads/*/test', 'permissions': ['force_push']}],
+            ['refs/heads/wildcard/test', 'old', 'new'])
+        self.assertEqual([], output)
+
+    def test_no_permission(self):
+        """User does not have permission to force push"""
+        self.patch_repo('somehex')
+        output = hook.match_update_rules(
+            [{'pattern': 'ref', 'permissions': ['create']}],
+            ['ref', 'old', 'new'])
+        self.assertEqual([b'You are not allowed to force push to ref'], output)

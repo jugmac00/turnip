@@ -29,6 +29,14 @@ def glob_to_re(s):
     return b'^%s\Z' % (
         b''.join(b'[^/]*' if c == b'*' else re.escape(c) for c in s))
 
+def get_repo():
+    # Find the repo we're concerned about
+    repo_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        os.pardir)
+    repo = pygit2.Repository(repo_path)
+    return repo
+
 
 def match_rules(rule_lines, ref_lines):
     result = []
@@ -46,12 +54,7 @@ def match_rules(rule_lines, ref_lines):
 def match_update_rules(rule_lines, ref_line):
 
     ref, old, new = ref_line
-
-    # Find the repo we're concerned about
-    repo_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        os.pardir)
-    repo = pygit2.Repository(repo_path)
+    repo = get_repo()
 
     # If it's a create, the old ref doesn't exist
     if old == CREATION_REF:
@@ -65,8 +68,8 @@ def match_update_rules(rule_lines, ref_line):
 
     # If it's not fast forwardable, check that user has permissions
     for rule in rule_lines:
-        rule['pattern'] = re.compile(glob_to_re(rule['pattern'].rstrip(b'\n')))
-        match = rule['pattern'].match(ref)
+        pattern = re.compile(glob_to_re(rule['pattern'].rstrip(b'\n')))
+        match = pattern.match(ref)
         if not match:
             continue
         if 'force_push' in rule['permissions']:
