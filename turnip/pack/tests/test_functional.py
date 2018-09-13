@@ -297,7 +297,6 @@ class FunctionalTestMixin(object):
         # Test a push fails if the user has no permissions to that ref
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
-        clone2 = os.path.join(test_root, 'clone2')
 
         # Clone the empty repo from the backend and commit to it.
         yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
@@ -331,6 +330,51 @@ class FunctionalTestMixin(object):
         output, error = yield self.assertCommandFailure(
             (b'git', b'push', b'origin', b'master'), path=clone1)
         self.assertIn(b"You can't push to refs/heads/master", error)
+
+    @defer.inlineCallbacks
+    def test_force_push(self):
+        # Update the test ref_rules
+        self.virtinfo.ref_rules = [
+            {'pattern': 'refs/heads/master',
+            'permissions': ['create', 'push']}]
+
+        # Test a force push fails if the user has no permissions
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+
+         # Clone the empty repo from the backend and commit to it.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Second test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Third test'),
+            path=clone1)
+
+        # Push the changes
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+
+        # Squash some commits to force a non-fast-forward commit
+        yield self.assertCommandSuccess(
+            (b'git', b'reset', b'--soft', b'HEAD~2'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Rebase'),
+            path=clone1)
+
+        output, error = yield self.assertCommandFailure(
+            (b'git', b'push', b'origin', b'master', b'--force'), path=clone1)
+        self.assertIn(
+            b"You are not allowed to force push to refs/heads/master", error)
 
 
     @defer.inlineCallbacks
