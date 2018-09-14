@@ -458,7 +458,7 @@ class PackBackendProtocol(PackServerProtocol):
         reactor.spawnProcess(self.peer, cmd, args, env=env)
 
     def getRules(self, auth_params):
-        # Request the ref rules for 'branch permissions'.
+        # Request the ref rules for branch permissions.
         proxy = xmlrpc.Proxy(
             self.factory.virtinfo_endpoint, allowNone=True)
         return proxy.callRemote(

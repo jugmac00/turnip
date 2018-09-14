@@ -18,9 +18,6 @@ import sys
 import pygit2
 
 
-CREATION_REF = '0000000000000000000000000000000000000000'
-
-
 def glob_to_re(s):
     """Convert a glob to a regular expression.
 
@@ -31,7 +28,10 @@ def glob_to_re(s):
 
 
 def get_repo():
-    # Find the repo we're concerned about
+    # Find the repo we're concerned about.
+    # The hook is guaranteed to be in the hooks/ subdirectory
+    # of the repository. We need the root of the repository,
+    # so find the parent directory of the current file.
     repo_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
         os.pardir)
@@ -50,22 +50,25 @@ def match_rules(rule_lines, ref_lines):
     # Match each ref against each rule.
     for ref_line in ref_lines:
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
-        outcome = determine_permissions_outcome(old, ref, rule_lines)
-        if outcome:
-            result.append(outcome)
+        error = determine_permissions_outcome(old, ref, rule_lines)
+        if error:
+            result.append(error)
     return result
 
 
 def match_update_rules(rule_lines, ref_line):
+    """ Match update hook refs against rules and check permissions.
 
+    Called by the update hook to check against force-push
+    """
     ref, old, new = ref_line
     repo = get_repo()
 
     # If it's a create, the old ref doesn't exist
-    if old == CREATION_REF:
+    if old == pygit2.GIT_OID_HEX_ZERO:
         return []
 
-    # Find common ancestors: if there aren't any, it's a none-fast-forward
+    # Find common ancestors: if there aren't any, it's a non-fast-forward
     base = repo.merge_base(old, new)
     if base and base.hex == old:
         # This is a fast-forwardable merge
@@ -97,10 +100,10 @@ def determine_permissions_outcome(old, ref, rules):
         if 'force_push' in rule['permissions']:
             return
         # We are creating a new ref and have the correct permission
-        if 'create' in rule['permissions'] and old == CREATION_REF:
+        if 'create' in rule['permissions'] and old == pygit2.GIT_OID_HEX_ZERO:
             return
         # We are creating a new ref, but we don't have permission
-        if 'create' not in rule['permissions'] and old == CREATION_REF:
+        if 'create' not in rule['permissions'] and old == pygit2.GIT_OID_HEX_ZERO:
             return b'You do not have permissions to create ref %s.' % ref
         # We have push permission, everything is okay
         # force_push is checked later (in update-hook)

@@ -476,7 +476,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         yield self.authserver_listener.stopListening()
 
     @defer.inlineCallbacks
-    def test_read_only_foo(self):
+    def test_read_only(self):
         self.virtinfo.ref_rules = [
             {'pattern': 'refs/heads/master',
              'permissions': ['create', 'push']}]
