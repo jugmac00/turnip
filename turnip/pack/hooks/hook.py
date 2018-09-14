@@ -44,6 +44,13 @@ def make_regex(pattern):
 
 
 def match_rules(rule_lines, ref_lines):
+    """Check if the list of ref_rules is allowable by the rule_lines.
+
+    Called by the pre-receive hook, checks each ref in turn to see if
+    there is a matching rule line and that the operation is allowable.
+    Does not confirm that the operation is a merge or force-push, that is
+    performed by the update hook and match_update_rules.
+    """
     result = []
     regex_rules = list(rule_lines)  # cppy to prevent mutation
     for rule in regex_rules:
@@ -60,7 +67,9 @@ def match_rules(rule_lines, ref_lines):
 def match_update_rules(rule_lines, ref_line):
     """ Match update hook refs against rules and check permissions.
 
-    Called by the update hook to check against force-push
+    Called by the update hook, checks if the operation is a merge or
+    a force-push. In the case of a force-push, checks the ref against
+    the rule_lines to confirm that the user has permissions for that operation.
     """
     ref, old, new = ref_line
     repo = get_repo()
