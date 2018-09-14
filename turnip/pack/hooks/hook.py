@@ -96,7 +96,7 @@ def determine_permissions_outcome(old, ref, rules):
             continue
         # If we match, but empty permissions array, user has no write access
         if not rule['permissions']:
-            return b"You can't push to %s." % ref
+            return "You can't push to %s." % ref
         # We have force-push permission, implies push, therefore okay
         # This is confirmed in match_update_rules
         if 'force_push' in rule['permissions']:
@@ -106,7 +106,7 @@ def determine_permissions_outcome(old, ref, rules):
             return
         # We are creating a new ref, but we don't have permission
         if 'create' not in rule['permissions'] and old == pygit2.GIT_OID_HEX_ZERO:
-            return b'You do not have permissions to create ref %s.' % ref
+            return 'You do not have permissions to create ref %s.' % ref
         # We have push permission, everything is okay
         # force_push is checked later (in update-hook)
         if 'push' in rule['permissions']:
@@ -114,7 +114,7 @@ def determine_permissions_outcome(old, ref, rules):
         # We only check the first matching rule
         break
     # If we're here, there are no matching rules
-    return b"You can't push to %s." % ref
+    return "You can't push to %s." % ref
 
 
 def netstring_send(sock, s):
@@ -159,7 +159,7 @@ if __name__ == '__main__':
         rule_lines = rpc_invoke(sock, b'list_ref_rules', {'key': rpc_key})
         errors = match_rules(rule_lines, sys.stdin.readlines())
         for error in errors:
-            sys.stdout.write(error + b'\n')
+            sys.stdout.write(error + '\n')
         sys.exit(1 if errors else 0)
     elif hook == 'post-receive':
         # Notify the server about the push if there were any changes.
@@ -171,8 +171,8 @@ if __name__ == '__main__':
         rule_lines = rpc_invoke(sock, b'list_ref_rules', {'key': rpc_key})
         errors = match_update_rules(rule_lines, sys.argv[1:4])
         for error in errors:
-            sys.stdout.write(error + b'\n')
+            sys.stdout.write(error + '\n')
         sys.exit(1 if errors else 0)
     else:
-        sys.stderr.write(b'Invalid hook name: %s' % hook)
+        sys.stderr.write('Invalid hook name: %s' % hook)
         sys.exit(1)
