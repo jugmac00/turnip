@@ -45,12 +45,13 @@ def make_regex(pattern):
 
 def match_rules(rule_lines, ref_lines):
     result = []
-    for rule in rule_lines:
+    regex_rules = list(rule_lines)  # cppy to prevent mutation
+    for rule in regex_rules:
         rule['pattern'] = make_regex(rule['pattern'])
     # Match each ref against each rule.
     for ref_line in ref_lines:
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
-        error = determine_permissions_outcome(old, ref, rule_lines)
+        error = determine_permissions_outcome(old, ref, regex_rules)
         if error:
             result.append(error)
     return result
@@ -75,7 +76,8 @@ def match_update_rules(rule_lines, ref_line):
         return []
 
     # If it's not fast forwardable, check that user has permissions
-    for rule in rule_lines:
+    regex_rules = list(rule_lines)  # cppy to prevent mutation
+    for rule in regex_rules:
         match = make_regex(rule['pattern']).match(ref)
         if not match:
             continue
@@ -83,7 +85,7 @@ def match_update_rules(rule_lines, ref_line):
             return []
         # We only check the first matching rule
         break
-    return [b'You are not allowed to force push to %s' % ref]
+    return ['You are not allowed to force push to %s' % ref]
 
 
 def determine_permissions_outcome(old, ref, rules):
