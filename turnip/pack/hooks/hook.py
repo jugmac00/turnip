@@ -9,6 +9,7 @@ from __future__ import (
     unicode_literals,
     )
 
+import copy
 import json
 import os
 import re
@@ -35,12 +36,36 @@ def get_repo():
     repo_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
         os.pardir)
-    repo = pygit2.Repository(repo_path)
-    return repo
+    return pygit2.Repository(repo_path)
 
 
 def make_regex(pattern):
     return re.compile(glob_to_re(pattern.rstrip(b'\n')))
+
+
+def determine_permissions_outcome(old, ref, rules):
+    for rule in rules:
+        match = rule['pattern'].match(ref)
+        # If we don't match this ref, move on
+        if not match:
+            continue
+        # We have force-push permission, implies push, therefore okay
+        if 'force_push' in rule['permissions']:
+            return
+        # We are creating a new ref
+        if old == pygit2.GIT_OID_HEX_ZERO:
+            if 'create' in rule['permissions']:
+                return
+            else:
+                return 'You do not have permission to create %s.' % ref
+        # We have push permission, everything is okay
+        # force_push is checked later (in update-hook)
+        if 'push' in rule['permissions']:
+            return
+        # We only check the first matching rule
+        break
+    # If we're here, there are no matching rules
+    return "You do not have permission to push to %s." % ref
 
 
 def match_rules(rule_lines, ref_lines):
@@ -52,7 +77,7 @@ def match_rules(rule_lines, ref_lines):
     performed by the update hook and match_update_rules.
     """
     result = []
-    regex_rules = list(rule_lines)  # cppy to prevent mutation
+    regex_rules = copy.deepcopy(rule_lines)  # copy to prevent mutation
     for rule in regex_rules:
         rule['pattern'] = make_regex(rule['pattern'])
     # Match each ref against each rule.
@@ -85,7 +110,7 @@ def match_update_rules(rule_lines, ref_line):
         return []
 
     # If it's not fast forwardable, check that user has permissions
-    regex_rules = list(rule_lines)  # cppy to prevent mutation
+    regex_rules = copy.deepcopy(rule_lines)  # copy to prevent mutation
     for rule in regex_rules:
         match = make_regex(rule['pattern']).match(ref)
         if not match:
@@ -95,31 +120,6 @@ def match_update_rules(rule_lines, ref_line):
         # We only check the first matching rule
         break
     return ['You do not have permission to force push to %s.' % ref]
-
-
-def determine_permissions_outcome(old, ref, rules):
-    for rule in rules:
-        match = rule['pattern'].match(ref)
-        # If we don't match this ref, move on
-        if not match:
-            continue
-        # We have force-push permission, implies push, therefore okay
-        if 'force_push' in rule['permissions']:
-            return
-        # We are creating a new ref
-        if old == pygit2.GIT_OID_HEX_ZERO:
-            if 'create' in rule['permissions']:
-                return
-            else:
-                return 'You do not have permission to create %s.' % ref
-        # We have push permission, everything is okay
-        # force_push is checked later (in update-hook)
-        if 'push' in rule['permissions']:
-            return
-        # We only check the first matching rule
-        break
-    # If we're here, there are no matching rules
-    return "You do not have permission to push to %s." % ref
 
 
 def netstring_send(sock, s):
