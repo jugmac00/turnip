@@ -85,7 +85,7 @@ def match_update_rules(rule_lines, ref_line):
             return []
         # We only check the first matching rule
         break
-    return ['You are not allowed to force push to %s' % ref]
+    return ['You do not have permission to force push to %s.' % ref]
 
 
 def determine_permissions_outcome(old, ref, rules):
@@ -94,19 +94,15 @@ def determine_permissions_outcome(old, ref, rules):
         # If we don't match this ref, move on
         if not match:
             continue
-        # If we match, but empty permissions array, user has no write access
-        if not rule['permissions']:
-            return "You can't push to %s." % ref
         # We have force-push permission, implies push, therefore okay
-        # This is confirmed in match_update_rules
         if 'force_push' in rule['permissions']:
             return
-        # We are creating a new ref and have the correct permission
-        if 'create' in rule['permissions'] and old == pygit2.GIT_OID_HEX_ZERO:
-            return
-        # We are creating a new ref, but we don't have permission
-        if 'create' not in rule['permissions'] and old == pygit2.GIT_OID_HEX_ZERO:
-            return 'You do not have permissions to create ref %s.' % ref
+        # We are creating a new ref
+        if old == pygit2.GIT_OID_HEX_ZERO:
+            if 'create' in rule['permissions']:
+                return
+            else:
+                return 'You do not have permission to create %s.' % ref
         # We have push permission, everything is okay
         # force_push is checked later (in update-hook)
         if 'push' in rule['permissions']:
@@ -114,7 +110,7 @@ def determine_permissions_outcome(old, ref, rules):
         # We only check the first matching rule
         break
     # If we're here, there are no matching rules
-    return "You can't push to %s." % ref
+    return "You do not have permission to push to %s." % ref
 
 
 def netstring_send(sock, s):

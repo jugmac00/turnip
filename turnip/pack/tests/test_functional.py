@@ -313,7 +313,7 @@ class FunctionalTestMixin(object):
         output, error = yield self.assertCommandFailure(
             (b'git', b'push', b'origin', b'master'), path=clone1)
         self.assertIn(
-            b'You do not have permissions to create ref refs/heads/master',
+            b'You do not have permission to create refs/heads/master.',
             error)
 
         # add create, disable push
@@ -329,7 +329,8 @@ class FunctionalTestMixin(object):
             path=clone1)
         output, error = yield self.assertCommandFailure(
             (b'git', b'push', b'origin', b'master'), path=clone1)
-        self.assertIn(b"You can't push to refs/heads/master", error)
+        self.assertIn(
+            b"You do not have permission to push to refs/heads/master", error)
 
     @defer.inlineCallbacks
     def test_force_push(self):
@@ -374,7 +375,7 @@ class FunctionalTestMixin(object):
         output, error = yield self.assertCommandFailure(
             (b'git', b'push', b'origin', b'master', b'--force'), path=clone1)
         self.assertIn(
-            b"You are not allowed to force push to refs/heads/master", error)
+            b"You do not have permission to force push to", error)
 
     @defer.inlineCallbacks
     def test_large_push(self):
