@@ -463,7 +463,7 @@ class PackBackendProtocol(PackServerProtocol):
             self.factory.virtinfo_endpoint, allowNone=True)
         rules = yield proxy.callRemote(
             b'listRefRules',
-            self.path,
+            self.raw_pathname,
             auth_params)
         for rule in rules:
             if isinstance(rule['pattern'], bytes):
