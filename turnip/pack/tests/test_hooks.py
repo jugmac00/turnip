@@ -137,14 +137,14 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
         # A single valid ref is accepted.
         yield self.assertAccepted(
             [(b'refs/heads/master', self.old_sha1, self.new_sha1)],
-            [{'pattern': 'refs/heads/master', 'permissions': ['push']}])
+            [{'ref_pattern': 'refs/heads/master', 'permissions': ['push']}])
 
     @defer.inlineCallbacks
     def test_rejected(self):
         # An invalid ref is rejected.
         yield self.assertRejected(
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1)],
-            [{'pattern': 'refs/heads/verboten', 'permissions': []}],
+            [{'ref_pattern': 'refs/heads/verboten', 'permissions': []}],
             b"You do not have permission to push to refs/heads/verboten.\n")
 
     @defer.inlineCallbacks
@@ -155,8 +155,8 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
              (b'refs/tags/bar', self.old_sha1, self.new_sha1),
              (b'refs/tags/foo', self.old_sha1, self.new_sha1),
              (b'refs/baz/quux', self.old_sha1, self.new_sha1)],
-            [{'pattern': 'refs/*/foo', 'permissions': []},
-             {'pattern': 'refs/baz/*', 'permissions': []}],
+            [{'ref_pattern': 'refs/*/foo', 'permissions': []},
+             {'ref_pattern': 'refs/baz/*', 'permissions': []}],
             b"You do not have permission to push to refs/heads/foo.\n"
             b"You do not have permission to push to refs/tags/bar.\n"
             b"You do not have permission to push to refs/tags/foo.\n"
@@ -169,11 +169,12 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1),
              (b'refs/heads/master', self.old_sha1, self.new_sha1),
              (b'refs/heads/super-verboten', self.old_sha1, self.new_sha1)],
-            [{'pattern': 'refs/heads/verboten', 'permissions': []},
-             {'pattern': 'refs/heads/super-verboten', 'permissions': []},
-             {'pattern': 'refs/heads/master', 'permissions': ['push']}],
+            [{'ref_pattern': 'refs/heads/verboten', 'permissions': []},
+             {'ref_pattern': 'refs/heads/super-verboten', 'permissions': []},
+             {'ref_pattern': 'refs/heads/master', 'permissions': ['push']}],
             b"You do not have permission to push to refs/heads/verboten.\n"
-            b"You do not have permission to push to refs/heads/super-verboten.\n")
+            b"You do not have permission to push "
+            b"to refs/heads/super-verboten.\n")
 
 
 class TestPostReceiveHook(HookTestMixin, TestCase):
@@ -224,7 +225,7 @@ class TestUpdateHook(TestCase):
         # No matches means deny by default
         self.patch_repo('somehex')
         output = hook.match_update_rules(
-            [{'pattern': 'notamatch', 'permissions': []}],
+            [{'ref_pattern': 'notamatch', 'permissions': []}],
             ['ref', 'old', 'new'])
         self.assertEqual(
             [b'You do not have permission to force push to ref.'], output)
@@ -233,7 +234,7 @@ class TestUpdateHook(TestCase):
         # Permission given to force push
         self.patch_repo('somehex')
         output = hook.match_update_rules(
-            [{'pattern': 'ref', 'permissions': ['force_push']}],
+            [{'ref_pattern': 'ref', 'permissions': ['force_push']}],
             ['ref', 'old', 'new'])
         self.assertEqual([], output)
 
@@ -241,7 +242,8 @@ class TestUpdateHook(TestCase):
         # Permission given by a wildcard ref
         self.patch_repo('somehex')
         output = hook.match_update_rules(
-            [{'pattern': 'refs/heads/*/test', 'permissions': ['force_push']}],
+            [{'ref_pattern': 'refs/heads/*/test',
+              'permissions': ['force_push']}],
             ['refs/heads/wildcard/test', 'old', 'new'])
         self.assertEqual([], output)
 
@@ -249,7 +251,7 @@ class TestUpdateHook(TestCase):
         # User does not have permission to force push
         self.patch_repo('somehex')
         output = hook.match_update_rules(
-            [{'pattern': 'ref', 'permissions': ['create']}],
+            [{'ref_pattern': 'ref', 'permissions': ['create']}],
             ['ref', 'old', 'new'])
         self.assertEqual(
             [b'You do not have permission to force push to ref.'], output)
@@ -270,35 +272,37 @@ class TestDeterminePermissions(TestCase):
         output = hook.determine_permissions_outcome(
             'old',
             'ref',
-            [{'pattern': self.make_pattern('ref'), 'permissions': []}])
+            [{'ref_pattern': self.make_pattern('ref'), 'permissions': []}])
         self.assertEqual(b"You do not have permission to push to ref.", output)
 
     def test_match_with_create(self):
         output = hook.determine_permissions_outcome(
             '0' * 40,
             'ref',
-            [{'pattern': self.make_pattern('ref'), 'permissions': ['create']}])
+            [{'ref_pattern': self.make_pattern('ref'),
+              'permissions': ['create']}])
         self.assertIsNone(output)
 
     def test_match_no_create_perms(self):
         output = hook.determine_permissions_outcome(
             '0' * 40,
             'ref',
-            [{'pattern': self.make_pattern('ref'), 'permissions': []}])
+            [{'ref_pattern': self.make_pattern('ref'), 'permissions': []}])
         self.assertEqual(b"You do not have permission to create ref.", output)
 
     def test_push(self):
         output = hook.determine_permissions_outcome(
             'old',
             'ref',
-            [{'pattern': self.make_pattern('ref'), 'permissions': ['push']}])
+            [{'ref_pattern': self.make_pattern('ref'),
+              'permissions': ['push']}])
         self.assertIsNone(output)
 
     def test_force_push(self):
         output = hook.determine_permissions_outcome(
             'old',
             'ref',
-            [{'pattern': self.make_pattern('ref'),
+            [{'ref_pattern': self.make_pattern('ref'),
               'permissions': ['force_push']}])
         self.assertIsNone(output)
 
@@ -306,9 +310,9 @@ class TestDeterminePermissions(TestCase):
         output = hook.determine_permissions_outcome(
             'old',
             'ref',
-            [{'pattern': self.make_pattern('ref'),
+            [{'ref_pattern': self.make_pattern('ref'),
               'permissions': ['force_push']},
-             {'pattern': self.make_pattern('ref'),
+             {'ref_pattern': self.make_pattern('ref'),
               'permissions': []}])
         self.assertIsNone(output)
 
@@ -316,9 +320,9 @@ class TestDeterminePermissions(TestCase):
         output = hook.determine_permissions_outcome(
             'old',
             'ref',
-            [{'pattern': self.make_pattern('ref'),
+            [{'ref_pattern': self.make_pattern('ref'),
               'permissions': []},
-             {'pattern': self.make_pattern('ref'),
+             {'ref_pattern': self.make_pattern('ref'),
               'permissions': ['force_push']}])
         self.assertEqual(b"You do not have permission to push to ref.", output)
 
@@ -326,14 +330,15 @@ class TestDeterminePermissions(TestCase):
         output = hook.determine_permissions_outcome(
             'old',
             'ref',
-            [{'pattern': self.make_pattern('refs/*/ref'), 'permissions': []}])
+            [{'ref_pattern': self.make_pattern('refs/*/ref'),
+              'permissions': []}])
         self.assertEqual(b"You do not have permission to push to ref.", output)
 
     def test_allow_wildcard(self):
         output = hook.determine_permissions_outcome(
             'old',
             'heads/ref',
-            [{'pattern': self.make_pattern('*/ref'),
+            [{'ref_pattern': self.make_pattern('*/ref'),
               'permissions': ['force_push']}])
         self.assertIsNone(output)
 
@@ -342,6 +347,6 @@ class TestDeterminePermissions(TestCase):
         output = hook.determine_permissions_outcome(
             '0' * 40,
             'ref',
-            [{'pattern': self.make_pattern('ref'),
+            [{'ref_pattern': self.make_pattern('ref'),
               'permissions': ['force_push']}])
         self.assertIsNone(output)

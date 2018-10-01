@@ -45,7 +45,7 @@ def make_regex(pattern):
 
 def determine_permissions_outcome(old, ref, rules):
     for rule in rules:
-        match = rule['pattern'].match(ref)
+        match = rule['ref_pattern'].match(ref)
         # If we don't match this ref, move on
         if not match:
             continue
@@ -79,7 +79,7 @@ def match_rules(rule_lines, ref_lines):
     result = []
     regex_rules = copy.deepcopy(rule_lines)  # copy to prevent mutation
     for rule in regex_rules:
-        rule['pattern'] = make_regex(rule['pattern'])
+        rule['ref_pattern'] = make_regex(rule['ref_pattern'])
     # Match each ref against each rule.
     for ref_line in ref_lines:
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
@@ -112,7 +112,7 @@ def match_update_rules(rule_lines, ref_line):
     # If it's not fast forwardable, check that user has permissions
     regex_rules = copy.deepcopy(rule_lines)  # copy to prevent mutation
     for rule in regex_rules:
-        match = make_regex(rule['pattern']).match(ref)
+        match = make_regex(rule['ref_pattern']).match(ref)
         if not match:
             continue
         if 'force_push' in rule['permissions']:
