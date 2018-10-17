@@ -25,7 +25,7 @@ def glob_to_re(s):
     The only wildcard supported is "*", to match any path segment.
     """
     return b'^%s\Z' % (
-        b''.join(b'[^/]*' if c == b'*' else re.escape(c) for c in s))
+        b''.join(b'.*' if c == b'*' else re.escape(c) for c in s))
 
 
 def get_repo():

@@ -257,6 +257,29 @@ class TestUpdateHook(TestCase):
             [b'You do not have permission to force push to ref.'], output)
 
 
+class TestMakeRegex(TestCase):
+
+    def test_simple_case(self):
+        regex = hook.make_regex('refs/heads/')
+        self.assertTrue(regex.match('refs/heads/'))
+
+    def test_single_wildcard(self):
+        regex = hook.make_regex('refs/heads/*/foo')
+        self.assertTrue(regex.match('refs/heads/bar/foo'))
+
+    def test_multiple_wildcard(self):
+        regex = hook.make_regex('refs/heads/*/foo')
+        self.assertTrue(regex.match('refs/heads/bar/quz/foo'))
+
+    def test_single_wildcard_no_trailing_match(self):
+        regex = hook.make_regex('refs/heads/*/foo')
+        self.assertFalse(regex.match('refs/heads/bar/baz'))
+
+    def test_multiple_wildcard_no_trailing_match(self):
+        regex = hook.make_regex('refs/heads/*/foo')
+        self.assertFalse(regex.match('refs/heads/one/two/three/baz'))
+
+
 class TestDeterminePermissions(TestCase):
 
     def make_pattern(self, pattern):
