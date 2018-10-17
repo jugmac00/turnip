@@ -421,7 +421,7 @@ class PackBackendProtocol(PackServerProtocol):
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
         args.append(self.path)
-        auth_params = {'uid': params.get('turnip-authenticated-uid')}
+        auth_params = {'uid': int(params.get('turnip-authenticated-uid'))}
         self.spawnGit(subcmd,
                       args,
                       write_operation=write_operation,
