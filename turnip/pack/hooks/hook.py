@@ -29,7 +29,7 @@ def get_repo():
 
 
 def determine_permissions_outcome(old, ref, rule_lines):
-    rule = rule_lines[ref]
+    rule = rule_lines.get(ref, [])
     # We have force-push permission, implies push, therefore okay
     if 'force_push' in rule:
         return
@@ -86,7 +86,7 @@ def match_update_rules(rule_lines, ref_line):
         return []
 
     # If it's not fast forwardable, check that user has permissions
-    rule = rule_lines[ref]
+    rule = rule_lines.get(ref, [])
     if 'force_push' in rule:
         return []
     return ['You do not have permission to force push to %s.' % ref]
