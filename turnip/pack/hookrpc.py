@@ -104,26 +104,34 @@ class HookRPCHandler(object):
     """
 
     def __init__(self, virtinfo_url):
+        self.auth_params = {}
         self.ref_paths = {}
-        self.ref_rules = {}
         self.virtinfo_url = virtinfo_url
 
-    def registerKey(self, key, path, ref_rules):
+    def registerKey(self, key, path, auth_params):
         """Register a key with the given path and ref_rules.
 
         Hooks identify themselves using this key.
         """
+        self.auth_params[key] = auth_params
         self.ref_paths[key] = path
-        self.ref_rules[key] = ref_rules
 
     def unregisterKey(self, key):
         """Unregister a key."""
-        del self.ref_rules[key]
+        del self.auth_params[key]
         del self.ref_paths[key]
 
+    @defer.inlineCallbacks
     def listRefRules(self, proto, args):
         """Get forbidden ref path patterns (as Unicode)."""
-        return self.ref_rules[args['key']]
+        proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
+        result = yield proxy.callRemote(
+            b'checkRefPermissions',
+            self.ref_paths[args['key']],
+            args['paths'],
+            self.auth_params[args['key']]
+        )
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def notify(self, path):

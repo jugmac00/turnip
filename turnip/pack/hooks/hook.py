@@ -18,6 +18,10 @@ import sys
 
 import pygit2
 
+def write(input):
+    sys.stdout.write("{}\n".format(input))
+    sys.stdout.flush()
+
 
 def glob_to_re(s):
     """Convert a glob to a regular expression.
@@ -43,27 +47,26 @@ def make_regex(pattern):
     return re.compile(glob_to_re(pattern.rstrip(b'\n')))
 
 
-def determine_permissions_outcome(old, ref, rules):
-    for rule in rules:
-        match = rule['ref_pattern'].match(ref)
-        # If we don't match this ref, move on
-        if not match:
-            continue
-        # We have force-push permission, implies push, therefore okay
-        if 'force_push' in rule['permissions']:
+def determine_permissions_outcome(old, ref, rule_lines):
+    write(ref)
+    try:
+        rule = rule_lines[ref]
+    except Exception as e:
+        write(str(e))
+    write(str(rule))
+    # We have force-push permission, implies push, therefore okay
+    if 'force_push' in rule:
+        return
+    # We are creating a new ref
+    if old == pygit2.GIT_OID_HEX_ZERO:
+        if 'create' in rule:
             return
-        # We are creating a new ref
-        if old == pygit2.GIT_OID_HEX_ZERO:
-            if 'create' in rule['permissions']:
-                return
-            else:
-                return 'You do not have permission to create %s.' % ref
-        # We have push permission, everything is okay
-        # force_push is checked later (in update-hook)
-        if 'push' in rule['permissions']:
-            return
-        # We only check the first matching rule
-        break
+        else:
+            return 'You do not have permission to create %s.' % ref
+    # We have push permission, everything is okay
+    # force_push is checked later (in update-hook)
+    if 'push' in rule:
+        return
     # If we're here, there are no matching rules
     return "You do not have permission to push to %s." % ref
 
@@ -77,15 +80,15 @@ def match_rules(rule_lines, ref_lines):
     performed by the update hook and match_update_rules.
     """
     result = []
-    regex_rules = copy.deepcopy(rule_lines)  # copy to prevent mutation
-    for rule in regex_rules:
-        rule['ref_pattern'] = make_regex(rule['ref_pattern'])
+    write("match_rules")
     # Match each ref against each rule.
     for ref_line in ref_lines:
+        write(ref_line)
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
-        error = determine_permissions_outcome(old, ref, regex_rules)
+        error = determine_permissions_outcome(old, ref, rule_lines)
         if error:
             result.append(error)
+    write("result: {}".format(result))
     return result
 
 
@@ -110,15 +113,9 @@ def match_update_rules(rule_lines, ref_line):
         return []
 
     # If it's not fast forwardable, check that user has permissions
-    regex_rules = copy.deepcopy(rule_lines)  # copy to prevent mutation
-    for rule in regex_rules:
-        match = make_regex(rule['ref_pattern']).match(ref)
-        if not match:
-            continue
-        if 'force_push' in rule['permissions']:
-            return []
-        # We only check the first matching rule
-        break
+    rule = rule_lines[ref]
+    if 'force_push' in rule:
+        return []
     return ['You do not have permission to force push to %s.' % ref]
 
 
@@ -161,11 +158,20 @@ if __name__ == '__main__':
     if hook == 'pre-receive':
         # Verify the proposed changes against rules from the server.
         # This currently just lets virtinfo forbid certain ref paths.
-        rule_lines = rpc_invoke(sock, b'list_ref_rules', {'key': rpc_key})
-        errors = match_rules(rule_lines, sys.stdin.readlines())
+        raw_paths = sys.stdin.readlines()
+        paths = []
+        for p in raw_paths:
+            path = p.split(' ')[2].strip()
+            paths.append(path)
+        rule_lines = rpc_invoke(
+            sock, b'list_ref_rules',
+            {'key': rpc_key, 'paths': paths})
+        errors = match_rules(rule_lines, raw_paths)
         for error in errors:
             sys.stdout.write(error + '\n')
+        write("EXITING: {}".format(errors))
         sys.exit(1 if errors else 0)
+        write('errr?')
     elif hook == 'post-receive':
         # Notify the server about the push if there were any changes.
         # Details of the changes aren't currently included.
@@ -173,7 +179,16 @@ if __name__ == '__main__':
             rule_lines = rpc_invoke(sock, b'notify_push', {'key': rpc_key})
         sys.exit(0)
     elif hook == 'update':
-        rule_lines = rpc_invoke(sock, b'list_ref_rules', {'key': rpc_key})
+        write("HELLO UPDATE")
+        write(sys.argv[1:4])
+
+        ref = sys.argv[1]
+        rule_lines = rpc_invoke(
+            sock, b'list_ref_rules',
+            {'key': rpc_key, 'paths': [ref]})
+        write(rule_lines)
+
+        #rule_lines = rpc_invoke(sock, b'list_ref_rules', {'key': rpc_key})
         errors = match_update_rules(rule_lines, sys.argv[1:4])
         for error in errors:
             sys.stdout.write(error + '\n')

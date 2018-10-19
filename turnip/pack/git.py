@@ -423,13 +423,12 @@ class PackBackendProtocol(PackServerProtocol):
         args.append(self.path)
         uid = params.get('turnip-authenticated-uid')
         uid = int(uid) if uid else None
-        auth_params = {'uid': uid} 
+        auth_params = {'uid': uid}
         self.spawnGit(subcmd,
                       args,
                       write_operation=write_operation,
                       auth_params=auth_params)
 
-    @defer.inlineCallbacks
     def spawnGit(self, subcmd, extra_args, write_operation=False,
                  send_path_as_option=False, auth_params=None):
         cmd = b'git'
@@ -441,13 +440,12 @@ class PackBackendProtocol(PackServerProtocol):
 
         env = {}
         if write_operation and self.factory.hookrpc_handler:
-            ref_rules = yield self.getRules(auth_params)
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.
             ensure_config(self.path)
             self.hookrpc_key = str(uuid.uuid4())
             self.factory.hookrpc_handler.registerKey(
-                self.hookrpc_key, self.raw_pathname, ref_rules)
+                self.hookrpc_key, self.raw_pathname, auth_params)
             ensure_hooks(self.path)
             env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hookrpc_sock
             env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
@@ -459,6 +457,7 @@ class PackBackendProtocol(PackServerProtocol):
     def spawnProcess(self, cmd, args, env=None):
         reactor.spawnProcess(self.peer, cmd, args, env=env)
 
+    """
     @defer.inlineCallbacks
     def getRules(self, auth_params):
         proxy = xmlrpc.Proxy(
@@ -471,6 +470,7 @@ class PackBackendProtocol(PackServerProtocol):
             if isinstance(rule['ref_pattern'], bytes):
                 rule['ref_pattern'] = rule['ref_pattern'].decode('utf-8')
         defer.returnValue(rules)
+    """
 
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
