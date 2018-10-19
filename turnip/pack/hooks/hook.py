@@ -9,27 +9,12 @@ from __future__ import (
     unicode_literals,
     )
 
-import copy
 import json
 import os
-import re
 import socket
 import sys
 
 import pygit2
-
-def write(input):
-    sys.stdout.write("{}\n".format(input))
-    sys.stdout.flush()
-
-
-def glob_to_re(s):
-    """Convert a glob to a regular expression.
-
-    The only wildcard supported is "*", to match any path segment.
-    """
-    return b'^%s\Z' % (
-        b''.join(b'.*' if c == b'*' else re.escape(c) for c in s))
 
 
 def get_repo():
@@ -43,17 +28,8 @@ def get_repo():
     return pygit2.Repository(repo_path)
 
 
-def make_regex(pattern):
-    return re.compile(glob_to_re(pattern.rstrip(b'\n')))
-
-
 def determine_permissions_outcome(old, ref, rule_lines):
-    write(ref)
-    try:
-        rule = rule_lines[ref]
-    except Exception as e:
-        write(str(e))
-    write(str(rule))
+    rule = rule_lines[ref]
     # We have force-push permission, implies push, therefore okay
     if 'force_push' in rule:
         return
@@ -80,15 +56,12 @@ def match_rules(rule_lines, ref_lines):
     performed by the update hook and match_update_rules.
     """
     result = []
-    write("match_rules")
     # Match each ref against each rule.
     for ref_line in ref_lines:
-        write(ref_line)
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
         error = determine_permissions_outcome(old, ref, rule_lines)
         if error:
             result.append(error)
-    write("result: {}".format(result))
     return result
 
 
@@ -157,21 +130,15 @@ if __name__ == '__main__':
     hook = os.path.basename(sys.argv[0])
     if hook == 'pre-receive':
         # Verify the proposed changes against rules from the server.
-        # This currently just lets virtinfo forbid certain ref paths.
         raw_paths = sys.stdin.readlines()
-        paths = []
-        for p in raw_paths:
-            path = p.split(' ')[2].strip()
-            paths.append(path)
+        ref_paths = [p.rstrip(b'\n').split(b' ', 2)[2] for p in raw_paths]
         rule_lines = rpc_invoke(
             sock, b'list_ref_rules',
-            {'key': rpc_key, 'paths': paths})
+            {'key': rpc_key, 'paths': ref_paths})
         errors = match_rules(rule_lines, raw_paths)
         for error in errors:
             sys.stdout.write(error + '\n')
-        write("EXITING: {}".format(errors))
         sys.exit(1 if errors else 0)
-        write('errr?')
     elif hook == 'post-receive':
         # Notify the server about the push if there were any changes.
         # Details of the changes aren't currently included.
@@ -179,16 +146,10 @@ if __name__ == '__main__':
             rule_lines = rpc_invoke(sock, b'notify_push', {'key': rpc_key})
         sys.exit(0)
     elif hook == 'update':
-        write("HELLO UPDATE")
-        write(sys.argv[1:4])
-
         ref = sys.argv[1]
         rule_lines = rpc_invoke(
             sock, b'list_ref_rules',
             {'key': rpc_key, 'paths': [ref]})
-        write(rule_lines)
-
-        #rule_lines = rpc_invoke(sock, b'list_ref_rules', {'key': rpc_key})
         errors = match_update_rules(rule_lines, sys.argv[1:4])
         for error in errors:
             sys.stdout.write(error + '\n')
