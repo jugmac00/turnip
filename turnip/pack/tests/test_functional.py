@@ -129,7 +129,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     def xmlrpc_notify(self, path):
         self.push_notifications.append(path)
 
-    def xmlrpc_listRefRules(self, proto, args):
+    def xmlrpc_checkRefPermissions(self, path, ref_paths, auth_params):
         return self.ref_rules
 
 

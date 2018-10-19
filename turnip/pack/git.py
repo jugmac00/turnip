@@ -457,21 +457,6 @@ class PackBackendProtocol(PackServerProtocol):
     def spawnProcess(self, cmd, args, env=None):
         reactor.spawnProcess(self.peer, cmd, args, env=env)
 
-    """
-    @defer.inlineCallbacks
-    def getRules(self, auth_params):
-        proxy = xmlrpc.Proxy(
-            self.factory.virtinfo_endpoint, allowNone=True)
-        rules = yield proxy.callRemote(
-            b'listRefRules',
-            self.raw_pathname,
-            auth_params)
-        for rule in rules:
-            if isinstance(rule['ref_pattern'], bytes):
-                rule['ref_pattern'] = rule['ref_pattern'].decode('utf-8')
-        defer.returnValue(rules)
-    """
-
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
             if data is None:
