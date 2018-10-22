@@ -21,6 +21,7 @@ from twisted.internet import (
     )
 
 from turnip.pack import hookrpc
+from turnip.pack.helpers import ensure_hooks
 import turnip.pack.hooks
 from turnip.pack.hooks import hook
 
@@ -82,11 +83,6 @@ class HookTestMixin(object):
     old_sha1 = b'a' * 40
     new_sha1 = b'b' * 40
 
-    @property
-    def hook_path(self):
-        return os.path.join(
-            os.path.dirname(turnip.pack.hooks.__file__), self.hook_name)
-
     def handlePushNotification(self, path):
         self.notifications.append(path)
 
@@ -99,6 +95,10 @@ class HookTestMixin(object):
         self.hookrpc_port = reactor.listenUNIX(
             self.hookrpc_path, self.hookrpc)
         self.addCleanup(self.hookrpc_port.stopListening)
+        hooks_dir = os.path.join(dir, 'hooks')
+        os.mkdir(hooks_dir)
+        ensure_hooks(dir)
+        self.hook_path = os.path.join(hooks_dir, self.hook_name)
 
     def encodeRefs(self, updates):
         return b'\n'.join(

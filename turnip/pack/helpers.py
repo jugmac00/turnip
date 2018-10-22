@@ -9,8 +9,9 @@ from __future__ import (
 
 import hashlib
 import os.path
-import shutil
+import re
 import stat
+import sys
 from tempfile import (
     mktemp,
     NamedTemporaryFile,
@@ -115,6 +116,26 @@ def ensure_config(repo_root):
         config[key] = val
 
 
+_orig_hook = None
+
+
+def read_orig_hook():
+    """Read hook.py and adjust it for writing to a repository's hooks.
+
+    We need to mangle the #! line so that it uses the correct virtualenv.
+    """
+    global _orig_hook
+    if _orig_hook is None:
+        # Always use the py, not the pyc, for consistency
+        orig_hook_path = os.path.join(
+            os.path.dirname(turnip.pack.hooks.__file__), 'hook.py')
+        with open(orig_hook_path, 'rb') as f:
+            contents = f.read()
+        _orig_hook = re.sub(
+            br'\A#!.*', ('#!' + sys.executable).encode('UTF-8'), contents)
+    return _orig_hook
+
+
 def ensure_hooks(repo_root):
     """Put a repository's hooks into the desired state.
 
@@ -129,25 +150,20 @@ def ensure_hooks(repo_root):
     def hook_path(name):
         return os.path.join(repo_root, 'hooks', name)
 
-    orig_hook_path = os.path.join(
-        os.path.dirname(turnip.pack.hooks.__file__), 'hook.py')
-
     if not os.path.exists(hook_path(target_name)):
         need_target = True
     elif not os.stat(hook_path(target_name)).st_mode & stat.S_IXUSR:
         need_target = True
     else:
         # Always use the py, not the pyc, for consistency
-        with open(orig_hook_path, 'rb') as f:
-            wanted = hashlib.sha256(f.read()).hexdigest()
+        wanted = hashlib.sha256(read_orig_hook()).hexdigest()
         with open(hook_path(target_name), 'rb') as f:
             have = hashlib.sha256(f.read()).hexdigest()
         need_target = wanted != have
 
     if need_target:
-        with open(orig_hook_path, 'rb') as master:
-            with NamedTemporaryFile(dir=hook_path('.'), delete=False) as this:
-                shutil.copyfileobj(master, this)
+        with NamedTemporaryFile(dir=hook_path('.'), delete=False) as this:
+            this.write(read_orig_hook())
         os.chmod(this.name, 0o755)
         os.rename(this.name, hook_path(target_name))
 
