@@ -69,11 +69,11 @@ class MockRef(object):
 
 class MockRepo(object):
 
-    def __init__(self, hex):
-        self.hex = hex
+    def __init__(self, ancestor):
+        self.ancestor = ancestor
 
     def merge_base(self, old, new):
-        return MockRef(self.hex)
+        return MockRef(self.ancestor)
 
 
 class HookTestMixin(object):
@@ -192,8 +192,8 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
 class TestUpdateHook(TestCase):
     """Tests for the git update hook"""
 
-    def patch_repo(self, hex):
-        hook.get_repo = lambda: MockRepo(hex)
+    def patch_repo(self, ancestor):
+        hook.get_repo = lambda: MockRepo(ancestor)
 
     def test_create(self):
         # Creation is determined by an all 0 base sha
