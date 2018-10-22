@@ -135,7 +135,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
 
 class FunctionalTestMixin(object):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=10)
 
     def startVirtInfo(self):
         # Set up a fake virt information XML-RPC server which just
