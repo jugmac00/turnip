@@ -122,8 +122,8 @@ class HookRPCHandler(object):
         del self.ref_paths[key]
 
     @defer.inlineCallbacks
-    def listRefRules(self, proto, args):
-        """Get forbidden ref path patterns (as Unicode)."""
+    def checkRefPermissions(self, proto, args):
+        """Get permissions for a set of refs."""
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
         result = yield proxy.callRemote(
             b'checkRefPermissions',
@@ -151,6 +151,6 @@ class HookRPCServerFactory(RPCServerFactory):
     def __init__(self, hookrpc_handler):
         self.hookrpc_handler = hookrpc_handler
         self.methods = {
-            'list_ref_rules': self.hookrpc_handler.listRefRules,
+            'check_ref_permissions': self.hookrpc_handler.checkRefPermissions,
             'notify_push': self.hookrpc_handler.notifyPush,
             }

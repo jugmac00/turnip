@@ -133,7 +133,7 @@ if __name__ == '__main__':
         raw_paths = sys.stdin.readlines()
         ref_paths = [p.rstrip(b'\n').split(b' ', 2)[2] for p in raw_paths]
         rule_lines = rpc_invoke(
-            sock, b'list_ref_rules',
+            sock, b'check_ref_permissions',
             {'key': rpc_key, 'paths': ref_paths})
         errors = match_rules(rule_lines, raw_paths)
         for error in errors:
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     elif hook == 'update':
         ref = sys.argv[1]
         rule_lines = rpc_invoke(
-            sock, b'list_ref_rules',
+            sock, b'check_ref_permissions',
             {'key': rpc_key, 'paths': [ref]})
         errors = match_update_rules(rule_lines, sys.argv[1:4])
         for error in errors:

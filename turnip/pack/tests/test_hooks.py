@@ -56,7 +56,7 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
     def notifyPush(self, proto, args):
         self.notifications.append(self.ref_paths[args['key']])
 
-    def listRefRules(self, proto, args):
+    def checkRefPermissions(self, proto, args):
         return self.ref_rules
 
 
@@ -161,7 +161,7 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
              (b'refs/heads/super-verboten', self.old_sha1, self.new_sha1)],
             {'refs/heads/verboten': [],
              'refs/heads/super-verboten': [],
-             'refs/heads/master':['push']},
+             'refs/heads/master': ['push']},
             b"You do not have permission to push to refs/heads/verboten.\n"
             b"You do not have permission to push "
             b"to refs/heads/super-verboten.\n")
