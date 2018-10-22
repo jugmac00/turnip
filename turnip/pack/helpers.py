@@ -132,7 +132,8 @@ def read_orig_hook():
         with open(orig_hook_path, 'rb') as f:
             contents = f.read()
         _orig_hook = re.sub(
-            br'\A#!.*', ('#!' + sys.executable).encode('UTF-8'), contents)
+            br'\A#!.*', ('#!' + sys.executable).encode('UTF-8'), contents,
+            count=1)
     return _orig_hook
 
 

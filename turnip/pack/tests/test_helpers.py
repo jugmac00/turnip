@@ -258,7 +258,7 @@ class TestEnsureHooks(TestCase):
             with open(expected_path, 'rb') as expected:
                 expected_bytes = re.sub(
                     br'\A#!.*', ('#!' + sys.executable).encode('UTF-8'),
-                    expected.read())
+                    expected.read(), count=1)
                 self.assertEqual(expected_bytes, actual.read())
         # The hook is executable.
         self.assertTrue(os.stat(self.hook('hook.py')).st_mode & stat.S_IXUSR)
