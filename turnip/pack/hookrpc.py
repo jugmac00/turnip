@@ -109,7 +109,7 @@ class HookRPCHandler(object):
         self.virtinfo_url = virtinfo_url
 
     def registerKey(self, key, path, auth_params):
-        """Register a key with the given path and ref_rules.
+        """Register a key with the given path and auth permissions.
 
         Hooks identify themselves using this key.
         """

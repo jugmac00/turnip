@@ -48,7 +48,7 @@ def determine_permissions_outcome(old, ref, rule_lines):
 
 
 def match_rules(rule_lines, ref_lines):
-    """Check if the list of ref_rules is allowable by the rule_lines.
+    """Check if the list of refs is allowable by the rule_lines.
 
     Called by the pre-receive hook, checks each ref in turn to see if
     there is a matching rule line and that the operation is allowable.
@@ -79,7 +79,8 @@ def match_update_rules(rule_lines, ref_line):
     if old == pygit2.GIT_OID_HEX_ZERO:
         return []
 
-    # Find common ancestors: if there aren't any, it's a non-fast-forward
+    # If there's no common ancestor, or the common ancestor is something
+    # other than the old commit, then this is a non-fast-forward push.
     base = repo.merge_base(old, new)
     if base and base.hex == old:
         # This is a fast-forwardable merge

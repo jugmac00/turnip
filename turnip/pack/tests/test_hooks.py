@@ -11,6 +11,7 @@ import os.path
 import uuid
 
 from fixtures import TempDir
+import pygit2
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (
@@ -51,13 +52,13 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
     def __init__(self):
         super(MockHookRPCHandler, self).__init__(None)
         self.notifications = []
-        self.ref_rules = []
+        self.ref_permissions = []
 
     def notifyPush(self, proto, args):
         self.notifications.append(self.ref_paths[args['key']])
 
     def checkRefPermissions(self, proto, args):
-        return self.ref_rules
+        return self.ref_permissions
 
 
 class MockRef(object):
@@ -107,7 +108,7 @@ class HookTestMixin(object):
     def invokeHook(self, input, rules):
         key = str(uuid.uuid4())
         self.hookrpc_handler.registerKey(key, '/translated', list(rules))
-        self.hookrpc_handler.ref_rules = rules
+        self.hookrpc_handler.ref_permissions = rules
         try:
             d = defer.Deferred()
             reactor.spawnProcess(
@@ -196,7 +197,8 @@ class TestUpdateHook(TestCase):
         # Creation is determined by an all 0 base sha
         self.patch_repo('')
         self.assertEqual(
-            [], hook.match_update_rules([], ['ref', '0'*40, 'new']))
+            [], hook.match_update_rules(
+                [], ['ref', pygit2.GIT_OID_HEX_ZERO, 'new']))
 
     def test_fast_forward(self):
         # If the old sha is a merge ancestor of the new
@@ -253,12 +255,12 @@ class TestDeterminePermissions(TestCase):
 
     def test_match_with_create(self):
         output = hook.determine_permissions_outcome(
-            '0' * 40, 'ref', {'ref': ['create']})
+            pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['create']})
         self.assertIsNone(output)
 
     def test_match_no_create_perms(self):
         output = hook.determine_permissions_outcome(
-            '0' * 40, 'ref', {'ref': []})
+            pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': []})
         self.assertEqual(b"You do not have permission to create ref.", output)
 
     def test_push(self):
@@ -274,5 +276,5 @@ class TestDeterminePermissions(TestCase):
     def test_force_push_always_allows(self):
         # If user has force push, they can do anything
         output = hook.determine_permissions_outcome(
-            '0' * 40, 'ref', {'ref': ['force_push']})
+           pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['force_push']})
         self.assertIsNone(output)
