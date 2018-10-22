@@ -52,13 +52,13 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
     def __init__(self):
         super(MockHookRPCHandler, self).__init__(None)
         self.notifications = []
-        self.ref_permissions = []
+        self.ref_permissions = {}
 
     def notifyPush(self, proto, args):
         self.notifications.append(self.ref_paths[args['key']])
 
     def checkRefPermissions(self, proto, args):
-        return self.ref_permissions
+        return self.ref_permissions[args['key']]
 
 
 class MockRef(object):
@@ -108,7 +108,7 @@ class HookTestMixin(object):
     def invokeHook(self, input, rules):
         key = str(uuid.uuid4())
         self.hookrpc_handler.registerKey(key, '/translated', list(rules))
-        self.hookrpc_handler.ref_permissions = rules
+        self.hookrpc_handler.ref_permissions[key] = rules
         try:
             d = defer.Deferred()
             reactor.spawnProcess(

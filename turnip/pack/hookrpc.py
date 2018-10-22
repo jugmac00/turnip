@@ -107,7 +107,7 @@ class HookRPCHandler(object):
     def __init__(self, virtinfo_url):
         self.auth_params = {}
         self.ref_paths = {}
-        self.ref_permissions = defaultdict(dict)
+        self.ref_permissions = {}
         self.virtinfo_url = virtinfo_url
 
     def registerKey(self, key, path, auth_params):
@@ -117,34 +117,34 @@ class HookRPCHandler(object):
         """
         self.auth_params[key] = auth_params
         self.ref_paths[key] = path
-        self.ref_permissions = defaultdict(dict)
+        self.ref_permissions[key] = {}
 
     def unregisterKey(self, key):
         """Unregister a key."""
         del self.auth_params[key]
         del self.ref_paths[key]
-        if key in self.ref_permissions:
-            del self.ref_permissions[key]
+        del self.ref_permissions[key]
 
     @defer.inlineCallbacks
     def checkRefPermissions(self, proto, args):
         """Get permissions for a set of refs."""
-        cached_permissions = self.ref_permissions.get(args['key'], {})
-        to_request = [x for x in args['paths']
-                      if x not in cached_permissions]
-        if to_request:
+        cached_permissions = self.ref_permissions[args['key']]
+        missing = [x for x in args['paths']
+                   if x not in cached_permissions]
+        if missing:
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
             result = yield proxy.callRemote(
                 b'checkRefPermissions',
                 self.ref_paths[args['key']],
-                to_request,
+                missing,
                 self.auth_params[args['key']]
             )
             for ref, permission in result.items():
-                self.ref_permissions[args['key']][ref] = permission
-            defer.returnValue(result)
-        else:
-            defer.returnValue(cached_permissions)
+                cached_permissions[ref] = permission
+        # cached_permissions is a shallow copy of the key index for
+        # self.ref_permissions, so changes will be updated in that.
+        defer.returnValue(
+            {ref: cached_permissions[ref] for ref in args['paths']})
 
     @defer.inlineCallbacks
     def notify(self, path):
