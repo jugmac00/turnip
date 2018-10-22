@@ -18,14 +18,7 @@ import pygit2
 
 
 def get_repo():
-    # Find the repo we're concerned about.
-    # The hook is guaranteed to be in the hooks/ subdirectory
-    # of the repository. We need the root of the repository,
-    # so find the parent directory of the current file.
-    repo_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        os.pardir)
-    return pygit2.Repository(repo_path)
+    return pygit2.Repository('.')
 
 
 def determine_permissions_outcome(old, ref, rule_lines):
