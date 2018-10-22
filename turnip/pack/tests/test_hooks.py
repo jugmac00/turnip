@@ -276,5 +276,5 @@ class TestDeterminePermissions(TestCase):
     def test_force_push_always_allows(self):
         # If user has force push, they can do anything
         output = hook.determine_permissions_outcome(
-           pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['force_push']})
+            pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['force_push']})
         self.assertIsNone(output)

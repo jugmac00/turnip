@@ -146,7 +146,8 @@ class FunctionalTestMixin(object):
         self.virtinfo_port = self.virtinfo_listener.getHost().port
         self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
         self.addCleanup(self.virtinfo_listener.stopListening)
-        self.virtinfo.ref_permissions = {'refs/heads/master': ['create', 'push']}
+        self.virtinfo.ref_permissions = {
+            'refs/heads/master': ['create', 'push']}
 
     def startHookRPC(self):
         self.hookrpc_handler = HookRPCHandler(self.virtinfo_url)
@@ -330,7 +331,8 @@ class FunctionalTestMixin(object):
     @defer.inlineCallbacks
     def test_force_push(self):
         # Update the test ref_permissions
-        self.virtinfo.ref_permissions = {'refs/heads/master': ['create', 'push']}
+        self.virtinfo.ref_permissions = {
+            'refs/heads/master': ['create', 'push']}
 
         # Test a force push fails if the user has no permissions
         test_root = self.useFixture(TempDir()).path
@@ -459,7 +461,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             PackVirtFactory(
                 b'localhost', self.backend_port, self.virtinfo_url))
         self.virt_port = self.virt_listener.getHost().port
-        self.virtinfo.ref_permissions = {'refs/heads/master': ['create', 'push']}
+        self.virtinfo.ref_permissions = {
+            'refs/heads/master': ['create', 'push']}
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -469,7 +472,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
     @defer.inlineCallbacks
     def test_read_only(self):
-        self.virtinfo.ref_permissions = {'refs/heads/master': ['create', 'push']}
+        self.virtinfo.ref_permissions = {
+            'refs/heads/master': ['create', 'push']}
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
         clone2 = os.path.join(test_root, 'clone2')

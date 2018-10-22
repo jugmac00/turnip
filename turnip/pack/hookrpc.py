@@ -20,6 +20,7 @@ from __future__ import (
     unicode_literals,
     )
 
+from collections import defaultdict
 import json
 import sys
 
@@ -106,6 +107,7 @@ class HookRPCHandler(object):
     def __init__(self, virtinfo_url):
         self.auth_params = {}
         self.ref_paths = {}
+        self.ref_permissions = defaultdict(dict)
         self.virtinfo_url = virtinfo_url
 
     def registerKey(self, key, path, auth_params):
@@ -115,23 +117,34 @@ class HookRPCHandler(object):
         """
         self.auth_params[key] = auth_params
         self.ref_paths[key] = path
+        self.ref_permissions = defaultdict(dict)
 
     def unregisterKey(self, key):
         """Unregister a key."""
         del self.auth_params[key]
         del self.ref_paths[key]
+        if key in self.ref_permissions:
+            del self.ref_permissions[key]
 
     @defer.inlineCallbacks
     def checkRefPermissions(self, proto, args):
         """Get permissions for a set of refs."""
-        proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        result = yield proxy.callRemote(
-            b'checkRefPermissions',
-            self.ref_paths[args['key']],
-            args['paths'],
-            self.auth_params[args['key']]
-        )
-        defer.returnValue(result)
+        cached_permissions = self.ref_permissions.get(args['key'], {})
+        to_request = [x for x in args['paths']
+                      if x not in cached_permissions]
+        if to_request:
+            proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
+            result = yield proxy.callRemote(
+                b'checkRefPermissions',
+                self.ref_paths[args['key']],
+                to_request,
+                self.auth_params[args['key']]
+            )
+            for ref, permission in result.items():
+                self.ref_permissions[args['key']][ref] = permission
+            defer.returnValue(result)
+        else:
+            defer.returnValue(cached_permissions)
 
     @defer.inlineCallbacks
     def notify(self, path):
