@@ -7,9 +7,10 @@ from __future__ import (
     unicode_literals,
     )
 
-import hashlib
 import os.path
+import re
 import stat
+import sys
 from textwrap import dedent
 import time
 
@@ -255,8 +256,9 @@ class TestEnsureHooks(TestCase):
             expected_path = os.path.join(
                 os.path.dirname(turnip.pack.hooks.__file__), 'hook.py')
             with open(expected_path, 'rb') as expected:
-                self.assertEqual(
-                    hashlib.sha256(expected.read()).hexdigest(),
-                    hashlib.sha256(actual.read()).hexdigest())
+                expected_bytes = re.sub(
+                    br'\A#!.*', ('#!' + sys.executable).encode('UTF-8'),
+                    expected.read(), count=1)
+                self.assertEqual(expected_bytes, actual.read())
         # The hook is executable.
         self.assertTrue(os.stat(self.hook('hook.py')).st_mode & stat.S_IXUSR)

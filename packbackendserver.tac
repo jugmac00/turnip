@@ -38,7 +38,10 @@ def getPackBackendServices():
         repo_store, 'hookrpc_sock_%d' % pack_backend_port)
     pack_backend_service = internet.TCPServer(
         pack_backend_port,
-        PackBackendFactory(repo_store, hookrpc_handler, hookrpc_path))
+        PackBackendFactory(repo_store,
+                           hookrpc_handler,
+                           hookrpc_path,
+                           config.get('virtinfo_endpoint')))
     if os.path.exists(hookrpc_path):
         os.unlink(hookrpc_path)
     hookrpc_service = internet.UNIXServer(

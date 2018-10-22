@@ -11,6 +11,7 @@ import os.path
 import uuid
 
 from fixtures import TempDir
+import pygit2
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (
@@ -20,7 +21,9 @@ from twisted.internet import (
     )
 
 from turnip.pack import hookrpc
+from turnip.pack.helpers import ensure_hooks
 import turnip.pack.hooks
+from turnip.pack.hooks import hook
 
 
 class HookProcessProtocol(protocol.ProcessProtocol):
@@ -50,21 +53,35 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
     def __init__(self):
         super(MockHookRPCHandler, self).__init__(None)
         self.notifications = []
+        self.ref_permissions = {}
 
     def notifyPush(self, proto, args):
         self.notifications.append(self.ref_paths[args['key']])
 
+    def checkRefPermissions(self, proto, args):
+        return self.ref_permissions[args['key']]
+
+
+class MockRef(object):
+
+    def __init__(self, hex):
+        self.hex = hex
+
+
+class MockRepo(object):
+
+    def __init__(self, ancestor):
+        self.ancestor = ancestor
+
+    def merge_base(self, old, new):
+        return MockRef(self.ancestor)
+
 
 class HookTestMixin(object):
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     old_sha1 = b'a' * 40
     new_sha1 = b'b' * 40
-
-    @property
-    def hook_path(self):
-        return os.path.join(
-            os.path.dirname(turnip.pack.hooks.__file__), self.hook_name)
 
     def handlePushNotification(self, path):
         self.notifications.append(path)
@@ -78,15 +95,20 @@ class HookTestMixin(object):
         self.hookrpc_port = reactor.listenUNIX(
             self.hookrpc_path, self.hookrpc)
         self.addCleanup(self.hookrpc_port.stopListening)
+        hooks_dir = os.path.join(dir, 'hooks')
+        os.mkdir(hooks_dir)
+        ensure_hooks(dir)
+        self.hook_path = os.path.join(hooks_dir, self.hook_name)
 
     def encodeRefs(self, updates):
         return b'\n'.join(
             old + b' ' + new + b' ' + ref for ref, old, new in updates)
 
     @defer.inlineCallbacks
-    def invokeHook(self, input, rules):
+    def invokeHook(self, input, permissions):
         key = str(uuid.uuid4())
-        self.hookrpc_handler.registerKey(key, '/translated', list(rules))
+        self.hookrpc_handler.registerKey(key, '/translated', {})
+        self.hookrpc_handler.ref_permissions[key] = permissions
         try:
             d = defer.Deferred()
             reactor.spawnProcess(
@@ -101,14 +123,20 @@ class HookTestMixin(object):
         defer.returnValue((code, stdout, stderr))
 
     @defer.inlineCallbacks
-    def assertAccepted(self, updates, rules):
-        code, out, err = yield self.invokeHook(self.encodeRefs(updates), rules)
-        self.assertEqual((0, b'', b''), (code, out, err))
+    def assertAccepted(self, updates, permissions):
+        code, out, err = yield self.invokeHook(
+            self.encodeRefs(updates), permissions)
+        # XXX cjwatson 2018-10-22: We should test that `err` is empty too,
+        # but we need pygit2 >= 0.25.1 to silence some cffi warnings.
+        self.assertEqual((0, b''), (code, out))
 
     @defer.inlineCallbacks
-    def assertRejected(self, updates, rules, message):
-        code, out, err = yield self.invokeHook(self.encodeRefs(updates), rules)
-        self.assertEqual((1, message, b''), (code, out, err))
+    def assertRejected(self, updates, permissions, message):
+        code, out, err = yield self.invokeHook(
+            self.encodeRefs(updates), permissions)
+        # XXX cjwatson 2018-10-22: We should test that `err` is empty too,
+        # but we need pygit2 >= 0.25.1 to silence some cffi warnings.
+        self.assertEqual((1, message), (code, out))
 
 
 class TestPreReceiveHook(HookTestMixin, TestCase):
@@ -121,28 +149,15 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
         # A single valid ref is accepted.
         yield self.assertAccepted(
             [(b'refs/heads/master', self.old_sha1, self.new_sha1)],
-            [])
+            {'refs/heads/master': ['push']})
 
     @defer.inlineCallbacks
     def test_rejected(self):
         # An invalid ref is rejected.
         yield self.assertRejected(
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1)],
-            [b'refs/heads/verboten'],
-            b"You can't push to refs/heads/verboten.\n")
-
-    @defer.inlineCallbacks
-    def test_wildcard(self):
-        # "*" in a rule matches any path segment.
-        yield self.assertRejected(
-            [(b'refs/heads/foo', self.old_sha1, self.new_sha1),
-             (b'refs/tags/bar', self.old_sha1, self.new_sha1),
-             (b'refs/tags/foo', self.old_sha1, self.new_sha1),
-             (b'refs/baz/quux', self.old_sha1, self.new_sha1)],
-            [b'refs/*/foo', b'refs/baz/*'],
-            b"You can't push to refs/heads/foo.\n"
-            b"You can't push to refs/tags/foo.\n"
-            b"You can't push to refs/baz/quux.\n")
+            {'refs/heads/verboten': []},
+            b"You do not have permission to push to refs/heads/verboten.\n")
 
     @defer.inlineCallbacks
     def test_rejected_multiple(self):
@@ -151,9 +166,12 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1),
              (b'refs/heads/master', self.old_sha1, self.new_sha1),
              (b'refs/heads/super-verboten', self.old_sha1, self.new_sha1)],
-            [b'refs/heads/verboten', b'refs/heads/super-verboten'],
-            b"You can't push to refs/heads/verboten.\n"
-            b"You can't push to refs/heads/super-verboten.\n")
+            {'refs/heads/verboten': [],
+             'refs/heads/super-verboten': [],
+             'refs/heads/master': ['push']},
+            b"You do not have permission to push to refs/heads/verboten.\n"
+            b"You do not have permission to push "
+            b"to refs/heads/super-verboten.\n")
 
 
 class TestPostReceiveHook(HookTestMixin, TestCase):
@@ -173,3 +191,96 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         # No notification is sent for an empty push.
         yield self.assertAccepted([], [])
         self.assertEqual([], self.hookrpc_handler.notifications)
+
+
+class TestUpdateHook(TestCase):
+    """Tests for the git update hook"""
+
+    def patch_repo(self, ancestor):
+        hook.get_repo = lambda: MockRepo(ancestor)
+
+    def test_create(self):
+        # Creation is determined by an all 0 base sha
+        self.patch_repo('')
+        self.assertEqual(
+            [], hook.match_update_rules(
+                [], ['ref', pygit2.GIT_OID_HEX_ZERO, 'new']))
+
+    def test_fast_forward(self):
+        # If the old sha is a merge ancestor of the new
+        self.patch_repo('somehex')
+        self.assertEqual(
+            [], hook.match_update_rules([], ['ref', 'somehex', 'new']))
+
+    def test_rules_fall_through(self):
+        # The default is to deny
+        self.patch_repo('somehex')
+        output = hook.match_update_rules({}, ['ref', 'old', 'new'])
+        self.assertEqual(
+            [b'You do not have permission to force-push to ref.'], output)
+
+    def test_no_matching_ref(self):
+        # No matches means deny by default
+        self.patch_repo('somehex')
+        output = hook.match_update_rules(
+            {'notamatch': []},
+            ['ref', 'old', 'new'])
+        self.assertEqual(
+            [b'You do not have permission to force-push to ref.'], output)
+
+    def test_matching_ref(self):
+        # Permission given to force-push
+        self.patch_repo('somehex')
+        output = hook.match_update_rules(
+            {'ref': ['force_push']},
+            ['ref', 'old', 'new'])
+        self.assertEqual([], output)
+
+    def test_no_permission(self):
+        # User does not have permission to force-push
+        self.patch_repo('somehex')
+        output = hook.match_update_rules(
+            {'ref': ['create']},
+            ['ref', 'old', 'new'])
+        self.assertEqual(
+            [b'You do not have permission to force-push to ref.'], output)
+
+
+class TestDeterminePermissions(TestCase):
+
+    def test_no_match_fallthrough(self):
+        # No matching rule is deny by default
+        output = hook.determine_permissions_outcome(
+            'old', 'ref', {})
+        self.assertEqual(b"You do not have permission to push to ref.", output)
+
+    def test_match_no_permissions(self):
+        output = hook.determine_permissions_outcome(
+            'old', 'ref', {'ref': []})
+        self.assertEqual(b"You do not have permission to push to ref.", output)
+
+    def test_match_with_create(self):
+        output = hook.determine_permissions_outcome(
+            pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['create']})
+        self.assertIsNone(output)
+
+    def test_match_no_create_perms(self):
+        output = hook.determine_permissions_outcome(
+            pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': []})
+        self.assertEqual(b"You do not have permission to create ref.", output)
+
+    def test_push(self):
+        output = hook.determine_permissions_outcome(
+            'old', 'ref', {'ref': ['push']})
+        self.assertIsNone(output)
+
+    def test_force_push(self):
+        output = hook.determine_permissions_outcome(
+            'old', 'ref', {'ref': ['force_push']})
+        self.assertIsNone(output)
+
+    def test_force_push_always_allows(self):
+        # If user has force-push, they can do anything
+        output = hook.determine_permissions_outcome(
+            pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['force_push']})
+        self.assertIsNone(output)

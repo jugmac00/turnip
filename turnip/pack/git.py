@@ -421,10 +421,16 @@ class PackBackendProtocol(PackServerProtocol):
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
         args.append(self.path)
-        self.spawnGit(subcmd, args, write_operation=write_operation)
+        uid = params.get('turnip-authenticated-uid')
+        uid = int(uid) if uid else None
+        auth_params = {'uid': uid}
+        self.spawnGit(subcmd,
+                      args,
+                      write_operation=write_operation,
+                      auth_params=auth_params)
 
     def spawnGit(self, subcmd, extra_args, write_operation=False,
-                 send_path_as_option=False):
+                 send_path_as_option=False, auth_params=None):
         cmd = b'git'
         args = [b'git']
         if send_path_as_option:
@@ -439,7 +445,7 @@ class PackBackendProtocol(PackServerProtocol):
             ensure_config(self.path)
             self.hookrpc_key = str(uuid.uuid4())
             self.factory.hookrpc_handler.registerKey(
-                self.hookrpc_key, self.raw_pathname, [])
+                self.hookrpc_key, self.raw_pathname, auth_params)
             ensure_hooks(self.path)
             env[b'TURNIP_HOOK_RPC_SOCK'] = self.factory.hookrpc_sock
             env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
@@ -519,10 +525,15 @@ class PackBackendFactory(protocol.Factory):
 
     protocol = PackBackendProtocol
 
-    def __init__(self, root, hookrpc_handler=None, hookrpc_sock=None):
+    def __init__(self,
+                 root,
+                 hookrpc_handler=None,
+                 hookrpc_sock=None,
+                 virtinfo_endpoint=None):
         self.root = root
         self.hookrpc_handler = hookrpc_handler
         self.hookrpc_sock = hookrpc_sock
+        self.virtinfo_endpoint = virtinfo_endpoint
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):

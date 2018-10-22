@@ -20,6 +20,7 @@ from __future__ import (
     unicode_literals,
     )
 
+from collections import defaultdict
 import json
 import sys
 
@@ -104,26 +105,46 @@ class HookRPCHandler(object):
     """
 
     def __init__(self, virtinfo_url):
+        self.auth_params = {}
         self.ref_paths = {}
-        self.ref_rules = {}
+        self.ref_permissions = {}
         self.virtinfo_url = virtinfo_url
 
-    def registerKey(self, key, path, ref_rules):
-        """Register a key with the given path and ref_rules.
+    def registerKey(self, key, path, auth_params):
+        """Register a key with the given path and auth permissions.
 
         Hooks identify themselves using this key.
         """
+        self.auth_params[key] = auth_params
         self.ref_paths[key] = path
-        self.ref_rules[key] = ref_rules
+        self.ref_permissions[key] = {}
 
     def unregisterKey(self, key):
         """Unregister a key."""
-        del self.ref_rules[key]
+        del self.auth_params[key]
         del self.ref_paths[key]
+        del self.ref_permissions[key]
 
-    def listRefRules(self, proto, args):
-        """Get forbidden ref path patterns (as Unicode)."""
-        return [rule.decode('utf-8') for rule in self.ref_rules[args['key']]]
+    @defer.inlineCallbacks
+    def checkRefPermissions(self, proto, args):
+        """Get permissions for a set of refs."""
+        cached_permissions = self.ref_permissions[args['key']]
+        missing = [x for x in args['paths']
+                   if x not in cached_permissions]
+        if missing:
+            proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
+            result = yield proxy.callRemote(
+                b'checkRefPermissions',
+                self.ref_paths[args['key']],
+                missing,
+                self.auth_params[args['key']]
+            )
+            for ref, permission in result.items():
+                cached_permissions[ref] = permission
+        # cached_permissions is a shallow copy of the key index for
+        # self.ref_permissions, so changes will be updated in that.
+        defer.returnValue(
+            {ref: cached_permissions[ref] for ref in args['paths']})
 
     @defer.inlineCallbacks
     def notify(self, path):
@@ -143,6 +164,6 @@ class HookRPCServerFactory(RPCServerFactory):
     def __init__(self, hookrpc_handler):
         self.hookrpc_handler = hookrpc_handler
         self.methods = {
-            'list_ref_rules': self.hookrpc_handler.listRefRules,
+            'check_ref_permissions': self.hookrpc_handler.checkRefPermissions,
             'notify_push': self.hookrpc_handler.notifyPush,
             }

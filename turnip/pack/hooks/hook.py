@@ -11,29 +11,79 @@ from __future__ import (
 
 import json
 import os
-import re
 import socket
 import sys
 
+import pygit2
 
-def glob_to_re(s):
-    """Convert a glob to a regular expression.
 
-    The only wildcard supported is "*", to match any path segment.
-    """
-    return b'^%s\Z' % (
-        b''.join(b'[^/]*' if c == b'*' else re.escape(c) for c in s))
+def get_repo():
+    return pygit2.Repository('.')
+
+
+def determine_permissions_outcome(old, ref, rule_lines):
+    rule = rule_lines.get(ref, [])
+    # We have force-push permission, implies push, therefore okay
+    if 'force_push' in rule:
+        return
+    # We are creating a new ref
+    if old == pygit2.GIT_OID_HEX_ZERO:
+        if 'create' in rule:
+            return
+        else:
+            return 'You do not have permission to create %s.' % ref
+    # We have push permission, everything is okay
+    # force_push is checked later (in update-hook)
+    if 'push' in rule:
+        return
+    # If we're here, there are no matching rules
+    return "You do not have permission to push to %s." % ref
 
 
 def match_rules(rule_lines, ref_lines):
-    rules = [re.compile(glob_to_re(l.rstrip(b'\n'))) for l in rule_lines]
+    """Check if the list of refs is allowable by the rule_lines.
+
+    Called by the pre-receive hook, checks each ref in turn to see if
+    there is a matching rule line and that the operation is allowable.
+    Does not confirm that the operation is a merge or force-push, that is
+    performed by the update hook and match_update_rules.
+    """
+    result = []
     # Match each ref against each rule.
-    errors = []
     for ref_line in ref_lines:
         old, new, ref = ref_line.rstrip(b'\n').split(b' ', 2)
-        if any(rule.match(ref) for rule in rules):
-            errors.append(b"You can't push to %s." % ref)
-    return errors
+        error = determine_permissions_outcome(old, ref, rule_lines)
+        if error:
+            result.append(error)
+    return result
+
+
+def match_update_rules(rule_lines, ref_line):
+    """ Match update hook refs against rules and check permissions.
+
+    Called by the update hook, checks if the operation is a merge or
+    a force-push. In the case of a force-push, checks the ref against
+    the rule_lines to confirm that the user has permissions for that operation.
+    """
+    ref, old, new = ref_line
+    repo = get_repo()
+
+    # If it's a create, the old ref doesn't exist
+    if old == pygit2.GIT_OID_HEX_ZERO:
+        return []
+
+    # If there's no common ancestor, or the common ancestor is something
+    # other than the old commit, then this is a non-fast-forward push.
+    base = repo.merge_base(old, new)
+    if base and base.hex == old:
+        # This is a fast-forwardable merge
+        return []
+
+    # If it's not fast forwardable, check that user has permissions
+    rule = rule_lines.get(ref, [])
+    if 'force_push' in rule:
+        return []
+    return ['You do not have permission to force-push to %s.' % ref]
 
 
 def netstring_send(sock, s):
@@ -74,11 +124,14 @@ if __name__ == '__main__':
     hook = os.path.basename(sys.argv[0])
     if hook == 'pre-receive':
         # Verify the proposed changes against rules from the server.
-        # This currently just lets virtinfo forbid certain ref paths.
-        rule_lines = rpc_invoke(sock, b'list_ref_rules', {'key': rpc_key})
-        errors = match_rules(rule_lines, sys.stdin.readlines())
+        raw_paths = sys.stdin.readlines()
+        ref_paths = [p.rstrip(b'\n').split(b' ', 2)[2] for p in raw_paths]
+        rule_lines = rpc_invoke(
+            sock, b'check_ref_permissions',
+            {'key': rpc_key, 'paths': ref_paths})
+        errors = match_rules(rule_lines, raw_paths)
         for error in errors:
-            sys.stdout.write(error + b'\n')
+            sys.stdout.write(error + '\n')
         sys.exit(1 if errors else 0)
     elif hook == 'post-receive':
         # Notify the server about the push if there were any changes.
@@ -86,6 +139,15 @@ if __name__ == '__main__':
         if sys.stdin.readlines():
             rule_lines = rpc_invoke(sock, b'notify_push', {'key': rpc_key})
         sys.exit(0)
+    elif hook == 'update':
+        ref = sys.argv[1]
+        rule_lines = rpc_invoke(
+            sock, b'check_ref_permissions',
+            {'key': rpc_key, 'paths': [ref]})
+        errors = match_update_rules(rule_lines, sys.argv[1:4])
+        for error in errors:
+            sys.stdout.write(error + '\n')
+        sys.exit(1 if errors else 0)
     else:
-        sys.stderr.write(b'Invalid hook name: %s' % hook)
+        sys.stderr.write('Invalid hook name: %s' % hook)
         sys.exit(1)

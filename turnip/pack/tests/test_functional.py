@@ -106,6 +106,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.translations = []
         self.authentications = []
         self.push_notifications = []
+        self.ref_permissions = {}
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
@@ -128,10 +129,13 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     def xmlrpc_notify(self, path):
         self.push_notifications.append(path)
 
+    def xmlrpc_checkRefPermissions(self, path, ref_paths, auth_params):
+        return self.ref_permissions
+
 
 class FunctionalTestMixin(object):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=30)
 
     def startVirtInfo(self):
         # Set up a fake virt information XML-RPC server which just
@@ -142,6 +146,8 @@ class FunctionalTestMixin(object):
         self.virtinfo_port = self.virtinfo_listener.getHost().port
         self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
         self.addCleanup(self.virtinfo_listener.stopListening)
+        self.virtinfo.ref_permissions = {
+            'refs/heads/master': ['create', 'push']}
 
     def startHookRPC(self):
         self.hookrpc_handler = HookRPCHandler(self.virtinfo_url)
@@ -159,7 +165,8 @@ class FunctionalTestMixin(object):
         self.backend_listener = reactor.listenTCP(
             0,
             PackBackendFactory(
-                self.root, self.hookrpc_handler, self.hookrpc_path))
+                self.root, self.hookrpc_handler, self.hookrpc_path,
+                virtinfo_endpoint=self.virtinfo_url))
         self.backend_port = self.backend_listener.getHost().port
         self.addCleanup(self.backend_listener.stopListening)
 
@@ -172,6 +179,16 @@ class FunctionalTestMixin(object):
             self.addDetail('stderr', text_content(err))
             self.assertEqual(0, code)
         defer.returnValue(out)
+
+    @defer.inlineCallbacks
+    def assertCommandFailure(self, command, path='.'):
+        out, err, code = yield utils.getProcessOutputAndValue(
+            command[0], command[1:], env=os.environ, path=path)
+        if code == 0:
+            self.addDetail('stdout', text_content(out))
+            self.addDetail('stderr', text_content(err))
+            self.assertNotEqual(0, code)
+        defer.returnValue((out, err))
 
     @defer.inlineCallbacks
     def test_clone_and_push(self):
@@ -271,6 +288,91 @@ class FunctionalTestMixin(object):
         self.assertIn(b'does not appear to be a git repository', output)
 
     @defer.inlineCallbacks
+    def test_no_permissions(self):
+        # Update the test ref_permissions
+        self.virtinfo.ref_permissions = {'refs/heads/master': ['push']}
+        # Test a push fails if the user has no permissions to that ref
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+
+        # Clone the empty repo from the backend and commit to it.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+
+        # This should fail to push.
+        output, error = yield self.assertCommandFailure(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+        self.assertIn(
+            b'You do not have permission to create refs/heads/master.',
+            error)
+
+        # add create, disable push
+        self.virtinfo.ref_permissions = {'refs/heads/master': ['create']}
+        # Can now create the ref
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+
+        # But can't push a new commit.
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Second test'),
+            path=clone1)
+        output, error = yield self.assertCommandFailure(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+        self.assertIn(
+            b"You do not have permission to push to refs/heads/master", error)
+
+    @defer.inlineCallbacks
+    def test_force_push(self):
+        # Update the test ref_permissions
+        self.virtinfo.ref_permissions = {
+            'refs/heads/master': ['create', 'push']}
+
+        # Test a force-push fails if the user has no permissions
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+
+        # Clone the empty repo from the backend and commit to it.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Second test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Third test'),
+            path=clone1)
+
+        # Push the changes
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+
+        # Squash some commits to force a non-fast-forward commit
+        yield self.assertCommandSuccess(
+            (b'git', b'reset', b'--soft', b'HEAD~2'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Rebase'),
+            path=clone1)
+
+        output, error = yield self.assertCommandFailure(
+            (b'git', b'push', b'origin', b'master', b'--force'), path=clone1)
+        self.assertIn(
+            b"You do not have permission to force-push to", error)
+
+    @defer.inlineCallbacks
     def test_large_push(self):
         # Test a large push, which behaves a bit differently with some
         # frontends.  For example, when doing a large push, as an
@@ -359,6 +461,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             PackVirtFactory(
                 b'localhost', self.backend_port, self.virtinfo_url))
         self.virt_port = self.virt_listener.getHost().port
+        self.virtinfo.ref_permissions = {
+            'refs/heads/master': ['create', 'push']}
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -368,6 +472,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
     @defer.inlineCallbacks
     def test_read_only(self):
+        self.virtinfo.ref_permissions = {
+            'refs/heads/master': ['create', 'push']}
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
         clone2 = os.path.join(test_root, 'clone2')
