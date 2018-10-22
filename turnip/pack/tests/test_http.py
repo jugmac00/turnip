@@ -134,7 +134,7 @@ class ErrorTestMixin(object):
 
 class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     request_method = 'GET'
 
@@ -185,7 +185,7 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
 
 class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=1)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     def setUp(self):
         super(TestSmartHTTPCommandResource, self).setUp()
