@@ -83,7 +83,7 @@ def match_update_rules(rule_lines, ref_line):
     rule = rule_lines.get(ref, [])
     if 'force_push' in rule:
         return []
-    return ['You do not have permission to force push to %s.' % ref]
+    return ['You do not have permission to force-push to %s.' % ref]
 
 
 def netstring_send(sock, s):

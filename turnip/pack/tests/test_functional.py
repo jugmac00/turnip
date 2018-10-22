@@ -106,7 +106,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.translations = []
         self.authentications = []
         self.push_notifications = []
-        self.ref_permissions = []
+        self.ref_permissions = {}
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
@@ -334,7 +334,7 @@ class FunctionalTestMixin(object):
         self.virtinfo.ref_permissions = {
             'refs/heads/master': ['create', 'push']}
 
-        # Test a force push fails if the user has no permissions
+        # Test a force-push fails if the user has no permissions
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
 
@@ -370,7 +370,7 @@ class FunctionalTestMixin(object):
         output, error = yield self.assertCommandFailure(
             (b'git', b'push', b'origin', b'master', b'--force'), path=clone1)
         self.assertIn(
-            b"You do not have permission to force push to", error)
+            b"You do not have permission to force-push to", error)
 
     @defer.inlineCallbacks
     def test_large_push(self):

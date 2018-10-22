@@ -105,10 +105,10 @@ class HookTestMixin(object):
             old + b' ' + new + b' ' + ref for ref, old, new in updates)
 
     @defer.inlineCallbacks
-    def invokeHook(self, input, rules):
+    def invokeHook(self, input, permissions):
         key = str(uuid.uuid4())
-        self.hookrpc_handler.registerKey(key, '/translated', list(rules))
-        self.hookrpc_handler.ref_permissions[key] = rules
+        self.hookrpc_handler.registerKey(key, '/translated', {})
+        self.hookrpc_handler.ref_permissions[key] = permissions
         try:
             d = defer.Deferred()
             reactor.spawnProcess(
@@ -123,13 +123,15 @@ class HookTestMixin(object):
         defer.returnValue((code, stdout, stderr))
 
     @defer.inlineCallbacks
-    def assertAccepted(self, updates, rules):
-        code, out, err = yield self.invokeHook(self.encodeRefs(updates), rules)
+    def assertAccepted(self, updates, permissions):
+        code, out, err = yield self.invokeHook(
+            self.encodeRefs(updates), permissions)
         self.assertEqual((0, b'', b''), (code, out, err))
 
     @defer.inlineCallbacks
-    def assertRejected(self, updates, rules, message):
-        code, out, err = yield self.invokeHook(self.encodeRefs(updates), rules)
+    def assertRejected(self, updates, permissions, message):
+        code, out, err = yield self.invokeHook(
+            self.encodeRefs(updates), permissions)
         self.assertEqual((1, message, b''), (code, out, err))
 
 
@@ -211,7 +213,7 @@ class TestUpdateHook(TestCase):
         self.patch_repo('somehex')
         output = hook.match_update_rules({}, ['ref', 'old', 'new'])
         self.assertEqual(
-            [b'You do not have permission to force push to ref.'], output)
+            [b'You do not have permission to force-push to ref.'], output)
 
     def test_no_matching_ref(self):
         # No matches means deny by default
@@ -220,10 +222,10 @@ class TestUpdateHook(TestCase):
             {'notamatch': []},
             ['ref', 'old', 'new'])
         self.assertEqual(
-            [b'You do not have permission to force push to ref.'], output)
+            [b'You do not have permission to force-push to ref.'], output)
 
     def test_matching_ref(self):
-        # Permission given to force push
+        # Permission given to force-push
         self.patch_repo('somehex')
         output = hook.match_update_rules(
             {'ref': ['force_push']},
@@ -231,13 +233,13 @@ class TestUpdateHook(TestCase):
         self.assertEqual([], output)
 
     def test_no_permission(self):
-        # User does not have permission to force push
+        # User does not have permission to force-push
         self.patch_repo('somehex')
         output = hook.match_update_rules(
             {'ref': ['create']},
             ['ref', 'old', 'new'])
         self.assertEqual(
-            [b'You do not have permission to force push to ref.'], output)
+            [b'You do not have permission to force-push to ref.'], output)
 
 
 class TestDeterminePermissions(TestCase):
@@ -274,7 +276,7 @@ class TestDeterminePermissions(TestCase):
         self.assertIsNone(output)
 
     def test_force_push_always_allows(self):
-        # If user has force push, they can do anything
+        # If user has force-push, they can do anything
         output = hook.determine_permissions_outcome(
             pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['force_push']})
         self.assertIsNone(output)
