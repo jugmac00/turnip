@@ -10,7 +10,10 @@ from __future__ import (
 import os.path
 import uuid
 
-from fixtures import TempDir
+from fixtures import (
+    MonkeyPatch,
+    TempDir,
+    )
 import pygit2
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
@@ -197,16 +200,17 @@ class TestUpdateHook(TestCase):
 
     def setUp(self):
         super(TestUpdateHook, self).setUp()
-        self.patch_check_ancestor()
+        self.useFixture(MonkeyPatch(
+            'turnip.pack.hooks.hook.check_ancestor',
+            self.patched_ancestor_check
+        ))
 
-    def patch_check_ancestor(self):
-        def check(old, new):
-            # Avoid a subprocess call to execute on a git repository
-            # that we haven't created.
-            if old == 'old':
-                return False
-            return True
-        hook.check_ancestor = check
+    def patched_ancestor_check(self, old, new):
+        # Avoid a subprocess call to execute on a git repository
+        # that we haven't created.
+        if old == 'old':
+            return False
+        return True
 
     def test_create(self):
         # Creation is determined by an all 0 base sha
