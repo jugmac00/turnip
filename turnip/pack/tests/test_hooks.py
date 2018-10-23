@@ -22,7 +22,6 @@ from twisted.internet import (
 
 from turnip.pack import hookrpc
 from turnip.pack.helpers import ensure_hooks
-import turnip.pack.hooks
 from turnip.pack.hooks import hook
 
 
@@ -196,32 +195,38 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
 class TestUpdateHook(TestCase):
     """Tests for the git update hook"""
 
-    def patch_repo(self, ancestor):
-        hook.get_repo = lambda: MockRepo(ancestor)
+    def setUp(self):
+        super(TestUpdateHook, self).setUp()
+        self.patch_check_ancestor()
+
+    def patch_check_ancestor(self):
+        def check(old, new):
+            # Avoid a subprocess call to execute on a git repository
+            # that we haven't created.
+            if old == 'old':
+                return False
+            return True
+        hook.check_ancestor = check
 
     def test_create(self):
         # Creation is determined by an all 0 base sha
-        self.patch_repo('')
         self.assertEqual(
             [], hook.match_update_rules(
                 [], ['ref', pygit2.GIT_OID_HEX_ZERO, 'new']))
 
     def test_fast_forward(self):
         # If the old sha is a merge ancestor of the new
-        self.patch_repo('somehex')
         self.assertEqual(
             [], hook.match_update_rules([], ['ref', 'somehex', 'new']))
 
     def test_rules_fall_through(self):
         # The default is to deny
-        self.patch_repo('somehex')
         output = hook.match_update_rules({}, ['ref', 'old', 'new'])
         self.assertEqual(
             [b'You do not have permission to force-push to ref.'], output)
 
     def test_no_matching_ref(self):
         # No matches means deny by default
-        self.patch_repo('somehex')
         output = hook.match_update_rules(
             {'notamatch': []},
             ['ref', 'old', 'new'])
@@ -230,7 +235,6 @@ class TestUpdateHook(TestCase):
 
     def test_matching_ref(self):
         # Permission given to force-push
-        self.patch_repo('somehex')
         output = hook.match_update_rules(
             {'ref': ['force_push']},
             ['ref', 'old', 'new'])
@@ -238,7 +242,6 @@ class TestUpdateHook(TestCase):
 
     def test_no_permission(self):
         # User does not have permission to force-push
-        self.patch_repo('somehex')
         output = hook.match_update_rules(
             {'ref': ['create']},
             ['ref', 'old', 'new'])
