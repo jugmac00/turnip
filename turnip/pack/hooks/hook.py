@@ -12,13 +12,20 @@ from __future__ import (
 import json
 import os
 import socket
+import subprocess
 import sys
 
-import pygit2
+
+# XXX twom 2018-10-23 This should be a pygit2 import, but
+# that currently causes CFFI warnings to be returned to the client.
+GIT_OID_HEX_ZERO = '0'*40
 
 
-def get_repo():
-    return pygit2.Repository('.')
+def check_ancestor(old, new):
+    # https://git-scm.com/docs/git-merge-base#_discussion
+    return_code = subprocess.call(
+        ['git', 'merge-base', '--is-ancestor', old, new])
+    return return_code == 0
 
 
 def determine_permissions_outcome(old, ref, rule_lines):
@@ -27,7 +34,7 @@ def determine_permissions_outcome(old, ref, rule_lines):
     if 'force_push' in rule:
         return
     # We are creating a new ref
-    if old == pygit2.GIT_OID_HEX_ZERO:
+    if old == GIT_OID_HEX_ZERO:
         if 'create' in rule:
             return
         else:
@@ -66,17 +73,13 @@ def match_update_rules(rule_lines, ref_line):
     the rule_lines to confirm that the user has permissions for that operation.
     """
     ref, old, new = ref_line
-    repo = get_repo()
 
     # If it's a create, the old ref doesn't exist
-    if old == pygit2.GIT_OID_HEX_ZERO:
+    if old == GIT_OID_HEX_ZERO:
         return []
 
-    # If there's no common ancestor, or the common ancestor is something
-    # other than the old commit, then this is a non-fast-forward push.
-    base = repo.merge_base(old, new)
-    if base and base.hex == old:
-        # This is a fast-forwardable merge
+    # https://git-scm.com/docs/git-merge-base#_discussion
+    if check_ancestor(old, new):
         return []
 
     # If it's not fast forwardable, check that user has permissions
