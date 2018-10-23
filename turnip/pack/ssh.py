@@ -176,7 +176,8 @@ class SmartSSHSession(DoNothingSession):
             self.pack_protocol.transport.loseConnection()
 
     def eofReceived(self):
-        if self.pack_protocol is not None:
+        if (self.pack_protocol is not None and
+                self.pack_protocol.transport.connected):
             self.pack_protocol.transport.loseWriteConnection()
 
 

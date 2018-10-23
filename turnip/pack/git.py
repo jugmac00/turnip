@@ -381,7 +381,7 @@ class PackProxyServerProtocol(PackServerProtocol):
 
     def readConnectionLost(self):
         # Forward the closed stdin down the stack.
-        if self.peer is not None:
+        if self.peer is not None and self.peer.transport.connected:
             self.peer.transport.loseWriteConnection()
 
 
