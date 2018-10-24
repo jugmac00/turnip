@@ -22,6 +22,9 @@ GIT_OID_HEX_ZERO = '0'*40
 
 
 def check_ancestor(old, new):
+    # This is a delete, setting the new ref.
+    if new == GIT_OID_HEX_ZERO:
+        return False
     # https://git-scm.com/docs/git-merge-base#_discussion
     return_code = subprocess.call(
         ['git', 'merge-base', '--is-ancestor', old, new])
