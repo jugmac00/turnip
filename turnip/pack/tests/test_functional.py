@@ -441,6 +441,10 @@ class FunctionalTestMixin(object):
         out, err, code = yield utils.getProcessOutputAndValue(
             b'git', (b'push', b'origin', b':newref'),
             env=os.environ, path=clone1)
+        # Check that the GIT_OID_HEX_ZERO does not appear in our output,
+        # as it would if the merge-base call has failed because it's attempted
+        # to find it's ancestry.
+        self.assertNotIn(b'0'*40, err)
         self.assertIn(b'[deleted]', err)
         self.assertEqual(0, code)
 
@@ -473,6 +477,10 @@ class FunctionalTestMixin(object):
         out, err, code = yield utils.getProcessOutputAndValue(
             b'git', (b'push', b'origin', b':newref'),
             env=os.environ, path=clone1)
+        # Check that the GIT_OID_HEX_ZERO does not appear in our output,
+        # as it would if the merge-base call has failed because it's attempted
+        # to find it's ancestry.
+        self.assertNotIn(b'0'*40, err)
         self.assertIn(
             b'You do not have permission to force-push to refs/heads/newref',
             err
