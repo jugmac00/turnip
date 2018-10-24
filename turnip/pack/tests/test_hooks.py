@@ -128,17 +128,13 @@ class HookTestMixin(object):
     def assertAccepted(self, updates, permissions):
         code, out, err = yield self.invokeHook(
             self.encodeRefs(updates), permissions)
-        # XXX cjwatson 2018-10-22: We should test that `err` is empty too,
-        # but we need pygit2 >= 0.25.1 to silence some cffi warnings.
-        self.assertEqual((0, b''), (code, out))
+        self.assertEqual((0, b'', b''), (code, out, err))
 
     @defer.inlineCallbacks
     def assertRejected(self, updates, permissions, message):
         code, out, err = yield self.invokeHook(
             self.encodeRefs(updates), permissions)
-        # XXX cjwatson 2018-10-22: We should test that `err` is empty too,
-        # but we need pygit2 >= 0.25.1 to silence some cffi warnings.
-        self.assertEqual((1, message), (code, out))
+        self.assertEqual((1, message, b''), (code, out, err))
 
 
 class TestPreReceiveHook(HookTestMixin, TestCase):
