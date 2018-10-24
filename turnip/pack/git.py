@@ -214,6 +214,19 @@ class PackServerProtocol(PackProxyProtocol):
         self.sendPacket(ERROR_PREFIX + message + b'\n')
         self.transport.loseConnection()
 
+    def createAuthParams(self, params):
+        auth_params = {}
+        for key, value in params.items():
+            if key.startswith(b'turnip-authenticated-'):
+                decoded_key = key[len(b'turnip-authenticated-'):].decode(
+                    'utf-8')
+                auth_params[decoded_key] = value
+        if 'uid' in auth_params:
+            auth_params['uid'] = int(auth_params['uid'])
+        if params.get(b'turnip-can-authenticate') == b'yes':
+            auth_params['can-authenticate'] = True
+        return auth_params
+
 
 class GitProcessProtocol(protocol.ProcessProtocol):
 
@@ -421,9 +434,7 @@ class PackBackendProtocol(PackServerProtocol):
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
         args.append(self.path)
-        uid = params.get('turnip-authenticated-uid')
-        uid = int(uid) if uid else None
-        auth_params = {'uid': uid}
+        auth_params = self.createAuthParams(params)
         self.spawnGit(subcmd,
                       args,
                       write_operation=write_operation,
@@ -549,16 +560,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
         permission = b'read' if command == b'git-upload-pack' else b'write'
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint, allowNone=True)
         try:
-            auth_params = {}
-            for key, value in params.items():
-                if key.startswith(b'turnip-authenticated-'):
-                    decoded_key = key[len(b'turnip-authenticated-'):].decode(
-                        'utf-8')
-                    auth_params[decoded_key] = value
-            if 'uid' in auth_params:
-                auth_params['uid'] = int(auth_params['uid'])
-            if params.get(b'turnip-can-authenticate') == b'yes':
-                auth_params['can-authenticate'] = True
+            auth_params = self.createAuthParams(params)
             self.log.info("Translating request.")
             translated = yield proxy.callRemote(
                 b'translatePath', pathname, permission, auth_params)
