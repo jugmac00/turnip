@@ -33,6 +33,7 @@ from fixtures import (
     TempDir,
     )
 from lazr.sshserver.auth import NoSuchPersonWithName
+from pygit2 import GIT_OID_HEX_ZERO
 from testtools import TestCase
 from testtools.content import text_content
 from testtools.deferredruntest import AsynchronousDeferredRunTest
@@ -443,8 +444,8 @@ class FunctionalTestMixin(object):
             env=os.environ, path=clone1)
         # Check that the GIT_OID_HEX_ZERO does not appear in our output,
         # as it would if the merge-base call has failed because it's attempted
-        # to find it's ancestry.
-        self.assertNotIn(b'0'*40, err)
+        # to find its ancestry.
+        self.assertNotIn(GIT_OID_HEX_ZERO, err)
         self.assertIn(b'[deleted]', err)
         self.assertEqual(0, code)
 
@@ -479,8 +480,8 @@ class FunctionalTestMixin(object):
             env=os.environ, path=clone1)
         # Check that the GIT_OID_HEX_ZERO does not appear in our output,
         # as it would if the merge-base call has failed because it's attempted
-        # to find it's ancestry.
-        self.assertNotIn(b'0'*40, err)
+        # to find its ancestry.
+        self.assertNotIn(GIT_OID_HEX_ZERO, err)
         self.assertIn(
             b'You do not have permission to force-push to refs/heads/newref',
             err
