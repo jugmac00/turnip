@@ -418,7 +418,6 @@ class FunctionalTestMixin(object):
             'refs/heads/newref': ['create', 'push', 'force_push']}
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
-        clone2 = os.path.join(test_root, 'clone2')
 
         # Clone the empty repo from the backend and commit to it.
         yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
@@ -440,9 +439,45 @@ class FunctionalTestMixin(object):
             (b'git', b'push', b'origin', b'newref'), path=clone1)
 
         out, err, code = yield utils.getProcessOutputAndValue(
-            b'git',(b'push', b'origin', b':newref'),
+            b'git', (b'push', b'origin', b':newref'),
             env=os.environ, path=clone1)
-        self.assertEqual((0, b'', b''), (code, out, err))
+        self.assertIn(b'[deleted]', err)
+        self.assertEqual(0, code)
+
+    @defer.inlineCallbacks
+    def test_delete_ref_without_permission(self):
+        self.virtinfo.ref_permissions = {
+            'refs/heads/newref': ['create', 'push']}
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+
+        # Clone the empty repo from the backend and commit to it.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+
+        yield self.assertCommandSuccess(
+            (b'git', b'checkout', b'-b', b'newref'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'newref'), path=clone1)
+
+        out, err, code = yield utils.getProcessOutputAndValue(
+            b'git', (b'push', b'origin', b':newref'),
+            env=os.environ, path=clone1)
+        self.assertIn(
+            b'You do not have permission to force-push to refs/heads/newref',
+            err
+            )
+        self.assertEqual(1, code)
 
 
 class TestBackendFunctional(FunctionalTestMixin, TestCase):
