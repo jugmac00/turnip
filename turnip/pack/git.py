@@ -214,7 +214,7 @@ class PackServerProtocol(PackProxyProtocol):
         self.sendPacket(ERROR_PREFIX + message + b'\n')
         self.transport.loseConnection()
 
-    def create_auth_params(self, params):
+    def createAuthParams(self, params):
         auth_params = {}
         for key, value in params.items():
             if key.startswith(b'turnip-authenticated-'):
@@ -434,7 +434,7 @@ class PackBackendProtocol(PackServerProtocol):
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
         args.append(self.path)
-        auth_params = self.create_auth_params(params)
+        auth_params = self.createAuthParams(params)
         self.spawnGit(subcmd,
                       args,
                       write_operation=write_operation,
@@ -560,7 +560,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
         permission = b'read' if command == b'git-upload-pack' else b'write'
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint, allowNone=True)
         try:
-            auth_params = self.create_auth_params(params)
+            auth_params = self.createAuthParams(params)
             self.log.info("Translating request.")
             translated = yield proxy.callRemote(
                 b'translatePath', pathname, permission, auth_params)
