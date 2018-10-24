@@ -33,6 +33,7 @@ from fixtures import (
     TempDir,
     )
 from lazr.sshserver.auth import NoSuchPersonWithName
+from pygit2 import GIT_OID_HEX_ZERO
 from testtools import TestCase
 from testtools.content import text_content
 from testtools.deferredruntest import AsynchronousDeferredRunTest
@@ -411,6 +412,81 @@ class FunctionalTestMixin(object):
         out = yield self.assertCommandSuccess(
             (b'git', b'log', b'--oneline', b'-n', b'1'), path=clone2)
         self.assertIn(b'Add big file', out)
+
+    @defer.inlineCallbacks
+    def test_delete_ref(self):
+        self.virtinfo.ref_permissions = {
+            'refs/heads/newref': ['create', 'push', 'force_push']}
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+
+        # Clone the empty repo from the backend and commit to it.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+
+        yield self.assertCommandSuccess(
+            (b'git', b'checkout', b'-b', b'newref'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'newref'), path=clone1)
+
+        out, err, code = yield utils.getProcessOutputAndValue(
+            b'git', (b'push', b'origin', b':newref'),
+            env=os.environ, path=clone1)
+        # Check that the GIT_OID_HEX_ZERO does not appear in our output,
+        # as it would if the merge-base call has failed because it's attempted
+        # to find its ancestry.
+        self.assertNotIn(GIT_OID_HEX_ZERO, err)
+        self.assertIn(b'[deleted]', err)
+        self.assertEqual(0, code)
+
+    @defer.inlineCallbacks
+    def test_delete_ref_without_permission(self):
+        self.virtinfo.ref_permissions = {
+            'refs/heads/newref': ['create', 'push']}
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+
+        # Clone the empty repo from the backend and commit to it.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+
+        yield self.assertCommandSuccess(
+            (b'git', b'checkout', b'-b', b'newref'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'newref'), path=clone1)
+
+        out, err, code = yield utils.getProcessOutputAndValue(
+            b'git', (b'push', b'origin', b':newref'),
+            env=os.environ, path=clone1)
+        # Check that the GIT_OID_HEX_ZERO does not appear in our output,
+        # as it would if the merge-base call has failed because it's attempted
+        # to find its ancestry.
+        self.assertNotIn(GIT_OID_HEX_ZERO, err)
+        self.assertIn(
+            b'You do not have permission to force-push to refs/heads/newref',
+            err
+            )
+        self.assertEqual(1, code)
 
 
 class TestBackendFunctional(FunctionalTestMixin, TestCase):
