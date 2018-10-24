@@ -106,6 +106,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.translations = []
         self.authentications = []
         self.push_notifications = []
+        self.ref_permissions_checks = []
         self.ref_permissions = {}
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
@@ -130,6 +131,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.push_notifications.append(path)
 
     def xmlrpc_checkRefPermissions(self, path, ref_paths, auth_params):
+        self.ref_permissions_checks.append((path, ref_paths, auth_params))
         return self.ref_permissions
 
 
@@ -676,6 +678,26 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
             [(b'/test', b'read',
               {b'can-authenticate': True, b'user': b'test-user'})],
             self.virtinfo.translations)
+
+    @defer.inlineCallbacks
+    def test_authenticated_push(self):
+        test_root = self.useFixture(TempDir()).path
+        clone = os.path.join(test_root, 'clone')
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master'), path=clone)
+        self.assertEqual(
+            [(self.internal_name, [b'refs/heads/master'],
+              {b'can-authenticate': True, b'user': b'test-user'})],
+            self.virtinfo.ref_permissions_checks)
 
 
 class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
