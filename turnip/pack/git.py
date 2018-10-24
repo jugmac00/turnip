@@ -224,7 +224,7 @@ class PackServerProtocol(PackProxyProtocol):
         if 'uid' in auth_params:
             auth_params['uid'] = int(auth_params['uid'])
         if params.get(b'turnip-can-authenticate') == b'yes':
-            auth_params['can-authenticate'] = True#
+            auth_params['can-authenticate'] = True
         return auth_params
 
 
