@@ -55,8 +55,8 @@ def format_commit(git_object):
         raise GitError('Invalid type: object {} is not a commit.'.format(
             git_object.oid.hex))
     parents = [parent.hex for parent in git_object.parent_ids]
-    # A regression in pygit2 0.27.1 means that we have to decode the commit
-    # message ourselves.  See:
+    # XXX cjwatson 2018-11-15: A regression in pygit2 0.27.1 means that we
+    # have to decode the commit message ourselves.  See:
     #   https://github.com/libgit2/pygit2/issues/839
     if git_object.message_encoding is not None:
         message = git_object.raw_message.decode(
