@@ -82,9 +82,9 @@ class RepoFactory(object):
 
     def set_head(self, oid):
         try:
-            master_ref = self.repo.lookup_reference('refs/heads/master')
+            master_ref = self.repo.references['refs/heads/master']
         except KeyError:
-            master_ref = self.repo.create_reference('refs/heads/master', oid)
+            master_ref = self.repo.references.create('refs/heads/master', oid)
         finally:
             master_ref.set_target(oid)
 
@@ -124,9 +124,9 @@ class RepoFactory(object):
             if i == num_commits - 1:
                 ref = 'refs/heads/master'
                 try:
-                    self.repo.lookup_reference(ref)
+                    self.repo.references[ref]
                 except KeyError:
-                    self.repo.create_reference(ref, commit_oid)
+                    self.repo.references.create(ref, commit_oid)
                 self.repo.set_head(commit_oid)
 
     def generate_tags(self, num_tags):

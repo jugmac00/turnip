@@ -73,7 +73,7 @@ class InitTestCase(TestCase):
         orig = RepoFactory(
             self.orig_path, num_branches=3, num_commits=2).build()
         self.orig_refs = orig.listall_references()
-        self.master_oid = orig.lookup_reference('refs/heads/master').target
+        self.master_oid = orig.references['refs/heads/master'].target
         self.orig_objs = os.path.join(self.orig_path, '.git/objects')
 
     def test_from_scratch(self):

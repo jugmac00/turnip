@@ -55,9 +55,20 @@ def format_commit(git_object):
         raise GitError('Invalid type: object {} is not a commit.'.format(
             git_object.oid.hex))
     parents = [parent.hex for parent in git_object.parent_ids]
+    # XXX cjwatson 2018-11-15: A regression in pygit2 0.27.1 means that we
+    # have to decode the commit message ourselves.  See:
+    #   https://github.com/libgit2/pygit2/issues/839
+    if git_object.message_encoding is not None:
+        message = git_object.raw_message.decode(
+            encoding=git_object.message_encoding, errors="strict")
+    else:
+        # If the encoding is not explicit, it may not be UTF-8, so it is not
+        # safe to decode it strictly.
+        message = git_object.raw_message.decode(
+            encoding="UTF-8", errors="replace")
     return {
         'sha1': git_object.oid.hex,
-        'message': git_object.message,
+        'message': message,
         'author': format_signature(git_object.author),
         'committer': format_signature(git_object.committer),
         'parents': parents,
@@ -144,8 +155,8 @@ def import_into_subordinate(sub_root, from_root):
     from_repo = Repository(from_root)
     sub_repo = Repository(sub_root)
     for ref in from_repo.listall_references():
-        sub_repo.create_reference(
-            ref, from_repo.lookup_reference(ref).target, force=True)
+        sub_repo.references.create(
+            ref, from_repo.references[ref].target, force=True)
 
 
 def init_repo(repo_path, clone_from=None, clone_refs=False,
@@ -181,8 +192,7 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         from_repo = Repository(clone_from)
         to_repo = Repository(repo_path)
         for ref in from_repo.listall_references():
-            to_repo.create_reference(
-                ref, from_repo.lookup_reference(ref).target)
+            to_repo.references.create(ref, from_repo.references[ref].target)
 
     ensure_config(repo_path)  # set repository configuration defaults
     return repo_path
@@ -226,7 +236,7 @@ def open_repo(repo_store, repo_name, force_ephemeral=False):
 
 def get_default_branch(repo_path):
     repo = Repository(repo_path)
-    return repo.lookup_reference('HEAD').target
+    return repo.references['HEAD'].target
 
 
 def set_default_branch(repo_path, target):
@@ -274,7 +284,7 @@ def get_refs(repo_store, repo_name):
     with open_repo(repo_store, repo_name) as repo:
         refs = {}
         for ref in repo.listall_references():
-            git_object = repo.lookup_reference(ref).peel()
+            git_object = repo.references[ref].peel()
             # Filter non-unicode refs, as refs are treated as unicode
             # given json is unable to represent arbitrary byte strings.
             try:
@@ -289,7 +299,7 @@ def get_refs(repo_store, repo_name):
 def get_ref(repo_store, repo_name, ref):
     """Return a specific ref for a git repository."""
     with open_repo(repo_store, repo_name) as repo:
-        git_object = repo.lookup_reference(ref.encode('utf-8')).peel()
+        git_object = repo.references[ref.encode('utf-8')].peel()
         ref_obj = format_ref(ref, git_object)
         return ref_obj
 
