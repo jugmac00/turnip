@@ -47,8 +47,8 @@ class ApiTestCase(TestCase):
 
     def assertReferencesEqual(self, repo, expected, observed):
         self.assertEqual(
-            repo.lookup_reference(expected).peel().oid,
-            repo.lookup_reference(observed).peel().oid)
+            repo.references[expected].peel().oid,
+            repo.references[observed].peel().oid)
 
     def get_ref(self, ref):
         resp = self.app.get('/repo/{}/{}'.format(self.repo_path, ref))
@@ -104,7 +104,7 @@ class ApiTestCase(TestCase):
         factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
         factory.build()
         factory.repo.set_head('refs/heads/branch-0')
-        factory.repo.lookup_reference('refs/heads/branch-0').delete()
+        factory.repo.references.delete('refs/heads/branch-0')
 
         resp = self.app.get('/repo/{}'.format(self.repo_path))
         self.assertEqual(200, resp.status_code)
