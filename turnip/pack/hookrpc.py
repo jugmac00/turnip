@@ -21,17 +21,13 @@ from __future__ import (
     )
 
 import json
-import sys
 
 from twisted.internet import (
     defer,
     protocol,
     )
 from twisted.protocols import basic
-# twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
-# bits of this module work.
-if sys.version_info.major < 3:
-    from twisted.web import xmlrpc
+from twisted.web import xmlrpc
 
 
 class JSONNetstringProtocol(basic.NetstringReceiver):

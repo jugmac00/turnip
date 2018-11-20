@@ -16,7 +16,6 @@ try:
     from urllib.parse import urlencode
 except ImportError:
     from urllib import urlencode
-import sys
 import uuid
 import zlib
 
@@ -46,6 +45,7 @@ from twisted.web import (
     server,
     static,
     twcgi,
+    xmlrpc,
     )
 
 from turnip.helpers import compose_path
@@ -62,10 +62,6 @@ try:
     from turnip.version_info import version_info
 except ImportError:
     version_info = {}
-# twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
-# bits of this module work.
-if sys.version_info.major < 3:
-    from twisted.web import xmlrpc
 
 
 def fail_request(request, message, code=http.INTERNAL_SERVER_ERROR):

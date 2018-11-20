@@ -7,7 +7,6 @@ from __future__ import (
     unicode_literals,
     )
 
-import sys
 import uuid
 
 from twisted.internet import (
@@ -18,10 +17,7 @@ from twisted.internet import (
     )
 from twisted.internet.interfaces import IHalfCloseableProtocol
 from twisted.logger import Logger
-# twisted.web.xmlrpc doesn't exist for Python 3 yet, but the non-XML-RPC
-# bits of this module work.
-if sys.version_info.major < 3:  # noqa
-    from twisted.web import xmlrpc
+from twisted.web import xmlrpc
 from zope.interface import implementer
 
 from turnip.helpers import compose_path
