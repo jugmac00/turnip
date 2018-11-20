@@ -246,6 +246,10 @@ def set_default_branch(repo_path, target):
 
 def delete_repo(repo_path):
     """Permanently delete a git repository from repo store."""
+    # XXX cjwatson 2018-11-20: Python 2's shutil.rmtree crashes if given a
+    # Unicode path to a directory that contains non-UTF-8 files.
+    if not isinstance(repo_path, bytes):
+        repo_path = repo_path.encode('UTF-8')
     shutil.rmtree(repo_path)
 
 

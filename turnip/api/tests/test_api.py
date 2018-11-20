@@ -179,6 +179,17 @@ class ApiTestCase(TestCase):
         self.assertEqual(200, resp.status_code)
         self.assertFalse(os.path.exists(self.repo_store))
 
+    def test_repo_delete_non_utf8_file_names(self):
+        """Deleting a repo works even if it contains non-UTF-8 file names."""
+        self.app.post_json('/repo', {'repo_path': self.repo_path})
+        factory = RepoFactory(self.repo_store)
+        factory.add_commit('foo', 'foobar.txt')
+        subprocess.check_call(
+            ['git', '-C', self.repo_store, 'branch', b'\x80'])
+        resp = self.app.delete('/repo/{}'.format(self.repo_path))
+        self.assertEqual(200, resp.status_code)
+        self.assertFalse(os.path.exists(self.repo_store))
+
     def test_repo_get_refs(self):
         """Ensure expected ref objects are returned and shas match."""
         ref = self.commit.get('ref')
