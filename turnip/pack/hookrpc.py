@@ -1,4 +1,4 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """RPC server for Git hooks.
@@ -20,8 +20,10 @@ from __future__ import (
     unicode_literals,
     )
 
+import base64
 import json
 
+from six.moves import xmlrpc_client
 from twisted.internet import (
     defer,
     protocol,
@@ -124,22 +126,24 @@ class HookRPCHandler(object):
     def checkRefPermissions(self, proto, args):
         """Get permissions for a set of refs."""
         cached_permissions = self.ref_permissions[args['key']]
-        missing = [x for x in args['paths']
-                   if x not in cached_permissions]
+        paths = [
+            base64.b64decode(path.encode('UTF-8')) for path in args['paths']]
+        missing = [x for x in paths if x not in cached_permissions]
         if missing:
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
             result = yield proxy.callRemote(
                 b'checkRefPermissions',
                 self.ref_paths[args['key']],
-                missing,
+                [xmlrpc_client.Binary(path) for path in missing],
                 self.auth_params[args['key']]
             )
-            for ref, permission in result.items():
-                cached_permissions[ref] = permission
+            for ref, permission in result:
+                cached_permissions[ref.data] = permission
         # cached_permissions is a shallow copy of the key index for
         # self.ref_permissions, so changes will be updated in that.
         defer.returnValue(
-            {ref: cached_permissions[ref] for ref in args['paths']})
+            {base64.b64encode(ref).decode('UTF-8'): cached_permissions[ref]
+             for ref in paths})
 
     @defer.inlineCallbacks
     def notify(self, path):

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -9,6 +9,7 @@ from __future__ import (
     unicode_literals,
     )
 
+import base64
 import json
 import os
 import socket
@@ -41,13 +42,13 @@ def determine_permissions_outcome(old, ref, rule_lines):
         if 'create' in rule:
             return
         else:
-            return 'You do not have permission to create %s.' % ref
+            return b'You do not have permission to create ' + ref + b'.'
     # We have push permission, everything is okay
     # force_push is checked later (in update-hook)
     if 'push' in rule:
         return
     # If we're here, there are no matching rules
-    return "You do not have permission to push to %s." % ref
+    return b"You do not have permission to push to " + ref + b"."
 
 
 def match_rules(rule_lines, ref_lines):
@@ -89,7 +90,7 @@ def match_update_rules(rule_lines, ref_line):
     rule = rule_lines.get(ref, [])
     if 'force_push' in rule:
         return []
-    return ['You do not have permission to force-push to %s.' % ref]
+    return [b'You do not have permission to force-push to ' + ref + b'.']
 
 
 def netstring_send(sock, s):
@@ -120,6 +121,16 @@ def rpc_invoke(sock, method, args):
     return res['result']
 
 
+def check_ref_permissions(sock, rpc_key, ref_paths):
+    ref_paths = [base64.b64encode(path).decode('UTF-8') for path in ref_paths]
+    rule_lines = rpc_invoke(
+        sock, b'check_ref_permissions',
+        {'key': rpc_key, 'paths': ref_paths})
+    return {
+        base64.b64decode(path.encode('UTF-8')): permissions
+        for path, permissions in rule_lines.items()}
+
+
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key
     # from the environment.
@@ -132,27 +143,23 @@ if __name__ == '__main__':
         # Verify the proposed changes against rules from the server.
         raw_paths = sys.stdin.readlines()
         ref_paths = [p.rstrip(b'\n').split(b' ', 2)[2] for p in raw_paths]
-        rule_lines = rpc_invoke(
-            sock, b'check_ref_permissions',
-            {'key': rpc_key, 'paths': ref_paths})
+        rule_lines = check_ref_permissions(sock, rpc_key, ref_paths)
         errors = match_rules(rule_lines, raw_paths)
         for error in errors:
-            sys.stdout.write(error + '\n')
+            sys.stdout.write(error + b'\n')
         sys.exit(1 if errors else 0)
     elif hook == 'post-receive':
         # Notify the server about the push if there were any changes.
         # Details of the changes aren't currently included.
         if sys.stdin.readlines():
-            rule_lines = rpc_invoke(sock, b'notify_push', {'key': rpc_key})
+            rpc_invoke(sock, b'notify_push', {'key': rpc_key})
         sys.exit(0)
     elif hook == 'update':
         ref = sys.argv[1]
-        rule_lines = rpc_invoke(
-            sock, b'check_ref_permissions',
-            {'key': rpc_key, 'paths': [ref]})
+        rule_lines = check_ref_permissions(sock, rpc_key, [ref])
         errors = match_update_rules(rule_lines, sys.argv[1:4])
         for error in errors:
-            sys.stdout.write(error + '\n')
+            sys.stdout.write(error + b'\n')
         sys.exit(1 if errors else 0)
     else:
         sys.stderr.write('Invalid hook name: %s' % hook)

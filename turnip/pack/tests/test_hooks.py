@@ -1,4 +1,5 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# -*- coding: utf-8 -*-
+# Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -7,6 +8,7 @@ from __future__ import (
     unicode_literals,
     )
 
+import base64
 import os.path
 import uuid
 
@@ -61,7 +63,9 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
         self.notifications.append(self.ref_paths[args['key']])
 
     def checkRefPermissions(self, proto, args):
-        return self.ref_permissions[args['key']]
+        return {
+            base64.b64encode(ref).decode('UTF-8'): permissions
+            for ref, permissions in self.ref_permissions[args['key']].items()}
 
 
 class MockRef(object):
@@ -147,7 +151,15 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
         # A single valid ref is accepted.
         yield self.assertAccepted(
             [(b'refs/heads/master', self.old_sha1, self.new_sha1)],
-            {'refs/heads/master': ['push']})
+            {b'refs/heads/master': ['push']})
+
+    @defer.inlineCallbacks
+    def test_accepted_non_ascii(self):
+        # Valid non-ASCII refs are accepted.
+        paths = [b'refs/heads/\x80', u'refs/heads/géag'.encode('UTF-8')]
+        yield self.assertAccepted(
+            [(path, self.old_sha1, self.new_sha1) for path in paths],
+            {path: ['push'] for path in paths})
 
     @defer.inlineCallbacks
     def test_rejected(self):
@@ -170,6 +182,16 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
             b"You do not have permission to push to refs/heads/verboten.\n"
             b"You do not have permission to push "
             b"to refs/heads/super-verboten.\n")
+
+    @defer.inlineCallbacks
+    def test_rejected_non_ascii(self):
+        # Invalid non-ASCII refs are rejected.
+        paths = [b'refs/heads/\x80', u'refs/heads/géag'.encode('UTF-8')]
+        yield self.assertRejected(
+            [(path, self.old_sha1, self.new_sha1) for path in paths],
+            {path: [] for path in paths},
+            b"You do not have permission to push to refs/heads/\x80.\n"
+            b"You do not have permission to push to refs/heads/g\xc3\xa9ag.\n")
 
 
 class TestPostReceiveHook(HookTestMixin, TestCase):
@@ -212,12 +234,12 @@ class TestUpdateHook(TestCase):
         # Creation is determined by an all 0 base sha
         self.assertEqual(
             [], hook.match_update_rules(
-                [], ['ref', pygit2.GIT_OID_HEX_ZERO, 'new']))
+                {}, [b'ref', pygit2.GIT_OID_HEX_ZERO, 'new']))
 
     def test_fast_forward(self):
         # If the old sha is a merge ancestor of the new
         self.assertEqual(
-            [], hook.match_update_rules([], ['ref', 'somehex', 'new']))
+            [], hook.match_update_rules({}, ['ref', 'somehex', 'new']))
 
     def test_rules_fall_through(self):
         # The default is to deny
@@ -229,15 +251,46 @@ class TestUpdateHook(TestCase):
         # No matches means deny by default
         output = hook.match_update_rules(
             {'notamatch': []},
-            ['ref', 'old', 'new'])
+            [b'ref', 'old', 'new'])
         self.assertEqual(
             [b'You do not have permission to force-push to ref.'], output)
+
+    def test_no_matching_non_utf8_ref(self):
+        # An unmatched non-UTF-8 ref is denied.
+        output = hook.match_update_rules(
+            {}, [b'refs/heads/\x80', 'old', 'new'])
+        self.assertEqual(
+            [b'You do not have permission to force-push to refs/heads/\x80.'],
+            output)
+
+    def test_no_matching_utf8_ref(self):
+        # An unmatched UTF-8 ref is denied.
+        output = hook.match_update_rules(
+            {}, [u'refs/heads/géag'.encode('UTF-8'), 'old', 'new'])
+        self.assertEqual(
+            [b'You do not have permission to force-push to '
+             b'refs/heads/g\xc3\xa9ag.'],
+            output)
 
     def test_matching_ref(self):
         # Permission given to force-push
         output = hook.match_update_rules(
             {'ref': ['force_push']},
             ['ref', 'old', 'new'])
+        self.assertEqual([], output)
+
+    def test_matching_non_utf8_ref(self):
+        # A non-UTF-8 ref with force-push permission is accepted.
+        output = hook.match_update_rules(
+            {b'refs/heads/\x80': ['force_push']},
+            [b'refs/heads/\x80', 'old', 'new'])
+        self.assertEqual([], output)
+
+    def test_matching_utf8_ref(self):
+        # A UTF-8 ref with force-push permission is accepted.
+        output = hook.match_update_rules(
+            {u'refs/heads/géag'.encode('UTF-8'): ['force_push']},
+            [u'refs/heads/géag'.encode('UTF-8'), 'old', 'new'])
         self.assertEqual([], output)
 
     def test_no_permission(self):

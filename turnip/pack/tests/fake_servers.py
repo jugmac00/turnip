@@ -11,6 +11,7 @@ from collections import defaultdict
 import hashlib
 
 from lazr.sshserver.auth import NoSuchPersonWithName
+from six.moves import xmlrpc_client
 from twisted.web import xmlrpc
 
 __all__ = [
@@ -88,4 +89,6 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
 
     def xmlrpc_checkRefPermissions(self, path, ref_paths, auth_params):
         self.ref_permissions_checks.append((path, ref_paths, auth_params))
-        return self.ref_permissions
+        return [
+            (xmlrpc_client.Binary(ref), permissions)
+            for ref, permissions in self.ref_permissions.items()]
