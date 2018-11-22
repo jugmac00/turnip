@@ -296,11 +296,8 @@ def get_refs(repo_store, repo_name, exclude_prefixes=None):
             except UnicodeDecodeError:
                 pass
             else:
-                excluded = False
-                for exclude_prefix in (exclude_prefixes or []):
-                    if ref.startswith(exclude_prefix):
-                        excluded = True
-                if not excluded:
+                if not any(ref.startswith(exclude_prefix)
+                           for exclude_prefix in (exclude_prefixes or [])):
                     refs.update(format_ref(ref, git_object))
         return refs
 
