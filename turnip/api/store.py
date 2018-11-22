@@ -283,7 +283,7 @@ def repack(repo_path, ignore_alternates=False, single=False,
         stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 
 
-def get_refs(repo_store, repo_name):
+def get_refs(repo_store, repo_name, exclude_prefixes=None):
     """Return all refs for a git repository."""
     with open_repo(repo_store, repo_name) as repo:
         refs = {}
@@ -292,11 +292,16 @@ def get_refs(repo_store, repo_name):
             # Filter non-unicode refs, as refs are treated as unicode
             # given json is unable to represent arbitrary byte strings.
             try:
-                ref.decode('utf-8')
+                ref = ref.decode('utf-8')
             except UnicodeDecodeError:
                 pass
             else:
-                refs.update(format_ref(ref, git_object))
+                excluded = False
+                for exclude_prefix in (exclude_prefixes or []):
+                    if ref.startswith(exclude_prefix):
+                        excluded = True
+                if not excluded:
+                    refs.update(format_ref(ref, git_object))
         return refs
 
 

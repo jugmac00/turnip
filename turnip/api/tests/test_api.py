@@ -21,6 +21,10 @@ from fixtures import (
     TempDir,
     )
 from testtools import TestCase
+from testtools.matchers import (
+    Equals,
+    MatchesSetwise,
+    )
 from webtest import TestApp
 
 from turnip import api
@@ -232,6 +236,25 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
         refs = resp.json
         self.assertEqual(2, len(refs.keys()))
+
+    def test_repo_get_refs_exclude_prefixes(self):
+        """Refs matching an excluded prefix are not returned."""
+        factory = RepoFactory(self.repo_store, num_commits=1)
+        factory.build()
+        for ref_path in (
+                'refs/heads/refs/changes/1',
+                'refs/changes/2',
+                'refs/pull/3/head',
+                ):
+            factory.repo.references.create(ref_path, factory.commits[0])
+
+        resp = self.app.get(
+            '/repo/{}/refs'
+            '?exclude_prefix=refs/changes/'
+            '&exclude_prefix=refs/pull/'.format(self.repo_path))
+        refs = resp.json
+        self.assertThat(list(refs), MatchesSetwise(
+            Equals('refs/heads/master'), Equals('refs/heads/refs/changes/1')))
 
     def test_repo_get_ref(self):
         RepoFactory(self.repo_store, num_commits=1).build()
