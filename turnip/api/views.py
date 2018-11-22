@@ -166,8 +166,10 @@ class RefAPI(BaseAPI):
 
     @validate_path
     def collection_get(self, repo_store, repo_name):
+        exclude_prefixes = self.request.params.getall('exclude_prefix')
         try:
-            return store.get_refs(repo_store, repo_name)
+            return store.get_refs(
+                repo_store, repo_name, exclude_prefixes=exclude_prefixes)
         except (KeyError, GitError):
             return exc.HTTPNotFound()  # 404
 
