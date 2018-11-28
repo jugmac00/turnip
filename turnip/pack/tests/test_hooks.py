@@ -79,6 +79,51 @@ class MockRepo(object):
         return MockRef(self.ancestor)
 
 
+class MockSocket(object):
+
+    def __init__(self, blocks=None):
+        self.blocks = blocks or []
+
+    def recv(self, bufsize, flags=None):
+        if not self.blocks:
+            return b''
+        elif bufsize < len(self.blocks[0]):
+            block = self.blocks[0][:bufsize]
+            self.blocks[0] = self.blocks[0][bufsize:]
+            return block
+        else:
+            return self.blocks.pop(0)
+
+
+class TestNetstringRecv(TestCase):
+    """Tests for netstring_recv."""
+
+    def test_nondigit(self):
+        sock = MockSocket([b'zzz:abc,'])
+        self.assertRaises(AssertionError, hook.netstring_recv, sock)
+
+    def test_short(self):
+        sock = MockSocket([b'4:abc,'])
+        self.assertRaises(AssertionError, hook.netstring_recv, sock)
+
+    def test_unterminated(self):
+        sock = MockSocket([b'4:abcd'])
+        self.assertRaises(AssertionError, hook.netstring_recv, sock)
+
+    def test_split_data(self):
+        sock = MockSocket([b'12:abcd', b'efgh', b'ijkl,'])
+        self.assertEqual(b'abcdefghijkl', hook.netstring_recv(sock))
+        self.assertEqual([], sock.blocks)
+
+    def test_valid(self):
+        sock = MockSocket(
+            [b'11:\x00\x01\x02\x03\x04,\x05\x06\x07\x08\x09,remaining'])
+        self.assertEqual(
+            b'\x00\x01\x02\x03\x04,\x05\x06\x07\x08\x09',
+            hook.netstring_recv(sock))
+        self.assertEqual([b'remaining'], sock.blocks)
+
+
 class HookTestMixin(object):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 

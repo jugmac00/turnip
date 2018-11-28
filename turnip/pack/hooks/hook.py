@@ -104,9 +104,11 @@ def netstring_recv(sock):
         lengthstr += c
         c = sock.recv(1)
     length = int(lengthstr)
-    s = sock.recv(length)
+    s = bytearray()
+    while len(s) < length:
+        s += sock.recv(length - len(s))
     assert sock.recv(1) == b','
-    return s
+    return bytes(s)
 
 
 def rpc_invoke(sock, method, args):
