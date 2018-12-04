@@ -7,11 +7,20 @@ from __future__ import (
     unicode_literals,
     )
 
+import base64
 import contextlib
 import uuid
 
+from six.moves import xmlrpc_client
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
+from testtools.matchers import (
+    Equals,
+    IsInstance,
+    MatchesAll,
+    MatchesListwise,
+    MatchesStructure,
+    )
 from twisted.internet import (
     defer,
     reactor,
@@ -164,22 +173,39 @@ class TestHookRPCHandler(TestCase):
         finally:
             self.hookrpc_handler.unregisterKey(key)
 
+    def encodeRefPath(self, ref_path):
+        return base64.b64encode(ref_path).decode('UTF-8')
+
     def assertCheckedRefPermissions(self, path, ref_paths, auth_params):
-        self.assertEqual(
-            [(path, ref_paths, auth_params)],
-            self.virtinfo.ref_permissions_checks)
+        self.assertThat(self.virtinfo.ref_permissions_checks, MatchesListwise([
+            MatchesListwise([
+                Equals(path),
+                MatchesListwise([
+                    MatchesAll(
+                        IsInstance(xmlrpc_client.Binary),
+                        MatchesStructure.byEquality(data=ref_path))
+                    for ref_path in ref_paths
+                    ]),
+                Equals(auth_params),
+                ]),
+            ]))
 
     @defer.inlineCallbacks
     def test_checkRefPermissions_fresh(self):
         self.virtinfo.ref_permissions = {
-            'refs/heads/master': ['push'],
-            'refs/heads/next': ['force_push'],
+            b'refs/heads/master': ['push'],
+            b'refs/heads/next': ['force_push'],
             }
+        encoded_paths = [
+            self.encodeRefPath(ref_path)
+            for ref_path in sorted(self.virtinfo.ref_permissions)]
         with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
             permissions = yield self.hookrpc_handler.checkRefPermissions(
-                None,
-                {'key': key, 'paths': sorted(self.virtinfo.ref_permissions)})
-        self.assertEqual(self.virtinfo.ref_permissions, permissions)
+                None, {'key': key, 'paths': encoded_paths})
+        expected_permissions = {
+            self.encodeRefPath(ref_path): perms
+            for ref_path, perms in self.virtinfo.ref_permissions.items()}
+        self.assertEqual(expected_permissions, permissions)
         self.assertCheckedRefPermissions(
             '/translated', [b'refs/heads/master', b'refs/heads/next'],
             {'uid': 42})
@@ -187,15 +213,16 @@ class TestHookRPCHandler(TestCase):
     @defer.inlineCallbacks
     def test_checkRefPermissions_cached(self):
         cached_ref_permissions = {
-            'refs/heads/master': ['push'],
-            'refs/heads/next': ['force_push'],
+            b'refs/heads/master': ['push'],
+            b'refs/heads/next': ['force_push'],
             }
+        encoded_master = self.encodeRefPath(b'refs/heads/master')
         with self.registeredKey(
                 '/translated', auth_params={'uid': 42},
                 permissions=cached_ref_permissions) as key:
             permissions = yield self.hookrpc_handler.checkRefPermissions(
-                None, {'key': key, 'paths': ['refs/heads/master']})
-        expected_permissions = {'refs/heads/master': ['push']}
+                None, {'key': key, 'paths': [encoded_master]})
+        expected_permissions = {encoded_master: ['push']}
         self.assertEqual(expected_permissions, permissions)
         self.assertEqual([], self.virtinfo.ref_permissions_checks)
 

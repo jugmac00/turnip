@@ -81,11 +81,13 @@ class FunctionalTestMixin(object):
         self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
         self.addCleanup(self.virtinfo_listener.stopListening)
         self.virtinfo.ref_permissions = {
-            'refs/heads/master': ['create', 'push']}
+            b'refs/heads/master': ['create', 'push']}
 
     def startHookRPC(self):
         self.hookrpc_handler = HookRPCHandler(self.virtinfo_url)
-        dir = tempfile.mkdtemp(prefix='turnip-test-hook-')
+        # XXX cjwatson 2018-11-20: Use bytes so that shutil.rmtree doesn't
+        # get confused on Python 2.
+        dir = tempfile.mkdtemp(prefix=b'turnip-test-hook-')
         self.addCleanup(shutil.rmtree, dir, ignore_errors=True)
 
         self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
@@ -94,7 +96,9 @@ class FunctionalTestMixin(object):
         self.addCleanup(self.hookrpc_listener.stopListening)
 
     def startPackBackend(self):
-        self.root = tempfile.mkdtemp(prefix='turnip-test-root-')
+        # XXX cjwatson 2018-11-20: Use bytes so that shutil.rmtree doesn't
+        # get confused on Python 2.
+        self.root = tempfile.mkdtemp(prefix=b'turnip-test-root-')
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
         self.backend_listener = reactor.listenTCP(
             0,
@@ -224,7 +228,7 @@ class FunctionalTestMixin(object):
     @defer.inlineCallbacks
     def test_no_permissions(self):
         # Update the test ref_permissions
-        self.virtinfo.ref_permissions = {'refs/heads/master': ['push']}
+        self.virtinfo.ref_permissions = {b'refs/heads/master': ['push']}
         # Test a push fails if the user has no permissions to that ref
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
@@ -248,7 +252,7 @@ class FunctionalTestMixin(object):
             error)
 
         # add create, disable push
-        self.virtinfo.ref_permissions = {'refs/heads/master': ['create']}
+        self.virtinfo.ref_permissions = {b'refs/heads/master': ['create']}
         # Can now create the ref
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'master'), path=clone1)
@@ -263,10 +267,44 @@ class FunctionalTestMixin(object):
             b"You do not have permission to push to refs/heads/master", error)
 
     @defer.inlineCallbacks
+    def test_push_non_ascii_refs(self):
+        # Pushing non-ASCII refs works.
+        self.virtinfo.ref_permissions = {
+            b'refs/heads/\x80': ['create', 'push'],
+            u'refs/heads/\N{SNOWMAN}'.encode('UTF-8'): ['create', 'push'],
+            }
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+        clone2 = os.path.join(test_root, 'clone2')
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Non-ASCII test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master:\x80',
+             u'master:\N{SNOWMAN}'.encode('UTF-8')), path=clone1)
+        # We get the new branches when we re-clone.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone2))
+        out = yield self.assertCommandSuccess(
+            (b'git', b'for-each-ref', b'--format=%(refname)',
+             b'refs/remotes/origin/*'),
+            path=clone2)
+        self.assertEqual(
+            sorted([
+                b'refs/remotes/origin/\x80',
+                u'refs/remotes/origin/\N{SNOWMAN}'.encode('UTF-8')]),
+            sorted(out.splitlines()))
+
+    @defer.inlineCallbacks
     def test_force_push(self):
         # Update the test ref_permissions
         self.virtinfo.ref_permissions = {
-            'refs/heads/master': ['create', 'push']}
+            b'refs/heads/master': ['create', 'push']}
 
         # Test a force-push fails if the user has no permissions
         test_root = self.useFixture(TempDir()).path
@@ -347,7 +385,7 @@ class FunctionalTestMixin(object):
     @defer.inlineCallbacks
     def test_delete_ref(self):
         self.virtinfo.ref_permissions = {
-            'refs/heads/newref': ['create', 'push', 'force_push']}
+            b'refs/heads/newref': ['create', 'push', 'force_push']}
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
 
@@ -383,7 +421,7 @@ class FunctionalTestMixin(object):
     @defer.inlineCallbacks
     def test_delete_ref_without_permission(self):
         self.virtinfo.ref_permissions = {
-            'refs/heads/newref': ['create', 'push']}
+            b'refs/heads/newref': ['create', 'push']}
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
 
@@ -471,7 +509,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
                 b'localhost', self.backend_port, self.virtinfo_url))
         self.virt_port = self.virt_listener.getHost().port
         self.virtinfo.ref_permissions = {
-            'refs/heads/master': ['create', 'push']}
+            b'refs/heads/master': ['create', 'push']}
 
     @defer.inlineCallbacks
     def tearDown(self):
@@ -482,7 +520,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
     @defer.inlineCallbacks
     def test_read_only(self):
         self.virtinfo.ref_permissions = {
-            'refs/heads/master': ['create', 'push']}
+            b'refs/heads/master': ['create', 'push']}
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, 'clone1')
         clone2 = os.path.join(test_root, 'clone2')
