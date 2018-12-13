@@ -682,7 +682,7 @@ class SmartHTTPFrontendResource(resource.Resource):
     def __init__(self, config):
         resource.Resource.__init__(self)
         self.backend_host = config.get("pack_virt_host")
-        self.backend_port = config.get("pack_virt_port")
+        self.backend_port = int(config.get("pack_virt_port"))
         self.virtinfo_endpoint = config.get("virtinfo_endpoint")
         # XXX cjwatson 2015-03-30: Knowing about the store path here
         # violates turnip's layering and may cause scaling problems later,

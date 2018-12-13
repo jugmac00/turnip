@@ -31,9 +31,9 @@ config = TurnipConfig()
 
 LOG_PATH = config.get('turnip_log_dir')
 PACK_VIRT_HOST = config.get('pack_virt_host')
-PACK_VIRT_PORT = config.get('pack_virt_port')
+PACK_VIRT_PORT = int(config.get('pack_virt_port'))
 PACK_BACKEND_HOST = config.get('pack_backend_host')
-PACK_BACKEND_PORT = config.get('pack_backend_port')
+PACK_BACKEND_PORT = int(config.get('pack_backend_port'))
 REPO_STORE = config.get('repo_store')
 VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 
@@ -60,18 +60,18 @@ reactor.listenTCP(PACK_VIRT_PORT,
                   PackVirtFactory(PACK_BACKEND_HOST,
                                   PACK_BACKEND_PORT,
                                   VIRTINFO_ENDPOINT))
-reactor.listenTCP(config.get('pack_frontend_port'),
+reactor.listenTCP(int(config.get('pack_frontend_port')),
                   PackFrontendFactory(PACK_VIRT_HOST,
                                       PACK_VIRT_PORT))
 smarthttp_site = server.Site(SmartHTTPFrontendResource(config))
-reactor.listenTCP(config.get('smart_http_port'), smarthttp_site)
+reactor.listenTCP(int(config.get('smart_http_port')), smarthttp_site)
 smartssh_service = SmartSSHService(
     PACK_VIRT_HOST, PACK_VIRT_PORT, config.get('authentication_endpoint'),
     private_key_path=config.get('private_ssh_key_path'),
     public_key_path=config.get('public_ssh_key_path'),
     main_log='turnip', access_log=os.path.join(LOG_PATH, 'turnip.access'),
     access_log_path=os.path.join(LOG_PATH, 'turnip-access.log'),
-    strport=b'tcp:{}'.format(config.get('smart_ssh_port')),
+    strport=b'tcp:{}'.format(int(config.get('smart_ssh_port'))),
     moduli_path=config.get('moduli_path'))
 smartssh_service.startService()
 

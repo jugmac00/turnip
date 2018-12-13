@@ -22,7 +22,8 @@ def getSmartHTTPService():
 
     config = TurnipConfig()
     smarthttp_site = server.Site(SmartHTTPFrontendResource(config))
-    return internet.TCPServer(config.get('smart_http_port'), smarthttp_site)
+    return internet.TCPServer(
+        int(config.get('smart_http_port')), smarthttp_site)
 
 
 options = ServerOptions()
