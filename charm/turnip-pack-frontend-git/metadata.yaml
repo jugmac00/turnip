@@ -1,0 +1,24 @@
+name: turnip-pack-frontend-git
+display-name: turnip-pack-frontend-git
+summary: Turnip public Git server
+maintainer: Colin Watson <cjwatson@canonical.com>
+description: >
+  Turnip is a flexible and scalable Git server suite written in Python
+  using Twisted.  This component provides a public git:// protocol
+  server.
+tags:
+  # https://docs.jujucharms.com/devel/en/authors-charm-metadata#charm-store-fields
+  - network
+series:
+  - bionic
+  - xenial
+subordinate: false
+requires:
+  turnip-pack-virt:
+    interface: http
+provides:
+  turnip-pack-frontend-git:
+    interface: http
+  nrpe-external-master:
+    interface: nrpe-external-master
+    scope: container

@@ -1,0 +1,24 @@
+[Unit]
+Description=Turnip pack backend server
+After=network.target
+{%- if nfs %}
+RequiresMountsFor={{ data_dir }}
+{%- endif %}
+
+[Service]
+User={{ user }}
+Group={{ group }}
+WorkingDirectory={{ code_dir }}
+Environment=PATH={{ venv_dir }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOOKRPC_PATH={{ run_dir }}
+Environment=PACK_BACKEND_PORT={{ port }}
+Environment=REPO_STORE={{ data_dir }}/repos
+Environment=VIRTINFO_ENDPOINT={{ virtinfo_endpoint }}
+ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-backend.log --python=packbackendserver.tac
+
+[Install]
+WantedBy=multi-user.target
+{%- if nfs %}
+WantedBy={{ data_mount_unit }}
+{%- endif %}
+

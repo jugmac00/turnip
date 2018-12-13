@@ -1,0 +1,17 @@
+[Unit]
+Description=Turnip pack frontend server
+After=network.target
+
+[Service]
+User={{ user }}
+Group={{ group }}
+WorkingDirectory={{ code_dir }}
+Environment=PATH={{ venv_dir }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PACK_FRONTEND_PORT={{ port }}
+Environment=PACK_VIRT_HOST={{ pack_virt_host }}
+Environment=PACK_VIRT_PORT={{ pack_virt_port }}
+ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-frontend-git.log --python=packfrontendserver.tac
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,41 @@
+options:
+  port:
+    type: int
+    default: 19417
+    description: API port.
+  wsgi_workers:
+    type: int
+    default: 0
+    description: >
+      The number of worker processes for handling requests.  The default (0)
+      indicates the number of CPUs plus 1.
+  wsgi_backlog:
+    type: int
+    default: 2048
+    description: The maximum number of pending connections.
+  wsgi_timeout:
+    type: int
+    default: 30
+    description: Timeout of a request in seconds.
+  wsgi_keep_alive:
+    type: int
+    default: 2
+    description: Keep-alive time in seconds.
+  wsgi_max_requests:
+    type: int
+    default: 0
+    description: >
+      Maximum requests for a worker to serve before restarting.  The default
+      (0) disables automatic worker restarts.
+  wsgi_access_log_format:
+    type: string
+    default: ""
+    description: >
+      The access log format (see the Gunicorn documentation).  Leave this
+      blank to use Gunicorn's default.
+  wsgi_error_log_level:
+    type: string
+    default: info
+    description: >
+      The granularity of error log entries (valid values are debug, info,
+      warning, error, and critical).

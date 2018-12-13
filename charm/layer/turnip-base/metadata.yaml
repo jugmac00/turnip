@@ -1,0 +1,5 @@
+resources:
+  turnip:
+    type: file
+    filename: turnip.tar.gz
+    description: Turnip code

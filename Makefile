@@ -93,6 +93,7 @@ build-tarball:
 	tar -czf $(TARBALL_BUILD_PATH) \
 		--exclude-vcs \
 		--exclude build \
+		--exclude charm \
 		--exclude dist \
 		--exclude env \
 		./

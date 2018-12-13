@@ -1,0 +1,15 @@
+name = "turnip-api"
+workers = {{ wsgi_workers }}
+worker_class = "sync"
+max_requests = {{ wsgi_max_requests }}
+backlog = {{ wsgi_backlog }}
+timeout = {{ wsgi_timeout }}
+keep_alive = {{ wsgi_keep_alive }}
+bind = ['0.0.0.0:{{ port }}']
+accesslog = "{{ logs_dir }}/turnip-api-access.log"
+{% if wsgi_access_log_format -%}
+access_log_format = "{{ wsgi_access_log_format }}"
+{% endif -%}
+errorlog = "{{ logs_dir }}/turnip-api-error.log"
+log_level = "{{ wsgi_error_log_level }}"
+

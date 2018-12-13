@@ -1,0 +1,30 @@
+[Unit]
+Description=Turnip smart HTTP server
+After=network.target
+{%- if nfs %}
+RequiresMountsFor={{ data_dir }}
+{%- endif %}
+
+[Service]
+User={{ user }}
+Group={{ group }}
+WorkingDirectory={{ code_dir }}
+Environment=PATH={{ venv_dir }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=CGIT_EXEC_PATH=/usr/local/bin/cgitwrap
+Environment=CGIT_SECRET_PATH={{ cgit_secret_path }}
+Environment=MAIN_SITE_ROOT={{ main_site_root }}
+Environment=OPENID_PROVIDER_ROOT={{ openid_provider_root }}
+Environment=PACK_VIRT_HOST={{ pack_virt_host }}
+Environment=PACK_VIRT_PORT={{ pack_virt_port }}
+Environment=REPO_STORE={{ data_dir }}/repos
+Environment=SITE_NAME={{ site_name }}
+Environment=SMART_HTTP_PORT={{ port }}
+Environment=VIRTINFO_ENDPOINT={{ virtinfo_endpoint }}
+ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-frontend-http.log --python=httpserver.tac
+
+[Install]
+WantedBy=multi-user.target
+{%- if nfs %}
+WantedBy={{ data_mount_unit }}
+{%- endif %}
+

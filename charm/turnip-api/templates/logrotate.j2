@@ -1,0 +1,26 @@
+{{ base_dir }}/logs/turnip-api-access.log {
+    rotate 90
+    daily
+    dateext
+    delaycompress
+    compress
+    missingok
+    create 0644 {{ user }} {{ group }}
+    postrotate
+        service turnip-api reload
+    endscript
+}
+
+{{ base_dir }}/logs/turnip-api-error.log {
+    rotate 90
+    daily
+    dateext
+    delaycompress
+    compress
+    missingok
+    create 0644 {{ user }} {{ group }}
+    postrotate
+        service turnip-api reload
+    endscript
+}
+

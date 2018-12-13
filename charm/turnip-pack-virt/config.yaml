@@ -1,0 +1,9 @@
+options:
+  port:
+    type: int
+    default: 19419
+    description: Pack virt port.
+  virtinfo_endpoint:
+    type: string
+    default: http://localhost:6543/githosting
+    description: Virtinfo endpoint (Launchpad/Turnipcake)

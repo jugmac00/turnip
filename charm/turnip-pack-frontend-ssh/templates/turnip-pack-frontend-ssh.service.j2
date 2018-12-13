@@ -1,0 +1,21 @@
+[Unit]
+Description=Turnip smart SSH server
+After=network.target
+
+[Service]
+User={{ user }}
+Group={{ group }}
+WorkingDirectory={{ code_dir }}
+Environment=PATH={{ venv_dir }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=AUTHENTICATION_ENDPOINT={{ authentication_endpoint }}
+Environment=PACK_VIRT_HOST={{ pack_virt_host }}
+Environment=PACK_VIRT_PORT={{ pack_virt_port }}
+Environment=PRIVATE_SSH_KEY_PATH={{ private_ssh_key_path }}
+Environment=PUBLIC_SSH_KEY_PATH={{ public_ssh_key_path }}
+Environment=SMART_SSH_PORT={{ port }}
+Environment=TURNIP_LOG_DIR={{ base_dir }}/logs
+ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-frontend-ssh.log --python=sshserver.tac
+
+[Install]
+WantedBy=multi-user.target
+
