@@ -26,7 +26,7 @@ def getSmartSSHService():
     log_path = config.get('turnip_log_dir')
 
     return SmartSSHService(
-        config.get('pack_virt_host'), config.get('pack_virt_port'),
+        config.get('pack_virt_host'), int(config.get('pack_virt_port')),
         config.get('authentication_endpoint'),
         private_key_path=config.get('private_ssh_key_path'),
         public_key_path=config.get('public_ssh_key_path'),
@@ -34,7 +34,7 @@ def getSmartSSHService():
         # information to the main log?  Requires lazr.sshserver changes.
         main_log='turnip', access_log=os.path.join(log_path, 'turnip.access'),
         access_log_path=os.path.join(log_path, 'turnip-access.log'),
-        strport=b'tcp:{}'.format(config.get('smart_ssh_port')),
+        strport=b'tcp:{}'.format(int(config.get('smart_ssh_port'))),
         moduli_path=config.get('moduli_path'))
 
 

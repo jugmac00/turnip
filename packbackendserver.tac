@@ -32,7 +32,7 @@ def getPackBackendServices():
 
     config = TurnipConfig()
     repo_store = config.get('repo_store')
-    pack_backend_port = config.get('pack_backend_port')
+    pack_backend_port = int(config.get('pack_backend_port'))
     hookrpc_handler = HookRPCHandler(config.get('virtinfo_endpoint'))
     hookrpc_path = os.path.join(
         repo_store, 'hookrpc_sock_%d' % pack_backend_port)
