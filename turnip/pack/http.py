@@ -679,9 +679,9 @@ class SmartHTTPFrontendResource(resource.Resource):
     allowed_services = frozenset((
         b'git-upload-pack', b'git-receive-pack', b'turnip-set-symbolic-ref'))
 
-    def __init__(self, backend_host, config):
+    def __init__(self, config):
         resource.Resource.__init__(self)
-        self.backend_host = backend_host
+        self.backend_host = config.get("pack_virt_host")
         self.backend_port = config.get("pack_virt_port")
         self.virtinfo_endpoint = config.get("virtinfo_endpoint")
         # XXX cjwatson 2015-03-30: Knowing about the store path here

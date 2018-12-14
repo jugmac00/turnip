@@ -27,7 +27,7 @@ def getPackFrontendService():
     config = TurnipConfig()
     return internet.TCPServer(
         config.get('pack_frontend_port'),
-        PackFrontendFactory('localhost',
+        PackFrontendFactory(config.get('pack_virt_host'),
                             config.get('pack_virt_port')))
 
 

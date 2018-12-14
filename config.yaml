@@ -1,6 +1,8 @@
 authentication_endpoint: http://xmlrpc-private.launchpad.dev:8087/authserver
+pack_backend_host: localhost
 pack_backend_port: 19418
 pack_frontend_port: 9418
+pack_virt_host: localhost
 pack_virt_port: 19419
 private_ssh_key_path: ./turnip/pack/tests/data/ssh-host-key
 public_ssh_key_path: ./turnip/pack/tests/data/ssh-host-key.pub

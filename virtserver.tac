@@ -24,7 +24,7 @@ def getPackVirtService():
     config = TurnipConfig()
     return internet.TCPServer(
         config.get('pack_virt_port'),
-        PackVirtFactory('localhost',
+        PackVirtFactory(config.get('pack_backend_host'),
                         config.get('pack_backend_port'),
                         config.get('virtinfo_endpoint')))
 

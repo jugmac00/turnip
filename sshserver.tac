@@ -26,7 +26,7 @@ def getSmartSSHService():
     log_path = config.get('turnip_log_dir')
 
     return SmartSSHService(
-        b'localhost', config.get('pack_virt_port'),
+        config.get('pack_virt_host'), config.get('pack_virt_port'),
         config.get('authentication_endpoint'),
         private_key_path=config.get('private_ssh_key_path'),
         public_key_path=config.get('public_ssh_key_path'),
