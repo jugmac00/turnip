@@ -35,6 +35,7 @@ PACK_VIRT_PORT = int(config.get('pack_virt_port'))
 PACK_BACKEND_HOST = config.get('pack_backend_host')
 PACK_BACKEND_PORT = int(config.get('pack_backend_port'))
 REPO_STORE = config.get('repo_store')
+HOOKRPC_PATH = config.get('hookrpc_path') or REPO_STORE
 VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 
 # turnipserver.py is preserved for convenience in development, services
@@ -46,7 +47,7 @@ VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 
 hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT)
 hookrpc_sock_path = os.path.join(
-    REPO_STORE, 'hookrpc_sock_%d' % PACK_BACKEND_PORT)
+    HOOKRPC_PATH, 'hookrpc_sock_%d' % PACK_BACKEND_PORT)
 reactor.listenTCP(
     PACK_BACKEND_PORT,
     PackBackendFactory(REPO_STORE,
