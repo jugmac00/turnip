@@ -45,16 +45,17 @@ VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 # a smart SSH frontend on 9422.
 
 hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT)
-hookrpc_path = os.path.join(REPO_STORE, 'hookrpc_sock_%d' % PACK_BACKEND_PORT)
+hookrpc_sock_path = os.path.join(
+    REPO_STORE, 'hookrpc_sock_%d' % PACK_BACKEND_PORT)
 reactor.listenTCP(
     PACK_BACKEND_PORT,
     PackBackendFactory(REPO_STORE,
                        hookrpc_handler,
-                       hookrpc_path,
+                       hookrpc_sock_path,
                        VIRTINFO_ENDPOINT))
-if os.path.exists(hookrpc_path):
-    os.unlink(hookrpc_path)
-reactor.listenUNIX(hookrpc_path, HookRPCServerFactory(hookrpc_handler))
+if os.path.exists(hookrpc_sock_path):
+    os.unlink(hookrpc_sock_path)
+reactor.listenUNIX(hookrpc_sock_path, HookRPCServerFactory(hookrpc_handler))
 
 reactor.listenTCP(PACK_VIRT_PORT,
                   PackVirtFactory(PACK_BACKEND_HOST,
