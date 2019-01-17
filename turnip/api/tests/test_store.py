@@ -154,6 +154,15 @@ class InitTestCase(TestCase):
         self.assertIsNot(None, to[self.master_oid])
         self.assertEqual(self.orig_refs, to.listall_references())
 
+        # Advance master and remove branch-2, so that the commit referenced
+        # by the original repository's master isn't referenced by any of the
+        # cloned repository's refs; otherwise git >= 2.13 deduplicates the
+        # ref in the alternate object store which makes it hard to test that
+        # it's set up properly.
+        RepoFactory(to_path, num_commits=2).build()
+        to.references.delete('refs/heads/branch-2')
+        to_master_oid = to.references['refs/heads/master'].target
+
         # Internally, the packs are hardlinked into a subordinate
         # alternate repo, so minimal space is used by the clone.
         self.assertAlternates(['../turnip-subordinate'], to_path)
@@ -164,7 +173,7 @@ class InitTestCase(TestCase):
 
         self.assertAdvertisedRefs(
             [('.have', self.master_oid.hex),
-             ('refs/heads/master', self.master_oid.hex)],
+             ('refs/heads/master', to_master_oid.hex)],
             [], to_path)
 
     def test_clone_without_refs(self):
