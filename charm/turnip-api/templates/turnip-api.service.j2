@@ -15,6 +15,7 @@ Environment=TURNIP_LOG_DIR={{ logs_dir }}
 ExecStart={{ venv_dir }}/bin/gunicorn --config {{ config_file }} --paste api.ini
 ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID
+LimitNOFILE=1048576
 PrivateTmp=true
 
 [Install]

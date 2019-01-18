@@ -15,6 +15,7 @@ Environment=PACK_BACKEND_PORT={{ port }}
 Environment=REPO_STORE={{ data_dir }}/repos
 Environment=VIRTINFO_ENDPOINT={{ virtinfo_endpoint }}
 ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-backend.log --python=packbackendserver.tac
+LimitNOFILE=1048576
 
 [Install]
 WantedBy=multi-user.target
