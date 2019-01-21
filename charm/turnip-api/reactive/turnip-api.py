@@ -58,6 +58,7 @@ def nrpe_available():
     set_flag('turnip.nrpe-external-master.published')
 
 
+@when('turnip.nrpe-external-master.published')
 @when_not('nrpe-external-master.available')
 def nrpe_unavailable():
     clear_flag('turnip.nrpe-external-master.published')
@@ -72,6 +73,7 @@ def turnip_api_storage_available():
     set_flag('turnip.turnip-api-storage.published')
 
 
+@when('turnip.turnip-api-storage.published')
 @when_not('endpoint.turnip-api-storage.available')
 def turnip_api_storage_unavailable():
     clear_flag('turnip.turnip-api-storage.published')
