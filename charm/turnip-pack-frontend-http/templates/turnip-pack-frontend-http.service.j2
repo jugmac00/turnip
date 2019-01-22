@@ -2,7 +2,8 @@
 Description=Turnip smart HTTP server
 After=network.target
 {%- if nfs %}
-RequiresMountsFor={{ data_dir }}
+BindsTo={{ data_mount_unit }}
+After={{ data_mount_unit }}
 {%- endif %}
 
 [Service]

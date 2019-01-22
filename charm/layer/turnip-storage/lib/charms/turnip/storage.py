@@ -31,6 +31,7 @@ def mount_data(mount_info):
     context['data_dir'] = data_dir()
     templating.render('data.mount.j2', data_mount_conf, context, perms=0o644)
     reload_systemd()
+    host.service('unmask', data_mount)
     host.service_restart(data_mount)
     # systemctl shouldn't return successfully unless the mount completed,
     # but let's make sure.
@@ -41,6 +42,7 @@ def unmount_data():
     data_mount = data_mount_unit()
     if host.service_running(data_mount):
         host.service_stop(data_mount)
+    host.service('mask', data_mount)
     reload_systemd()
 
 
