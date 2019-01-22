@@ -39,7 +39,7 @@ def configure_wsgi():
         'gunicorn-turnip-api.py.j2', context['config_file'], context,
         perms=0o644)
     templating.render(
-        'turnip-api.service.j2', '/etc/systemd/system/turnip-api.service',
+        'turnip-api.service.j2', '/lib/systemd/system/turnip-api.service',
         context, perms=0o644)
     reload_systemd()
     if host.service_running('turnip-api'):

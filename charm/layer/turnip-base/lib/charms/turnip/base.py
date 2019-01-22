@@ -278,7 +278,7 @@ def configure_service(service_name=None):
         context['venv_dir'] = venv_dir()
         templating.render(
             '{}.service.j2'.format(service_name),
-            '/etc/systemd/system/{}.service'.format(service_name),
+            '/lib/systemd/system/{}.service'.format(service_name),
             context, perms=0o644)
         reload_systemd()
         if host.service_running(service_name):

@@ -26,7 +26,7 @@ def mount_data(mount_info):
     # and partly because this lets us automatically stop and start services
     # that require the mount.
     data_mount = data_mount_unit()
-    data_mount_conf = '/etc/systemd/system/{}'.format(data_mount)
+    data_mount_conf = '/lib/systemd/system/{}'.format(data_mount)
     context = dict(mount_info)
     context['data_dir'] = data_dir()
     templating.render('data.mount.j2', data_mount_conf, context, perms=0o644)
