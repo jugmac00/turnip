@@ -90,9 +90,9 @@ class FunctionalTestMixin(object):
         dir = tempfile.mkdtemp(prefix=b'turnip-test-hook-')
         self.addCleanup(shutil.rmtree, dir, ignore_errors=True)
 
-        self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
+        self.hookrpc_sock_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_listener = reactor.listenUNIX(
-            self.hookrpc_path, HookRPCServerFactory(self.hookrpc_handler))
+            self.hookrpc_sock_path, HookRPCServerFactory(self.hookrpc_handler))
         self.addCleanup(self.hookrpc_listener.stopListening)
 
     def startPackBackend(self):
@@ -103,7 +103,7 @@ class FunctionalTestMixin(object):
         self.backend_listener = reactor.listenTCP(
             0,
             PackBackendFactory(
-                self.root, self.hookrpc_handler, self.hookrpc_path,
+                self.root, self.hookrpc_handler, self.hookrpc_sock_path,
                 virtinfo_endpoint=self.virtinfo_url))
         self.backend_port = self.backend_listener.getHost().port
         self.addCleanup(self.backend_listener.stopListening)

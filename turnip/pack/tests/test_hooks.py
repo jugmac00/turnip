@@ -142,9 +142,9 @@ class HookTestMixin(object):
         self.hookrpc_handler = MockHookRPCHandler()
         self.hookrpc = hookrpc.HookRPCServerFactory(self.hookrpc_handler)
         dir = self.useFixture(TempDir()).path
-        self.hookrpc_path = os.path.join(dir, 'hookrpc_sock')
+        self.hookrpc_sock_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_port = reactor.listenUNIX(
-            self.hookrpc_path, self.hookrpc)
+            self.hookrpc_sock_path, self.hookrpc)
         self.addCleanup(self.hookrpc_port.stopListening)
         hooks_dir = os.path.join(dir, 'hooks')
         os.mkdir(hooks_dir)
@@ -166,7 +166,7 @@ class HookTestMixin(object):
                 HookProcessProtocol(d, input),
                 self.hook_path, [self.hook_path],
                 env={
-                    b'TURNIP_HOOK_RPC_SOCK': self.hookrpc_path,
+                    b'TURNIP_HOOK_RPC_SOCK': self.hookrpc_sock_path,
                     b'TURNIP_HOOK_RPC_KEY': key})
             code, stdout, stderr = yield d
         finally:
