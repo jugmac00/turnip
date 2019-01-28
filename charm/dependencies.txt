@@ -1,6 +1,6 @@
 interface			@
 interface/http			git+https://github.com/juju-solutions/interface-http;revno=4a232c69
-interface/mount			git+https://github.com/cjwatson/interface-mount;revno=9306b7bf
+interface/mount			git+https://github.com/juju-solutions/interface-mount;revno=d5a2526f
 interface/nrpe-external-master	git+https://github.com/cmars/nrpe-external-master-interface;revno=20b2b9fb
 interface/turnip-api-storage	../../../interface/turnip-api-storage;method=link
 
