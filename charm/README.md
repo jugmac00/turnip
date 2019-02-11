@@ -21,7 +21,7 @@ authenticate users, and so on.  This may be Launchpad or the stub
     $ cd turnipcake/charm
     $ make deploy PIP_SOURCE_DIR=/path/to/dependencies
     $ juju add-relation turnip-api turnipcake
-    $ juju add-relation haproxy turnipcake
+    $ juju add-relation haproxy turnipcake:turnipcake
     $ HAPROXY_ADDRESS="$(juju status --format=json haproxy | jq -r '.applications.haproxy.units[]."public-address"')"
     $ VIRT_ENDPOINT="http://$HAPROXY_ADDRESS:6543/githosting"
     $ juju config turnip-pack-backend virtinfo_endpoint="$VIRT_ENDPOINT"

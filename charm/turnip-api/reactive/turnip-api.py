@@ -31,7 +31,6 @@ def configure_turnip():
     set_flag('turnip.configured')
     clear_flag('turnip.storage.nrpe-external-master.published')
     clear_flag('turnip.nrpe-external-master.published')
-    clear_flag('turnip.turnip-api-storage.published')
     clear_flag('turnip.turnip-api.published')
     status.active('Ready')
 
@@ -62,21 +61,6 @@ def nrpe_available():
 @when_not('nrpe-external-master.available')
 def nrpe_unavailable():
     clear_flag('turnip.nrpe-external-master.published')
-
-
-@when('endpoint.turnip-api-storage.available', 'turnip.configured')
-@when_not('turnip.turnip-api-storage.published')
-def turnip_api_storage_available():
-    turnip_api_storage = endpoint_from_flag(
-        'endpoint.turnip-api-storage.available')
-    turnip_api_storage.publish_info(hookenv.config()['port'])
-    set_flag('turnip.turnip-api-storage.published')
-
-
-@when('turnip.turnip-api-storage.published')
-@when_not('endpoint.turnip-api-storage.available')
-def turnip_api_storage_unavailable():
-    clear_flag('turnip.turnip-api-storage.published')
 
 
 @when('turnip-api.available', 'turnip.configured')

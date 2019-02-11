@@ -83,7 +83,6 @@ clean:
 	@find . -name \*.pyc -delete
 	@find . -depth -name '__pycache__' -exec rm -rf '{}' \;
 	@rm -f bundle.yaml
-	@rm -f interface/*/codetree-collect-info.yaml
 	@rm -f layer/*/codetree-collect-info.yaml
 	@rm -rf $(BUILDDIR) $(TMPDIR)
 
@@ -93,7 +92,7 @@ lint: build
 		charm proof dist/builds/$$charm; \
 	done
 	@echo "Linting python sources..."
-	@flake8 interface layer $(CHARMS)
+	@flake8 layer $(CHARMS)
 
 .PHONY: $(foreach charm,$(CHARMS),build-$(charm))
 .PHONY: all build clean deploy lint payload

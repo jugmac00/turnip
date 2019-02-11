@@ -14,8 +14,6 @@ series:
   - xenial
 subordinate: false
 provides:
-  turnip-api-storage:
-    interface: turnip-api-storage
   turnip-api:
     interface: http
   nrpe-external-master:
