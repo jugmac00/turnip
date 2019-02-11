@@ -10,7 +10,6 @@ from charms.reactive import (
     endpoint_from_flag,
     set_flag,
     when,
-    when_any,
     when_not,
     )
 
@@ -22,8 +21,7 @@ from charms.turnip.base import (
     )
 
 
-@when('turnip.installed')
-@when_any('turnip.storage.internal', 'turnip.storage.nfs')
+@when('turnip.installed', 'turnip.storage.available')
 @when_not('turnip.configured')
 def configure_turnip():
     configure_wsgi()
@@ -36,7 +34,7 @@ def configure_turnip():
 
 
 @when('turnip.configured')
-@when_not('turnip.storage.internal', 'turnip.storage.nfs')
+@when_not('turnip.storage.available')
 def deconfigure_turnip():
     deconfigure_service('turnip-api')
     clear_flag('turnip.configured')

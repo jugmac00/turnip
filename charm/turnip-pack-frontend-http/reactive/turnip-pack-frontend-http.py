@@ -13,7 +13,6 @@ from charms.reactive import (
     endpoint_from_flag,
     set_flag,
     when,
-    when_any,
     when_not,
     )
 
@@ -58,8 +57,7 @@ def turnip_pack_virt_available():
 
 
 @when('turnip.created_cgit_user', 'turnip.installed',
-      'turnip.services.pack-virt')
-@when_any('turnip.storage.internal', 'turnip.storage.nfs')
+      'turnip.services.pack-virt', 'turnip.storage.available')
 @when_not('turnip.configured')
 def configure_turnip():
     configure_cgit()
@@ -72,7 +70,7 @@ def configure_turnip():
 
 
 @when('turnip.configured')
-@when_not('turnip.storage.internal', 'turnip.storage.nfs')
+@when_not('turnip.storage.available')
 def deconfigure_turnip():
     deconfigure_service('turnip-pack-frontend-http')
     clear_flag('turnip.configured')

@@ -6,6 +6,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 from charmhelpers.core import hookenv
 from charmhelpers.fetch import apt_install
 from charms.reactive import (
+    any_flags_set,
     clear_flag,
     data_changed,
     endpoint_from_flag,
@@ -24,6 +25,12 @@ from charms.turnip.storage import (
     )
 
 
+def update_storage_available():
+    toggle_flag(
+        'turnip.storage.available',
+        any_flags_set('turnip.storage.internal', 'turnip.storage.nfs'))
+
+
 @when('turnip.created_user')
 @when_not('turnip.storage.initialised')
 def initial_request():
@@ -35,6 +42,7 @@ def initial_request():
         set_flag('turnip.storage.internal')
     clear_flag('turnip.storage.nfs')
     set_flag('turnip.storage.initialised')
+    update_storage_available()
 
 
 @when('nfs.joined')
@@ -65,6 +73,7 @@ def nfs_available():
             mount_data(mount_info)
             ensure_repo_store_writable()
         toggle_flag('turnip.storage.nfs', mount_info is not None)
+        update_storage_available()
 
 
 @when_any('turnip.storage.requested', 'turnip.storage.nfs')
@@ -73,6 +82,7 @@ def nfs_departed():
     unmount_data()
     clear_flag('turnip.storage.requested')
     clear_flag('turnip.storage.nfs')
+    update_storage_available()
 
 
 @when('config.changed.nfs')
@@ -90,6 +100,7 @@ def storage_config_changed():
     clear_flag('turnip.storage.initialised')
     clear_flag('turnip.storage.requested')
     clear_flag('turnip.storage.config-changed')
+    update_storage_available()
 
 
 @when('nrpe-external-master.available', 'turnip.configured')
