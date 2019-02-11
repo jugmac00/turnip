@@ -87,19 +87,10 @@ def nfs_departed():
 
 @when('config.changed.nfs')
 def nfs_config_changed():
-    # We may not be able to handle this immediately, and config.changed.* is
-    # cleared at the end of each hook invocation, so use an intermediate
-    # flag.
-    set_flag('turnip.storage.config-changed')
-
-
-@when('turnip.created_user', 'turnip.storage.config-changed')
-def storage_config_changed():
     clear_flag('turnip.storage.internal')
     clear_flag('turnip.storage.nfs')
     clear_flag('turnip.storage.initialised')
     clear_flag('turnip.storage.nfs-requested')
-    clear_flag('turnip.storage.config-changed')
     update_storage_available()
 
 
