@@ -273,6 +273,8 @@ def configure_service(service_name=None):
         context = dict(config)
         context['code_dir'] = code_dir()
         context['data_dir'] = data_dir()
+        # XXX cjwatson 2019-02-11: data_mount_unit is only meaningful with
+        # layer:turnip-storage, but we include it here for simplicity.
         context['data_mount_unit'] = data_mount_unit()
         context['run_dir'] = run_dir()
         context['venv_dir'] = venv_dir()
