@@ -46,11 +46,11 @@ def initial_request():
 
 
 @when('nfs.joined')
-@when_not('turnip.storage.requested')
+@when_not('turnip.storage.nfs-requested')
 def nfs_joined():
     nfs = endpoint_from_flag('nfs.joined')
     nfs.set_export_name('turnip')
-    set_flag('turnip.storage.requested')
+    set_flag('turnip.storage.nfs-requested')
 
 
 @when('nfs.available')
@@ -76,11 +76,11 @@ def nfs_available():
         update_storage_available()
 
 
-@when_any('turnip.storage.requested', 'turnip.storage.nfs')
+@when_any('turnip.storage.nfs-requested', 'turnip.storage.nfs')
 @when_not('nfs.joined')
 def nfs_departed():
     unmount_data()
-    clear_flag('turnip.storage.requested')
+    clear_flag('turnip.storage.nfs-requested')
     clear_flag('turnip.storage.nfs')
     update_storage_available()
 
@@ -98,7 +98,7 @@ def storage_config_changed():
     clear_flag('turnip.storage.internal')
     clear_flag('turnip.storage.nfs')
     clear_flag('turnip.storage.initialised')
-    clear_flag('turnip.storage.requested')
+    clear_flag('turnip.storage.nfs-requested')
     clear_flag('turnip.storage.config-changed')
     update_storage_available()
 
