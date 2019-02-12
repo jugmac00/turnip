@@ -22,7 +22,7 @@ requires = [
     'cornice',
     'lazr.sshserver>=0.1.7',
     'Paste',
-    'pygit2>=0.27.2,<0.28.0',
+    'pygit2>=0.27.4,<0.28.0',
     'python-openid',
     'PyYAML',
     'Twisted[conch]',
