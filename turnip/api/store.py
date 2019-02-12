@@ -55,20 +55,9 @@ def format_commit(git_object):
         raise GitError('Invalid type: object {} is not a commit.'.format(
             git_object.oid.hex))
     parents = [parent.hex for parent in git_object.parent_ids]
-    # XXX cjwatson 2018-11-15: A regression in pygit2 0.27.1 means that we
-    # have to decode the commit message ourselves.  See:
-    #   https://github.com/libgit2/pygit2/issues/839
-    if git_object.message_encoding is not None:
-        message = git_object.raw_message.decode(
-            encoding=git_object.message_encoding, errors="strict")
-    else:
-        # If the encoding is not explicit, it may not be UTF-8, so it is not
-        # safe to decode it strictly.
-        message = git_object.raw_message.decode(
-            encoding="UTF-8", errors="replace")
     return {
         'sha1': git_object.oid.hex,
-        'message': message,
+        'message': git_object.message,
         'author': format_signature(git_object.author),
         'committer': format_signature(git_object.committer),
         'parents': parents,

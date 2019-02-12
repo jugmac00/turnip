@@ -132,7 +132,7 @@ class RepoFactory(object):
     def generate_tags(self, num_tags):
         """Generate n number of tags."""
         repo = self.repo
-        oid = repo.head.get_object().oid
+        oid = repo.head.peel().oid
         for i in range(num_tags):
             self.add_tag('tag{}'.format(i), 'tag message {}'.format(i), oid)
 

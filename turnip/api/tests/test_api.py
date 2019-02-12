@@ -204,7 +204,7 @@ class ApiTestCase(TestCase):
         self.assertTrue(ref in body)
         self.assertTrue(self.tag.get('ref') in body)
 
-        oid = repo.head.get_object().oid.hex  # git object sha
+        oid = repo.head.peel().oid.hex  # git object sha
         resp_sha = body[ref]['object'].get('sha1')
         self.assertEqual(oid, resp_sha)
 
