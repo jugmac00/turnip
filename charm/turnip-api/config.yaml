@@ -39,3 +39,9 @@ options:
     description: >
       The granularity of error log entries (valid values are debug, info,
       warning, error, and critical).
+  haproxy_service_options:
+    default: |
+      - mode http
+      - option httplog
+      - option httpchk /repo
+      - balance leastconn

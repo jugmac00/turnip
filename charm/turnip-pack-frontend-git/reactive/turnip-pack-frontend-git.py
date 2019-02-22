@@ -75,7 +75,7 @@ def turnip_pack_frontend_git_available():
         'turnip-pack-frontend-git.available')
     publish_website(
         turnip_pack_frontend_git, 'turnip-pack-frontend-git',
-        hookenv.config()['port'], mode='tcp')
+        hookenv.config()['port'])
     set_flag('turnip.turnip-pack-frontend-git.published')
 
 

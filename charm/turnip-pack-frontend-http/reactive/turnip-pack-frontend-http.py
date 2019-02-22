@@ -103,14 +103,9 @@ def nrpe_unavailable():
 def turnip_pack_frontend_http_available():
     turnip_pack_frontend_http = endpoint_from_flag(
         'turnip-pack-frontend-http.available')
-    add_options = [
-        'option httpchk',
-        'rspadd Strict-Transport-Security:\\ max-age=15768000',
-        ]
     publish_website(
         turnip_pack_frontend_http, 'turnip-pack-frontend-http',
-        hookenv.config()['port'], mode='http', add_options=add_options,
-        public_port=443, tls=True, http_redirect=True)
+        hookenv.config()['port'])
     set_flag('turnip.turnip-pack-frontend-http.published')
 
 

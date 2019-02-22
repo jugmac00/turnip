@@ -73,6 +73,17 @@ options:
     type: string
     default: ""
     description: Container to put objects in.
+  haproxy_service_options:
+    type: string
+    description: HAProxy service options.
+    default: |
+      - mode tcp
+      - option tcplog
+      - balance leastconn
+  haproxy_server_options:
+    type: string
+    description: HAProxy server options.
+    default: check
   # layer-apt
   install_sources:
     default: |

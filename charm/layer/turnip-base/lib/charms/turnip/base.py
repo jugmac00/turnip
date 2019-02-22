@@ -15,6 +15,7 @@ from charmhelpers.core import (
     )
 from charmhelpers.fetch import apt_install
 from charmhelpers.payload import archive
+from charms.layer import status
 import six
 import yaml
 
@@ -332,49 +333,30 @@ def find_git_service(git_services, name):
     return None, None
 
 
-def publish_website(website, name, port, mode='http', add_options=None,
-                    public_port=None, tls=False, http_redirect=False):
+def publish_website(website, name, port):
+    config = hookenv.config()
     server_name = hookenv.local_unit().replace('/', '-')
     server_ip = str(hookenv.unit_private_ip())
-    if mode == 'tcp':
-        base_options = ['mode tcp', 'balance leastconn', 'option tcplog']
-    elif mode == 'http':
-        base_options = ['mode http', 'balance leastconn', 'option httplog']
-    else:
-        raise AssertionError('Unknown website mode: {}'.format(mode))
-    options = list(base_options)
-    if add_options is not None:
-        options.extend(add_options)
-    if public_port is None:
-        public_port = port
+    try:
+        service_options = yaml.safe_load(
+            config.get('haproxy_service_options'))
+    except Exception:
+        status.blocked('bad haproxy_service_options YAML config')
+        return
+    server_options = config.get('haproxy_server_options')
     haproxy_services = [{
         'service_name': name,
         'service_host': '0.0.0.0',
-        'service_port': public_port,
-        'service_options': options,
-        'servers': [[server_name, server_ip, port, 'check']],
+        'service_port': port,
+        'service_options': service_options,
+        'servers': [[server_name, server_ip, port, server_options]],
         }]
-    if tls:
-        haproxy_services[-1]['crts'] = ['DEFAULT']
-    if http_redirect:
-        # This is a slightly dubious use of the haproxy charm, but we don't
-        # have good relation settings and end up needing to hardcode some
-        # ports.
-        haproxy_services.append({
-            'service_name': 'turnip-pack-frontend-http-redirect',
-            'service_host': '0.0.0.0',
-            'service_port': 80,
-            'service_options':
-                base_options +
-                ['redirect scheme https code 301 if !{ ssl_fc }'],
-            'servers': [],
-            })
     haproxy_services_yaml = yaml.dump(haproxy_services)
     for relation in website.relations:
         ingress_address = website.get_ingress_address(relation.relation_id)
         relation.to_publish_raw.update({
             'hostname': ingress_address,
             'private-address': ingress_address,
-            'port': str(public_port),
+            'port': str(port),
             'services': haproxy_services_yaml,
             })

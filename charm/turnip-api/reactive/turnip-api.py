@@ -65,9 +65,7 @@ def nrpe_unavailable():
 @when_not('turnip.turnip-api.published')
 def turnip_api_available():
     turnip_api = endpoint_from_flag('turnip-api.available')
-    publish_website(
-        turnip_api, 'turnip-api', hookenv.config()['port'], mode='http',
-        add_options=['option httpchk /repo'])
+    publish_website(turnip_api, 'turnip-api', hookenv.config()['port'])
     set_flag('turnip.turnip-api.published')
 
 

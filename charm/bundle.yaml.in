@@ -5,7 +5,24 @@ applications:
     charm: cs:haproxy
     num_units: 1
     options:
-      services: ""
+      services: |
+        - service_name: turnip-pack-frontend-https
+          service_host: 0.0.0.0
+          service_port: 443
+          service_options:
+            - default_backend turnip-pack-frontend-http
+            - option forwardfor
+          crts: [DEFAULT]
+        - service_name: turnip-pack-frontend-http-redirect
+          service_host: 0.0.0.0
+          service_port: 80
+          service_options:
+            - mode http
+            - option httplog
+            - redirect scheme https code 301 if !{ ssl_fc }
+        - service_name: turnip-pack-frontend-http
+          service_host: 0.0.0.0
+          service_port: 9419
       ssl_cert: "%SSL_CERT%"
       ssl_key: "%SSL_KEY%"
   turnip-pack-backend:

@@ -64,8 +64,7 @@ def nrpe_unavailable():
 def turnip_pack_backend_available():
     turnip_pack_backend = endpoint_from_flag('turnip-pack-backend.available')
     publish_website(
-        turnip_pack_backend, 'turnip-pack-backend', hookenv.config()['port'],
-        mode='tcp')
+        turnip_pack_backend, 'turnip-pack-backend', hookenv.config()['port'])
     set_flag('turnip.turnip-pack-backend.published')
 
 
