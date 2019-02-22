@@ -48,6 +48,8 @@ def initial_request():
 @when('nfs.joined')
 @when_not('turnip.storage.nfs-requested')
 def nfs_joined():
+    if not hookenv.config()['nfs']:
+        return
     nfs = endpoint_from_flag('nfs.joined')
     nfs.set_export_name('turnip')
     set_flag('turnip.storage.nfs-requested')
@@ -55,6 +57,8 @@ def nfs_joined():
 
 @when('nfs.available')
 def nfs_available():
+    if not hookenv.config()['nfs']:
+        return
     nfs = endpoint_from_flag('nfs.available')
     mount_info = None
     for mount in nfs.mounts():
