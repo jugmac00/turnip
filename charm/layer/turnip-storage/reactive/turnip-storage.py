@@ -83,7 +83,8 @@ def nfs_available():
 @when_any('turnip.storage.nfs-requested', 'turnip.storage.nfs')
 @when_not('nfs.joined')
 def nfs_departed():
-    unmount_data()
+    if data_changed('turnip.storage.mount-info', None):
+        unmount_data()
     clear_flag('turnip.storage.nfs-requested')
     clear_flag('turnip.storage.nfs')
     update_storage_available()
