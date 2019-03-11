@@ -8,7 +8,7 @@ options:
     default: 0
     description: >
       The number of worker processes for handling requests.  The default (0)
-      indicates the number of CPUs plus 1.
+      indicates twice the number of CPUs plus 1.
   wsgi_backlog:
     type: int
     default: 2048
