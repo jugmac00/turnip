@@ -1,3 +1,6 @@
+# The charm tool is shipped as a snap, so make sure it's on $PATH.
+export PATH := $(PATH):/snap/bin
+
 APP_NAME := turnip
 
 BUILDDIR := $(CURDIR)/dist
