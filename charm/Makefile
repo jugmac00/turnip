@@ -125,5 +125,14 @@ publish: build lint | $(PUBLISHDIR)
 		git -C $(PUBLISHDIR)/$$charm push --tags origin master; \
 	done
 
+# Prepare a Jenkins-as-a-service container for charm building.
+setup-jenkaas:
+	sudo systemctl stop snapd.socket
+	sudo systemctl stop snapd
+	echo SNAPPY_STORE_NO_CDN=1 | sudo tee -a /etc/environment >/dev/null
+	echo SNAPPY_TESTING=1 | sudo tee -a /etc/environment >/dev/null
+	sudo systemctl start snapd.socket
+	sudo snap install --classic charm
+
 .PHONY: $(foreach charm,$(CHARMS),build-$(charm))
 .PHONY: all build clean deploy lint payload
