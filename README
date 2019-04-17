@@ -91,15 +91,17 @@ Development
 Setup
 -----
 
-Create a trusty container (optional)::
+Create a bionic container (optional)::
 
-       sudo lxc-create -t ubuntu -n turnip.trusty -- -r trusty -a amd64 -b $USER
+        lxc launch ubuntu:bionic turnip-bionic
+
+(You may want to use a profile to bind-mount your home directory as well.)
 
 Run the following::
 
         sudo add-apt-repository ppa:launchpad/ppa
         sudo apt-get update
-        cat system-dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
+        cat system-dependencies.txt charm/packages.txt | sudo xargs apt-get install -y --no-install-recommends
 
 
 Running
@@ -117,12 +119,4 @@ The HTTP API can be started with:
 Deployment
 ==========
 
-Turnip is deployed with the turnip juju charm, available from:
-
-   git clone https://git.launchpad.net/~canonical-launchpad-branches/charms/+source/turnip
-
-To deploy with the local provider:
-
-   juju switch local
-   juju bootstrap
-   juju deploy --repository=/path/to/loca/charm/repo/root local:trusty/turnip
+Turnip is deployed with its own set of charms.  See charm/README.
