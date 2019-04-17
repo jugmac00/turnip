@@ -18,9 +18,17 @@ CHARMS := \
 	turnip-pack-frontend-http \
 	turnip-api
 
+PUBLISH_REPO_PREFIX := lp:~canonical-launchpad-branches/turnip/+git/charm-build-
+PUBLISHDIR := $(BUILDDIR)/publish
+# We may need to force username and email when publishing, because git may
+# not be able to autodetect this in automatic build environments.
+DOMAIN ?= $(shell hostname -f)
+GIT_USERNAME = $(shell git config --get user.name || echo $(USER))
+GIT_EMAIL = $(shell git config --get user.email || echo $(USER)@$(DOMAIN))
+
 all: build lint
 
-$(BUILDDIR) $(TMPDIR):
+$(BUILDDIR) $(TMPDIR) $(PUBLISHDIR):
 	@mkdir -p $@
 
 CHARM_DEPS := $(LAYER_PATH)/.done $(INTERFACE_PATH)/.done
@@ -48,7 +56,7 @@ dist/.built-%: $(CHARM_DEPS) | $(BUILDDIR)
 
 clean-%:
 	@echo "Cleaning $*..."
-	@rm -rf dist/.built-$* dist/builds/$*
+	@rm -rf dist/.built-$* dist/builds/$* $(PUBLISHDIR)/$*
 
 tmp/git.launchpad.dev.crt: | $(TMPDIR)
 	openssl req -new -nodes -keyout tmp/git.launchpad.dev.key \
@@ -93,6 +101,29 @@ lint: build
 	done
 	@echo "Linting python sources..."
 	@flake8 layer $(CHARMS)
+
+publish: build lint | $(PUBLISHDIR)
+	@set -e; for charm in $(CHARMS); do \
+		if [ -d $(PUBLISHDIR)/$$charm ]; then \
+			git -C $(PUBLISHDIR)/$$charm pull; \
+		else \
+			git clone $(PUBLISH_REPO_PREFIX)$$charm \
+				$(PUBLISHDIR)/$$charm; \
+		fi; \
+		rsync -a -m --ignore-times --exclude .git --delete \
+			dist/builds/$$charm/ $(PUBLISHDIR)/$$charm/; \
+		git -C $(PUBLISHDIR)/$$charm add .; \
+		if [ "$$(git -C $(PUBLISHDIR)/$$charm status --porcelain || \
+			 echo status failed)" ]; then \
+			git -C $(PUBLISHDIR)/$$charm \
+				-c user.name="$(GIT_USERNAME)" \
+				-c user.email="$(GIT_EMAIL)" \
+				commit -a \
+				-m "Build of $$charm from $(BUILD_LABEL)"; \
+			git -C $(PUBLISHDIR)/$$charm tag build/$(BUILD_LABEL); \
+		fi; \
+		git -C $(PUBLISHDIR)/$$charm push --tags origin master; \
+	done
 
 .PHONY: $(foreach charm,$(CHARMS),build-$(charm))
 .PHONY: all build clean deploy lint payload

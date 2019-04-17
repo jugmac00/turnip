@@ -2,4 +2,5 @@ bundle.yaml
 dist
 interface/*/codetree-collect-info.yaml
 layer/*/codetree-collect-info.yaml
+publish
 tmp
