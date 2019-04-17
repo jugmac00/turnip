@@ -1,0 +1,13 @@
+{{ base_dir }}/logs/turnip-pack-frontend-http.log {
+    rotate 90
+    daily
+    dateext
+    delaycompress
+    compress
+    missingok
+    create 0644 {{ user }} {{ group }}
+    postrotate
+        service turnip-pack-frontend-http reload
+    endscript
+}
+

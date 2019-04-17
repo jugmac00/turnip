@@ -1,0 +1,53 @@
+options:
+  port:
+    type: int
+    default: 9419
+    description: Smart HTTP service port.
+  openid_provider_root:
+    type: string
+    default: https://testopenid.dev/
+    description: URL to the OpenID provider to authenticate against.
+  site_name:
+    type: string
+    default: git.launchpad.dev
+    description: Public host name used for clone URLs in cgit.
+  main_site_root:
+    type: string
+    default: https://launchpad.dev/
+    description: Root URL to the associated main Launchpad instance.
+  cgit_user:
+    type: string
+    default: turnip_cgit
+    description: The cgit code browser will run as this user.
+  cgit_user_id:
+    type: int
+    default: 1003
+    description: The cgit code browser user will be created with this ID.
+  cgit_group:
+    type: string
+    default: turnip_cgit
+    description: The cgit code browser will run under this group.
+  cgit_group_id:
+    type: int
+    default: 1003
+    description: The cgit code browser group will be created with this ID.
+  cgit_secret:
+    type: string
+    default: ''
+    description: Base64 encoded cgit session secret.
+  virtinfo_endpoint:
+    type: string
+    default: http://localhost:6543/githosting
+    description: Virtinfo endpoint (Launchpad/Turnipcake)
+  nagios_e2e_urls:
+    type: string
+    default: ""
+    description: >
+      A list of repository URLs to run end-to-end checks on. Multiple
+      entries should be separated by spaces.
+  haproxy_service_options:
+    default: |
+      - mode http
+      - option httplog
+      - option httpchk
+      - balance leastconn

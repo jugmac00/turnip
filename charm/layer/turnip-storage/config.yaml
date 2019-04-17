@@ -1,0 +1,8 @@
+options:
+  nfs:
+    type: boolean
+    default: false
+    description: >
+      Use the NFS relation to provision repository storage.  A file
+      system will be requested and mounted at ${base_dir}/data.  The
+      service will not start until the file system is mounted.

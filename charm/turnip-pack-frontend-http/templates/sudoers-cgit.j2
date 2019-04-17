@@ -1,0 +1,4 @@
+Runas_Alias CGIT = {{ cgit_user }}
+Defaults>CGIT !env_reset
+{{ user }} ALL = (CGIT) NOPASSWD: /usr/lib/cgit/cgit.cgi
+

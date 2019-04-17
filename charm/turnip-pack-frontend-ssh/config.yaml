@@ -1,0 +1,17 @@
+options:
+  port:
+    type: int
+    default: 9422
+    description: Smart SSH service port.
+  private_ssh_key:
+    type: string
+    default: ''
+    description: Base64 encoded private host ssh key.
+  public_ssh_key:
+    type: string
+    default: ''
+    description: Base64 encoded public host ssh key.
+  authentication_endpoint:
+    type: string
+    default: http://xmlrpc-private.launchpad.dev:8087/authserver
+    description: XMLRPC auth

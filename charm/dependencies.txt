@@ -1,0 +1,14 @@
+interface			@
+interface/http			git+https://github.com/juju-solutions/interface-http;revno=4a232c69
+interface/mount			git+https://github.com/juju-solutions/interface-mount;revno=d5a2526f
+interface/nrpe-external-master	git+https://github.com/cmars/nrpe-external-master-interface;revno=20b2b9fb
+
+layer				@
+layer/apt			git+https://git.launchpad.net/layer-apt;revno=cf78622e
+layer/basic			git+https://github.com/juju-solutions/layer-basic;revno=baf58223
+layer/options			git+https://github.com/juju-solutions/layer-options;revno=fcdcea4e
+layer/status			git+https://github.com/juju-solutions/layer-status;revno=02658f0f
+layer/turnip-base		../../../layer/turnip-base;method=link
+layer/turnip-storage		../../../layer/turnip-storage;method=link
+
+charm-wheels			git+https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies

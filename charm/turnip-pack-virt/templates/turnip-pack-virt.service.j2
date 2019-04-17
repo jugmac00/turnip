@@ -1,0 +1,18 @@
+[Unit]
+Description=Turnip pack virt server
+After=network.target
+
+[Service]
+User={{ user }}
+Group={{ group }}
+WorkingDirectory={{ code_dir }}
+Environment=PATH={{ venv_dir }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PACK_BACKEND_HOST={{ pack_backend_host }}
+Environment=PACK_BACKEND_PORT={{ pack_backend_port }}
+Environment=PACK_VIRT_PORT={{ port }}
+Environment=VIRTINFO_ENDPOINT={{ virtinfo_endpoint }}
+ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-virt.log --python=virtserver.tac
+
+[Install]
+WantedBy=multi-user.target
+

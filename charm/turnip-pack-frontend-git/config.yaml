@@ -1,0 +1,11 @@
+options:
+  port:
+    type: int
+    default: 9418
+    description: Pack frontend port.
+  nagios_e2e_urls:
+    type: string
+    default: ""
+    description: >
+      A list of repository URLs to run end-to-end checks on. Multiple
+      entries should be separated by spaces.
