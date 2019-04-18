@@ -138,4 +138,4 @@ setup-jenkaas:
 	sudo snap install --classic charm
 
 .PHONY: $(foreach charm,$(CHARMS),build-$(charm))
-.PHONY: all build clean deploy lint payload
+.PHONY: all build clean deploy lint payload publish setup-jenkaas
