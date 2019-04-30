@@ -11,6 +11,7 @@ Environment=PACK_FRONTEND_PORT={{ port }}
 Environment=PACK_VIRT_HOST={{ pack_virt_host }}
 Environment=PACK_VIRT_PORT={{ pack_virt_port }}
 ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-frontend-git.log --python=packfrontendserver.tac
+ExecReload=/bin/kill -s HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target

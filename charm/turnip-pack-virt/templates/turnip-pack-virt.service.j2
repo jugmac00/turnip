@@ -12,6 +12,7 @@ Environment=PACK_BACKEND_PORT={{ pack_backend_port }}
 Environment=PACK_VIRT_PORT={{ port }}
 Environment=VIRTINFO_ENDPOINT={{ virtinfo_endpoint }}
 ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-virt.log --python=virtserver.tac
+ExecReload=/bin/kill -s HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target

@@ -22,6 +22,7 @@ Environment=SITE_NAME={{ site_name }}
 Environment=SMART_HTTP_PORT={{ port }}
 Environment=VIRTINFO_ENDPOINT={{ virtinfo_endpoint }}
 ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-frontend-http.log --python=httpserver.tac
+ExecReload=/bin/kill -s HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target
