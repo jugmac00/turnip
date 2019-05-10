@@ -816,6 +816,28 @@ class ApiTestCase(TestCase):
         self.assertEqual(
             b'\x80\x81\x82\x83', base64.b64decode(resp.json['data']))
 
+    def test_repo_blob_from_tag(self):
+        """Getting an existing blob from a tag works."""
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('a\n', 'dir/file')
+        factory.add_commit('b\n', 'dir/file', parents=[c1])
+        factory.add_tag('tag-name', 'tag message', c1)
+        resp = self.app.get('/repo/{}/blob/dir/file?rev=tag-name'.format(
+            self.repo_path))
+        self.assertEqual(2, resp.json['size'])
+        self.assertEqual('a\n', base64.b64decode(resp.json['data']))
+
+    def test_repo_blob_from_non_commit(self):
+        """Trying to get a blob from a non-commit returns HTTP 404."""
+        factory = RepoFactory(self.repo_store)
+        c1 = factory.add_commit('a\n', 'dir/file')
+        factory.add_commit('b\n', 'dir/file', parents=[c1])
+        resp = self.app.get(
+            '/repo/{}/blob/dir/file?rev={}'.format(
+                self.repo_path, factory.repo[c1].tree.hex),
+            expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
 
 if __name__ == '__main__':
     unittest.main()
