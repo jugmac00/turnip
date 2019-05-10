@@ -502,8 +502,12 @@ def detect_merges(repo_store, repo_name, target_oid, source_oids):
 def get_blob(repo_store, repo_name, rev, filename):
     """Return a blob from a revision and file name."""
     with open_repo(repo_store, repo_name) as repo:
-        commit = repo.revparse_single(rev)
-        if commit.type != GIT_OBJ_COMMIT:
-            raise GitError('Invalid type: object {} is not a commit.'.format(
-                commit.oid.hex))
+        git_object = repo.revparse_single(rev)
+        # This raises ValueError if you give it a tree or a blob to start
+        # with, or GitError if it reaches a tree or a blob while recursively
+        # dereferencing.  We don't really care about the difference.
+        try:
+            commit = git_object.peel(GIT_OBJ_COMMIT)
+        except ValueError as e:
+            raise GitError(str(e))
         return format_blob(repo[commit.tree[filename].id])
