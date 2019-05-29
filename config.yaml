@@ -1,4 +1,4 @@
-authentication_endpoint: http://xmlrpc-private.launchpad.dev:8087/authserver
+authentication_endpoint: http://xmlrpc-private.launchpad.test:8087/authserver
 pack_backend_host: localhost
 pack_backend_port: 19418
 pack_frontend_port: 9418
@@ -10,12 +10,12 @@ repo_api_port: 19417
 smart_http_port: 9419
 smart_ssh_port: 9422
 moduli_path: /etc/ssh/moduli
-repo_store: /var/tmp/git.launchpad.dev
+repo_store: /var/tmp/git.launchpad.test
 turnip_log_dir: ./
-virtinfo_endpoint: http://xmlrpc-private.launchpad.dev:8087/git
+virtinfo_endpoint: http://xmlrpc-private.launchpad.test:8087/git
 cgit_exec_path: /usr/lib/cgit/cgit.cgi
 cgit_data_path: /usr/share/cgit
 cgit_secret_path: null
-openid_provider_root: https://testopenid.dev/
-site_name: git.launchpad.dev
-main_site_root: https://launchpad.dev/
+openid_provider_root: https://testopenid.test/
+site_name: git.launchpad.test
+main_site_root: https://launchpad.test/

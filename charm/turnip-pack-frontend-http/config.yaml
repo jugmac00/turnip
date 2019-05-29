@@ -5,15 +5,15 @@ options:
     description: Smart HTTP service port.
   openid_provider_root:
     type: string
-    default: https://testopenid.dev/
+    default: https://testopenid.test/
     description: URL to the OpenID provider to authenticate against.
   site_name:
     type: string
-    default: git.launchpad.dev
+    default: git.launchpad.test
     description: Public host name used for clone URLs in cgit.
   main_site_root:
     type: string
-    default: https://launchpad.dev/
+    default: https://launchpad.test/
     description: Root URL to the associated main Launchpad instance.
   cgit_user:
     type: string
