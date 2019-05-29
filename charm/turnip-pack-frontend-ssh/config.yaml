@@ -13,5 +13,5 @@ options:
     description: Base64 encoded public host ssh key.
   authentication_endpoint:
     type: string
-    default: http://xmlrpc-private.launchpad.dev:8087/authserver
+    default: http://xmlrpc-private.launchpad.test:8087/authserver
     description: XMLRPC auth

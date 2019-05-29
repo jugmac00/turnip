@@ -61,19 +61,19 @@ clean-%:
 	@echo "Cleaning $*..."
 	@rm -rf dist/.built-$* dist/builds/$* $(PUBLISHDIR)/$*
 
-tmp/git.launchpad.dev.crt: | $(TMPDIR)
-	openssl req -new -nodes -keyout tmp/git.launchpad.dev.key \
-		-out tmp/git.launchpad.dev.csr -subj '/CN=git.launchpad.dev'
-	openssl x509 -req -days 365 -in tmp/git.launchpad.dev.csr \
-		-signkey tmp/git.launchpad.dev.key -out $@
+tmp/git.launchpad.test.crt: | $(TMPDIR)
+	openssl req -new -nodes -keyout tmp/git.launchpad.test.key \
+		-out tmp/git.launchpad.test.csr -subj '/CN=git.launchpad.test'
+	openssl x509 -req -days 365 -in tmp/git.launchpad.test.csr \
+		-signkey tmp/git.launchpad.test.key -out $@
 
 tmp/ssh-host-key: | $(TMPDIR)
 	ssh-keygen -t rsa -b 2048 -f $@ -N ''
 
-bundle.yaml: bundle.yaml.in tmp/git.launchpad.dev.crt tmp/ssh-host-key
+bundle.yaml: bundle.yaml.in tmp/git.launchpad.test.crt tmp/ssh-host-key
 	sed -e 's/%BUILD_LABEL%/$(BUILD_LABEL)/g' \
-	     -e "s/%SSL_KEY%/$$(base64 -w 0 <tmp/git.launchpad.dev.key)/g" \
-	     -e "s/%SSL_CERT%/$$(base64 -w 0 <tmp/git.launchpad.dev.crt)/g" \
+	     -e "s/%SSL_KEY%/$$(base64 -w 0 <tmp/git.launchpad.test.key)/g" \
+	     -e "s/%SSL_CERT%/$$(base64 -w 0 <tmp/git.launchpad.test.crt)/g" \
 	     -e "s/%PRIVATE_SSH_KEY%/$$(base64 -w 0 <tmp/ssh-host-key)/g" \
 	     -e "s/%PUBLIC_SSH_KEY%/$$(base64 -w 0 <tmp/ssh-host-key.pub)/g" \
 	     bundle.yaml.in >bundle.yaml
