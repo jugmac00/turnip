@@ -109,7 +109,7 @@ def nrpe_available():
     # storage backend instead.  However, this is easier to arrange for now.
     nagios.add_check(
         ['/usr/lib/nagios/plugins/check_disk', '-u', 'GB',
-         '-w', '20%', '-c', '10%', '-K', '5%', '-p', data_dir()],
+         '-w', '10%', '-c', '5%', '-K', '5%', '-p', data_dir()],
         name='check_disk_data',
         description='Disk space on {}'.format(data_dir()),
         context=config['nagios_context'])
