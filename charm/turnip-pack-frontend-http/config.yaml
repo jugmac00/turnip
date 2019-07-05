@@ -35,6 +35,10 @@ options:
     type: string
     default: ''
     description: Base64 encoded cgit session secret.
+  cgit_timeout:
+    type: int
+    default: 30
+    description: Time out cgit processes after this many seconds.
   virtinfo_endpoint:
     type: string
     default: http://localhost:6543/githosting
