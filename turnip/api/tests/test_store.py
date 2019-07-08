@@ -14,6 +14,7 @@ import uuid
 
 from fixtures import (
     EnvironmentVariable,
+    MonkeyPatch,
     TempDir,
     )
 import pygit2
@@ -78,13 +79,14 @@ class InitTestCase(TestCase):
 
     def test_from_scratch(self):
         path = os.path.join(self.repo_store, 'repo/')
-        self.assertEqual(path, store.init_repo(path))
+        store.init_repo(path)
         r = pygit2.Repository(path)
         self.assertEqual([], r.listall_references())
 
     def test_repo_config(self):
         """Assert repository is initialised with correct config defaults."""
-        repo_path = store.init_repo(os.path.join(self.repo_store, 'repo'))
+        repo_path = os.path.join(self.repo_store, 'repo')
+        store.init_repo(repo_path)
         repo_config = pygit2.Repository(repo_path).config
         with open('git.config.yaml') as f:
             yaml_config = yaml.load(f)
@@ -106,9 +108,10 @@ class InitTestCase(TestCase):
             factory = RepoFactory(os.path.join(self.repo_store, name))
             factory.generate_branches(2, 2)
             repos[name] = factory.repo
-        repos['C'] = pygit2.Repository(store.init_repo(
-            os.path.join(self.repo_store, 'C'),
-            clone_from=os.path.join(self.repo_store, 'B')))
+        repo_path_c = os.path.join(self.repo_store, 'C')
+        store.init_repo(
+            repo_path_c, clone_from=os.path.join(self.repo_store, 'B'))
+        repos['C'] = pygit2.Repository(repo_path_c)
 
         # Opening the union of one and three includes the objects from
         # two, as they're in three's turnip-subordinate.
@@ -123,21 +126,64 @@ class InitTestCase(TestCase):
             self.assertIn(repos['A'].head.target, ephemeral_repo)
             self.assertIn(repos['B'].head.target, ephemeral_repo)
 
+    def test_open_ephemeral_repo_already_exists(self):
+        """If an ephemeral repo already exists, open_repo fails correctly."""
+        repos = {}
+        for name in ('A', 'B'):
+            repos[name] = RepoFactory(os.path.join(self.repo_store, name)).repo
+        ephemeral_uuid = uuid.uuid4()
+        self.useFixture(MonkeyPatch('uuid.uuid4', lambda: ephemeral_uuid))
+        ephemeral_path = os.path.join(
+            self.repo_store, 'ephemeral-' + ephemeral_uuid.hex)
+        os.mkdir(ephemeral_path)
+
+        def open_test_repo():
+            with store.open_repo(self.repo_store, 'A:B'):
+                pass
+
+        e = self.assertRaises(pygit2.GitError, open_test_repo)
+        self.assertEqual(
+            str(e), "Repository '%s' already exists" % ephemeral_path)
+        self.assertEqual(
+            {'A', 'B', os.path.basename(ephemeral_path)},
+            set(os.listdir(self.repo_store)))
+
+    def test_open_ephemeral_repo_init_exception(self):
+        """If init_repo fails, open_repo cleans up but preserves the error."""
+        class InitException(Exception):
+            pass
+
+        def mock_write_alternates(*args, **kwargs):
+            raise InitException()
+
+        self.useFixture(MonkeyPatch(
+            'turnip.api.store.write_alternates', mock_write_alternates))
+        repos = {}
+        for name in ('A', 'B'):
+            repos[name] = RepoFactory(os.path.join(self.repo_store, name)).repo
+
+        def open_test_repo():
+            with store.open_repo(self.repo_store, 'A:B'):
+                pass
+
+        self.assertRaises(InitException, open_test_repo)
+        self.assertEqual({'A', 'B'}, set(os.listdir(self.repo_store)))
+
     def test_repo_with_alternates(self):
         """Ensure objects path is defined correctly in repo alternates."""
         factory = RepoFactory(os.path.join(self.repo_store, uuid.uuid1().hex))
-        new_repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
-        repo_path_with_alt = store.init_repo(
-            new_repo_path, alternate_repo_paths=[factory.repo.path])
+        repo_path_with_alt = os.path.join(self.repo_store, uuid.uuid1().hex)
+        store.init_repo(
+            repo_path_with_alt, alternate_repo_paths=[factory.repo.path])
         self.assertAlternates([factory.repo_path], repo_path_with_alt)
 
     def test_repo_alternates_objects_shared(self):
         """Ensure objects are shared from alternate repo."""
         factory = RepoFactory(os.path.join(self.repo_store, uuid.uuid1().hex))
         commit_oid = factory.add_commit('foo', 'foobar.txt')
-        new_repo_path = os.path.join(self.repo_store, uuid.uuid4().hex)
-        repo_path_with_alt = store.init_repo(
-            new_repo_path, alternate_repo_paths=[factory.repo.path])
+        repo_path_with_alt = os.path.join(self.repo_store, uuid.uuid4().hex)
+        store.init_repo(
+            repo_path_with_alt, alternate_repo_paths=[factory.repo.path])
         repo_with_alt = open_repo(repo_path_with_alt)
         self.assertEqual(commit_oid.hex, repo_with_alt.get(commit_oid).hex)
 
