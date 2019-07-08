@@ -1,5 +1,5 @@
 #! /bin/sh
 set -e
 
-exec sudo -u {{ cgit_user }} /usr/lib/cgit/cgit.cgi "$@"
+exec timeout --kill-after=15 {{ cgit_timeout }} sudo -u {{ cgit_user }} /usr/lib/cgit/cgit.cgi "$@"
 
