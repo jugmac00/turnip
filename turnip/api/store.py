@@ -178,7 +178,6 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
             to_repo.references.create(ref, from_repo.references[ref].target)
 
     ensure_config(repo_path)  # set repository configuration defaults
-    return repo_path
 
 
 @contextmanager
@@ -193,21 +192,18 @@ def open_repo(repo_store, repo_name, force_ephemeral=False):
         does not contain ':'.
     """
     if force_ephemeral or ':' in repo_name:
+        # Create ephemeral repo with alternates set from both.  Neither git
+        # nor libgit2 will respect a relative alternate path except in the
+        # root repo, so we explicitly include the turnip-subordinate for
+        # each repo.  If it doesn't exist it'll just be ignored.
+        repos = list(itertools.chain(*(
+            (os.path.join(repo_store, repo),
+             os.path.join(repo_store, repo, 'turnip-subordinate'))
+            for repo in repo_name.split(':'))))
+        ephemeral_repo_path = os.path.join(
+            repo_store, 'ephemeral-' + uuid.uuid4().hex)
         try:
-            # Create ephemeral repo with alternates set from both.
-            # Neither git nor libgit2 will respect a relative alternate
-            # path except in the root repo, so we explicitly include the
-            # turnip-subordinate for each repo. If it doesn't exist
-            # it'll just be ignored.
-            repos = list(itertools.chain(*(
-                (os.path.join(repo_store, repo),
-                 os.path.join(repo_store, repo, 'turnip-subordinate'))
-                for repo in repo_name.split(':'))))
-            tmp_repo_path = os.path.join(repo_store,
-                                         'ephemeral-' + uuid.uuid4().hex)
-            ephemeral_repo_path = init_repo(
-                tmp_repo_path,
-                alternate_repo_paths=repos)
+            init_repo(ephemeral_repo_path, alternate_repo_paths=repos)
             repo = Repository(ephemeral_repo_path)
             yield repo
         finally:
