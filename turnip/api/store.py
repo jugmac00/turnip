@@ -89,13 +89,6 @@ def is_bare_repo(repo_path):
     return not os.path.exists(os.path.join(repo_path, '.git'))
 
 
-def is_valid_new_path(path):
-    """Verify repo path is new, or raise Exception."""
-    if os.path.exists(path):
-        raise GitError("Repository '%s' already exists" % path)
-    return True
-
-
 def alternates_path(repo_path):
     """Git object alternates path.
     See http://git-scm.com/docs/gitrepository-layout
@@ -151,7 +144,8 @@ def import_into_subordinate(sub_root, from_root):
 def init_repo(repo_path, clone_from=None, clone_refs=False,
               alternate_repo_paths=None, is_bare=True):
     """Initialise a new git repository or clone from existing."""
-    assert is_valid_new_path(repo_path)
+    if os.path.exists(repo_path):
+        raise GitError("Repository '%s' already exists" % repo_path)
     init_repository(repo_path, is_bare)
 
     if clone_from:
