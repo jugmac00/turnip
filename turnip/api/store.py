@@ -141,11 +141,20 @@ def import_into_subordinate(sub_root, from_root):
             ref, from_repo.references[ref].target, force=True)
 
 
+class AlreadyExistsError(GitError):
+    """We tried to initialise a repository that already exists."""
+
+    def __init__(self, path):
+        super(AlreadyExistsError, self).__init__(
+            "Repository '%s' already exists" % path)
+        self.path = path
+
+
 def init_repo(repo_path, clone_from=None, clone_refs=False,
               alternate_repo_paths=None, is_bare=True):
     """Initialise a new git repository or clone from existing."""
     if os.path.exists(repo_path):
-        raise GitError("Repository '%s' already exists" % repo_path)
+        raise AlreadyExistsError(repo_path)
     init_repository(repo_path, is_bare)
 
     if clone_from:
@@ -206,7 +215,14 @@ def open_repo(repo_store, repo_name, force_ephemeral=False):
             init_repo(ephemeral_repo_path, alternate_repo_paths=repos)
             repo = Repository(ephemeral_repo_path)
             yield repo
-        finally:
+        except AlreadyExistsError:
+            # Don't clean up the repository in this case, since it already
+            # existed so we didn't create it.
+            raise
+        except Exception:
+            delete_repo(ephemeral_repo_path)
+            raise
+        else:
             delete_repo(ephemeral_repo_path)
     else:
         repo_path = os.path.join(repo_store, repo_name)

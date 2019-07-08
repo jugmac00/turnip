@@ -126,6 +126,28 @@ class InitTestCase(TestCase):
             self.assertIn(repos['A'].head.target, ephemeral_repo)
             self.assertIn(repos['B'].head.target, ephemeral_repo)
 
+    def test_open_ephemeral_repo_already_exists(self):
+        """If an ephemeral repo already exists, open_repo fails correctly."""
+        repos = {}
+        for name in ('A', 'B'):
+            repos[name] = RepoFactory(os.path.join(self.repo_store, name)).repo
+        ephemeral_uuid = uuid.uuid4()
+        self.useFixture(MonkeyPatch('uuid.uuid4', lambda: ephemeral_uuid))
+        ephemeral_path = os.path.join(
+            self.repo_store, 'ephemeral-' + ephemeral_uuid.hex)
+        os.mkdir(ephemeral_path)
+
+        def open_test_repo():
+            with store.open_repo(self.repo_store, 'A:B'):
+                pass
+
+        e = self.assertRaises(pygit2.GitError, open_test_repo)
+        self.assertEqual(
+            str(e), "Repository '%s' already exists" % ephemeral_path)
+        self.assertEqual(
+            {'A', 'B', os.path.basename(ephemeral_path)},
+            set(os.listdir(self.repo_store)))
+
     def test_open_ephemeral_repo_init_exception(self):
         """If init_repo fails, open_repo cleans up but preserves the error."""
         class InitException(Exception):
