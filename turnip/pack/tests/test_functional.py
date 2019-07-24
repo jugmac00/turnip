@@ -35,7 +35,14 @@ from pygit2 import GIT_OID_HEX_ZERO
 from testtools import TestCase
 from testtools.content import text_content
 from testtools.deferredruntest import AsynchronousDeferredRunTest
-from testtools.matchers import StartsWith
+from testtools.matchers import (
+    Equals,
+    Is,
+    MatchesDict,
+    MatchesListwise,
+    Not,
+    StartsWith,
+    )
 from twisted.internet import (
     defer,
     reactor,
@@ -719,10 +726,14 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
         yield self.assertCommandSuccess((b'git', b'clone', self.ro_url, clone))
         self.assertEqual(
             [(b'test-user', b'test-password')], self.virtinfo.authentications)
-        self.assertEqual(
-            [(b'/test', b'read',
-              {b'can-authenticate': True, b'user': b'test-user'})],
-            self.virtinfo.translations)
+        self.assertThat(self.virtinfo.translations, MatchesListwise([
+            MatchesListwise([
+                Equals(b'/test'), Equals(b'read'),
+                MatchesDict({
+                    b'can-authenticate': Is(True),
+                    b'request-id': Not(Is(None)),
+                    b'user': Equals(b'test-user'),
+                    })])]))
 
     @defer.inlineCallbacks
     def test_authenticated_push(self):
@@ -739,10 +750,15 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
             path=clone)
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'master'), path=clone)
-        self.assertEqual(
-            [(self.internal_name, [b'refs/heads/master'],
-              {b'can-authenticate': True, b'user': b'test-user'})],
-            self.virtinfo.ref_permissions_checks)
+        self.assertThat(self.virtinfo.ref_permissions_checks, MatchesListwise([
+            MatchesListwise([
+                Equals(self.internal_name),
+                Equals([b'refs/heads/master']),
+                MatchesDict({
+                    b'can-authenticate': Is(True),
+                    b'request-id': Not(Is(None)),
+                    b'user': Equals(b'test-user'),
+                    })])]))
 
 
 class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
