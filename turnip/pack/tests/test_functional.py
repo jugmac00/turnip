@@ -91,7 +91,7 @@ class FunctionalTestMixin(object):
             b'refs/heads/master': ['create', 'push']}
 
     def startHookRPC(self):
-        self.hookrpc_handler = HookRPCHandler(self.virtinfo_url)
+        self.hookrpc_handler = HookRPCHandler(self.virtinfo_url, 15)
         # XXX cjwatson 2018-11-20: Use bytes so that shutil.rmtree doesn't
         # get confused on Python 2.
         dir = tempfile.mkdtemp(prefix=b'turnip-test-hook-')
@@ -110,8 +110,7 @@ class FunctionalTestMixin(object):
         self.backend_listener = reactor.listenTCP(
             0,
             PackBackendFactory(
-                self.root, self.hookrpc_handler, self.hookrpc_sock_path,
-                virtinfo_endpoint=self.virtinfo_url))
+                self.root, self.hookrpc_handler, self.hookrpc_sock_path))
         self.backend_port = self.backend_listener.getHost().port
         self.addCleanup(self.backend_listener.stopListening)
 
@@ -513,7 +512,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.virt_listener = reactor.listenTCP(
             0,
             PackVirtFactory(
-                b'localhost', self.backend_port, self.virtinfo_url))
+                b'localhost', self.backend_port, self.virtinfo_url, 15))
         self.virt_port = self.virt_listener.getHost().port
         self.virtinfo.ref_permissions = {
             b'refs/heads/master': ['create', 'push']}
@@ -624,6 +623,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
                 "pack_virt_host": "localhost",
                 "pack_virt_port": self.virt_port,
                 "virtinfo_endpoint": self.virtinfo_url,
+                "virtinfo_timeout": "15",
                 "repo_store": self.root,
                 }))
         self.frontend_listener = reactor.listenTCP(0, frontend_site)

@@ -43,6 +43,10 @@ options:
     type: string
     default: http://localhost:6543/githosting
     description: Virtinfo endpoint (Launchpad/Turnipcake)
+  virtinfo_timeout:
+    type: int
+    default: 15
+    description: Timeout for virtinfo requests, in seconds.
   nagios_e2e_urls:
     type: string
     default: ""

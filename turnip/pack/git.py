@@ -13,7 +13,7 @@ from twisted.internet import (
     defer,
     error,
     protocol,
-    reactor,
+    reactor as default_reactor,
     )
 from twisted.internet.interfaces import IHalfCloseableProtocol
 from twisted.logger import Logger
@@ -372,7 +372,7 @@ class PackProxyServerProtocol(PackServerProtocol):
         self.params = params
         d = defer.Deferred()
         client = self.client_factory(self, d)
-        reactor.connectTCP(
+        default_reactor.connectTCP(
             self.factory.backend_host, self.factory.backend_port, client)
         return d
 
@@ -464,7 +464,7 @@ class PackBackendProtocol(PackServerProtocol):
         self.spawnProcess(cmd, args, env=env)
 
     def spawnProcess(self, cmd, args, env=None):
-        reactor.spawnProcess(self.peer, cmd, args, env=env)
+        default_reactor.spawnProcess(self.peer, cmd, args, env=env)
 
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
@@ -537,12 +537,10 @@ class PackBackendFactory(protocol.Factory):
     def __init__(self,
                  root,
                  hookrpc_handler=None,
-                 hookrpc_sock=None,
-                 virtinfo_endpoint=None):
+                 hookrpc_sock=None):
         self.root = root
         self.hookrpc_handler = hookrpc_handler
         self.hookrpc_sock = hookrpc_sock
-        self.virtinfo_endpoint = virtinfo_endpoint
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):
@@ -561,7 +559,9 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             auth_params = self.createAuthParams(params)
             self.log.info("Translating request.")
             translated = yield proxy.callRemote(
-                b'translatePath', pathname, permission, auth_params)
+                b'translatePath', pathname, permission,
+                auth_params).addTimeout(
+                    self.factory.virtinfo_timeout, self.factory.reactor)
             self.log.info(
                 "Translation result: {translated}", translated=translated)
             if 'trailing' in translated and translated['trailing']:
@@ -582,6 +582,10 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             if not isinstance(fault_string, bytes):
                 fault_string = fault_string.encode('UTF-8')
             self.die(VIRT_ERROR_PREFIX + fault_type + b' ' + fault_string)
+        except defer.TimeoutError:
+            self.die(
+                VIRT_ERROR_PREFIX +
+                b'GATEWAY_TIMEOUT Path translation timed out.')
         except Exception as e:
             self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + str(e))
         else:
@@ -596,10 +600,13 @@ class PackVirtFactory(protocol.Factory):
 
     protocol = PackVirtServerProtocol
 
-    def __init__(self, backend_host, backend_port, virtinfo_endpoint):
+    def __init__(self, backend_host, backend_port, virtinfo_endpoint,
+                 virtinfo_timeout, reactor=None):
         self.backend_host = backend_host
         self.backend_port = backend_port
         self.virtinfo_endpoint = virtinfo_endpoint
+        self.virtinfo_timeout = virtinfo_timeout
+        self.reactor = reactor or default_reactor
 
 
 class PackFrontendClientProtocol(PackClientProtocol):

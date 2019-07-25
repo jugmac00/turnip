@@ -13,6 +13,7 @@ moduli_path: /etc/ssh/moduli
 repo_store: /var/tmp/git.launchpad.test
 turnip_log_dir: ./
 virtinfo_endpoint: http://xmlrpc-private.launchpad.test:8087/git
+virtinfo_timeout: 15
 cgit_exec_path: /usr/lib/cgit/cgit.cgi
 cgit_data_path: /usr/share/cgit
 cgit_secret_path: null

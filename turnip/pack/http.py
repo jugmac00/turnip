@@ -33,7 +33,7 @@ from twisted.internet import (
     defer,
     error,
     protocol,
-    reactor,
+    reactor as default_reactor,
     )
 from twisted.python import (
     compat,
@@ -119,6 +119,8 @@ class HTTPPackClientProtocol(PackProtocol):
                 error_code = http.UNAUTHORIZED
                 self.factory.http_request.setHeader(
                     b'WWW-Authenticate', b'Basic realm=turnip')
+            elif error_name == b'GATEWAY_TIMEOUT':
+                error_code = http.GATEWAY_TIMEOUT
             else:
                 error_code = http.INTERNAL_SERVER_ERROR
         elif msg.startswith(b'Repository is read-only'):
@@ -620,7 +622,9 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         request.render(cgit_resource)
 
     def _translatePathErrback(self, failure, request, session):
-        if failure.check(xmlrpc.Fault) is not None:
+        if failure.check(defer.TimeoutError) is not None:
+            code, message = 504, 'Path translation timed out.'
+        elif failure.check(xmlrpc.Fault) is not None:
             code, message = failure.value.faultCode, failure.value.faultString
         else:
             code, message = None, 'Unexpected error in translatePath.'
@@ -640,6 +644,8 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
             else:
                 self._beginLogin(request, session)
                 return
+        elif code == 504:
+            error_code = http.GATEWAY_TIMEOUT
         else:
             log.err(failure, "Unexpected error in translatePath")
             error_code = http.INTERNAL_SERVER_ERROR
@@ -652,6 +658,7 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         d = proxy.callRemote(
             b'translatePath', request.path, b'read',
             {'uid': identity_url, 'can-authenticate': True})
+        d.addTimeout(self.root.virtinfo_timeout, self.root.reactor)
         d.addCallback(self._translatePathCallback, request)
         d.addErrback(self._translatePathErrback, request, session)
         return server.NOT_DONE_YET
@@ -679,11 +686,13 @@ class SmartHTTPFrontendResource(resource.Resource):
     allowed_services = frozenset((
         b'git-upload-pack', b'git-receive-pack', b'turnip-set-symbolic-ref'))
 
-    def __init__(self, config):
+    def __init__(self, config, reactor=None):
         resource.Resource.__init__(self)
         self.backend_host = config.get("pack_virt_host")
         self.backend_port = int(config.get("pack_virt_port"))
         self.virtinfo_endpoint = config.get("virtinfo_endpoint")
+        self.virtinfo_timeout = int(config.get("virtinfo_timeout"))
+        self.reactor = reactor or default_reactor
         # XXX cjwatson 2015-03-30: Knowing about the store path here
         # violates turnip's layering and may cause scaling problems later,
         # but for now cgit needs direct filesystem access.
@@ -760,7 +769,7 @@ class SmartHTTPFrontendResource(resource.Resource):
         return resource.NoResource(b'No such resource')
 
     def connectToBackend(self, client_factory):
-        reactor.connectTCP(
+        self.reactor.connectTCP(
             self.backend_host, self.backend_port, client_factory)
 
     @defer.inlineCallbacks
