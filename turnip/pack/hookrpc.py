@@ -31,6 +31,8 @@ from twisted.internet import (
 from twisted.protocols import basic
 from twisted.web import xmlrpc
 
+from turnip.pack.git import RequestIDLogger
+
 
 class JSONNetstringProtocol(basic.NetstringReceiver):
     """A protocol that sends and receives JSON as netstrings."""
@@ -94,6 +96,15 @@ class RPCServerFactory(protocol.ServerFactory):
         return self.protocol(self.methods)
 
 
+class HookRPCLogContext(object):
+    """A context for logging hook RPC operations."""
+
+    log = RequestIDLogger()
+
+    def __init__(self, auth_params):
+        self.request_id = auth_params.get('request-id')
+
+
 class HookRPCHandler(object):
     """A collection of methods for use by git hooks.
 
@@ -125,6 +136,16 @@ class HookRPCHandler(object):
     @defer.inlineCallbacks
     def checkRefPermissions(self, proto, args):
         """Get permissions for a set of refs."""
+        log_context = HookRPCLogContext(self.auth_params[args['key']])
+        auth_params = self.auth_params[args['key']]
+        ref_path = self.ref_paths[args['key']]
+        # We don't log all the ref paths being checked, since there can be a
+        # lot of them.
+        log_context.log.info(
+            "checkRefPermissions request received: "
+            "auth_params={auth_params}, ref_path={ref_path}",
+            auth_params=auth_params, ref_path=ref_path)
+
         cached_permissions = self.ref_permissions[args['key']]
         paths = [
             base64.b64decode(path.encode('UTF-8')) for path in args['paths']]
@@ -133,12 +154,20 @@ class HookRPCHandler(object):
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
             result = yield proxy.callRemote(
                 b'checkRefPermissions',
-                self.ref_paths[args['key']],
+                ref_path,
                 [xmlrpc_client.Binary(path) for path in missing],
-                self.auth_params[args['key']]
-            )
+                auth_params)
+            log_context.log.info(
+                "checkRefPermissions virtinfo response: "
+                "auth_params={auth_params}, ref_path={ref_path}",
+                auth_params=auth_params, ref_path=ref_path)
             for ref, permission in result:
                 cached_permissions[ref.data] = permission
+        else:
+            log_context.log.info(
+                "checkRefPermissions returning cached permissions: "
+                "auth_params={auth_params}, ref_path={ref_path}",
+                auth_params=auth_params, ref_path=ref_path)
         # cached_permissions is a shallow copy of the key index for
         # self.ref_permissions, so changes will be updated in that.
         defer.returnValue(
@@ -153,8 +182,12 @@ class HookRPCHandler(object):
     @defer.inlineCallbacks
     def notifyPush(self, proto, args):
         """Notify the virtinfo service about a push."""
+        log_context = HookRPCLogContext(self.auth_params[args['key']])
         path = self.ref_paths[args['key']]
+        log_context.log.info(
+            "notifyPush request received: ref_path={path}", path=path)
         yield self.notify(path)
+        log_context.log.info("notifyPush done: ref_path={path}", path=path)
 
 
 class HookRPCServerFactory(RPCServerFactory):

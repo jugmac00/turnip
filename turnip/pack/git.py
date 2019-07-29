@@ -221,6 +221,8 @@ class PackServerProtocol(PackProxyProtocol):
             auth_params['uid'] = int(auth_params['uid'])
         if params.get(b'turnip-can-authenticate') == b'yes':
             auth_params['can-authenticate'] = True
+        if self.request_id is not None:
+            auth_params['request-id'] = self.request_id
         return auth_params
 
 
