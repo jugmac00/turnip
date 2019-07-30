@@ -11,7 +11,11 @@ from io import BytesIO
 
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
-from twisted.internet import defer
+from twisted.internet import (
+    defer,
+    reactor as default_reactor,
+    task,
+    )
 from twisted.test import proto_helpers
 from twisted.web import server
 from twisted.web.test import requesthelper
@@ -20,6 +24,7 @@ from turnip.pack import (
     helpers,
     http,
     )
+from turnip.pack.tests.fake_servers import FakeVirtInfoService
 
 
 class LessDummyRequest(requesthelper.DummyRequest):
@@ -217,3 +222,30 @@ class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
             '001bI am git protocol data.'
             'And I am raw, since we got a good packet to start with.',
             self.request.value)
+
+
+class TestHTTPAuthRootResource(TestCase):
+
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+
+    def test_translatePath_timeout(self):
+        root = FakeRoot()
+        virtinfo = FakeVirtInfoService(allowNone=True)
+        virtinfo_listener = default_reactor.listenTCP(0, server.Site(virtinfo))
+        virtinfo_port = virtinfo_listener.getHost().port
+        virtinfo_url = b'http://localhost:%d/' % virtinfo_port
+        self.addCleanup(virtinfo_listener.stopListening)
+        root.virtinfo_endpoint = virtinfo_url
+        root.virtinfo_timeout = 15
+        root.reactor = task.Clock()
+        root.cgit_secret = None
+        request = LessDummyRequest([''])
+        request.method = b'GET'
+        request.path = b'/example'
+        d = render_resource(http.HTTPAuthRootResource(root), request)
+        root.reactor.advance(1)
+        self.assertFalse(d.called)
+        root.reactor.advance(15)
+        self.assertTrue(d.called)
+        self.assertEqual(504, request.responseCode)
+        self.assertEqual('Path translation timed out.', request.value)

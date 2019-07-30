@@ -26,7 +26,8 @@ def getPackVirtService():
         int(config.get('pack_virt_port')),
         PackVirtFactory(config.get('pack_backend_host'),
                         int(config.get('pack_backend_port')),
-                        config.get('virtinfo_endpoint')))
+                        config.get('virtinfo_endpoint'),
+                        int(config.get('virtinfo_timeout'))))
 
 
 options = ServerOptions()

@@ -13,7 +13,10 @@ import uuid
 
 from six.moves import xmlrpc_client
 from testtools import TestCase
-from testtools.deferredruntest import AsynchronousDeferredRunTest
+from testtools.deferredruntest import (
+    assert_fails_with,
+    AsynchronousDeferredRunTest,
+    )
 from testtools.matchers import (
     Equals,
     IsInstance,
@@ -24,6 +27,7 @@ from testtools.matchers import (
 from twisted.internet import (
     defer,
     reactor,
+    task,
     )
 from twisted.test import proto_helpers
 from twisted.web import server
@@ -160,7 +164,7 @@ class TestHookRPCHandler(TestCase):
         self.virtinfo_port = self.virtinfo_listener.getHost().port
         self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
         self.addCleanup(self.virtinfo_listener.stopListening)
-        self.hookrpc_handler = hookrpc.HookRPCHandler(self.virtinfo_url)
+        self.hookrpc_handler = hookrpc.HookRPCHandler(self.virtinfo_url, 15)
 
     @contextlib.contextmanager
     def registeredKey(self, path, auth_params=None, permissions=None):
@@ -226,8 +230,34 @@ class TestHookRPCHandler(TestCase):
         self.assertEqual(expected_permissions, permissions)
         self.assertEqual([], self.virtinfo.ref_permissions_checks)
 
+    def test_checkRefPermissions_timeout(self):
+        clock = task.Clock()
+        self.hookrpc_handler = hookrpc.HookRPCHandler(
+            self.virtinfo_url, 15, reactor=clock)
+        encoded_master = self.encodeRefPath(b'refs/heads/master')
+        with self.registeredKey('/translated') as key:
+            d = self.hookrpc_handler.checkRefPermissions(
+                None, {'key': key, 'paths': [encoded_master]})
+            clock.advance(1)
+            self.assertFalse(d.called)
+            clock.advance(15)
+            self.assertTrue(d.called)
+            return assert_fails_with(d, defer.TimeoutError)
+
     @defer.inlineCallbacks
     def test_notifyPush(self):
         with self.registeredKey('/translated') as key:
             yield self.hookrpc_handler.notifyPush(None, {'key': key})
         self.assertEqual(['/translated'], self.virtinfo.push_notifications)
+
+    def test_notifyPush_timeout(self):
+        clock = task.Clock()
+        self.hookrpc_handler = hookrpc.HookRPCHandler(
+            self.virtinfo_url, 15, reactor=clock)
+        with self.registeredKey('/translated') as key:
+            d = self.hookrpc_handler.notifyPush(None, {'key': key})
+            clock.advance(1)
+            self.assertFalse(d.called)
+            clock.advance(15)
+            self.assertTrue(d.called)
+            return assert_fails_with(d, defer.TimeoutError)

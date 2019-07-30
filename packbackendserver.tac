@@ -33,7 +33,8 @@ def getPackBackendServices():
     config = TurnipConfig()
     repo_store = config.get('repo_store')
     pack_backend_port = int(config.get('pack_backend_port'))
-    hookrpc_handler = HookRPCHandler(config.get('virtinfo_endpoint'))
+    hookrpc_handler = HookRPCHandler(
+        config.get('virtinfo_endpoint'), int(config.get('virtinfo_timeout')))
     hookrpc_path = config.get('hookrpc_path') or repo_store
     hookrpc_sock_path = os.path.join(
         hookrpc_path, 'hookrpc_sock_%d' % pack_backend_port)
@@ -41,8 +42,7 @@ def getPackBackendServices():
         pack_backend_port,
         PackBackendFactory(repo_store,
                            hookrpc_handler,
-                           hookrpc_sock_path,
-                           config.get('virtinfo_endpoint')))
+                           hookrpc_sock_path))
     if os.path.exists(hookrpc_sock_path):
         os.unlink(hookrpc_sock_path)
     hookrpc_service = internet.UNIXServer(

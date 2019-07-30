@@ -12,17 +12,25 @@ import os.path
 from fixtures import TempDir
 from pygit2 import init_repository
 from testtools import TestCase
+from testtools.deferredruntest import assert_fails_with
 from testtools.matchers import (
     ContainsDict,
     Equals,
     MatchesListwise,
     )
+from twisted.internet import (
+    defer,
+    reactor as default_reactor,
+    task,
+    )
 from twisted.test import proto_helpers
+from twisted.web import server
 
 from turnip.pack import (
     git,
     helpers,
     )
+from turnip.pack.tests.fake_servers import FakeVirtInfoService
 from turnip.pack.tests.test_hooks import MockHookRPCHandler
 
 
@@ -205,3 +213,41 @@ class TestPackBackendProtocol(TestCase):
         self.assertIsNone(self.proto.test_process)
         self.proto.packetReceived(b'HEAD evil lies')
         self.assertKilledWith(b'Symbolic ref target may not contain " "')
+
+
+class TestPackVirtServerProtocol(TestCase):
+    """Test the Git pack virt protocol."""
+
+    def assertKilledWith(self, message):
+        self.assertFalse(self.transport.connected)
+        self.assertEqual(
+            (b'ERR turnip virt error: ' + message + b'\n', b''),
+            helpers.decode_packet(self.transport.value()))
+
+    def test_translatePath_timeout(self):
+        root = self.useFixture(TempDir()).path
+        hookrpc_handler = MockHookRPCHandler()
+        hookrpc_sock = os.path.join(root, 'hookrpc_sock')
+        backend_listener = default_reactor.listenTCP(
+            0, git.PackBackendFactory(root, hookrpc_handler, hookrpc_sock))
+        backend_port = backend_listener.getHost().port
+        self.addCleanup(backend_listener.stopListening)
+        virtinfo = FakeVirtInfoService(allowNone=True)
+        virtinfo_listener = default_reactor.listenTCP(0, server.Site(virtinfo))
+        virtinfo_port = virtinfo_listener.getHost().port
+        virtinfo_url = b'http://localhost:%d/' % virtinfo_port
+        self.addCleanup(virtinfo_listener.stopListening)
+        clock = task.Clock()
+        factory = git.PackVirtFactory(
+            b'localhost', backend_port, virtinfo_url, 15, reactor=clock)
+        proto = git.PackVirtServerProtocol()
+        proto.factory = factory
+        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport.protocol = proto
+        proto.makeConnection(self.transport)
+        d = proto.requestReceived(b'git-upload-pack', b'/example', {})
+        clock.advance(1)
+        self.assertFalse(d.called)
+        clock.advance(15)
+        self.assertTrue(d.called)
+        self.assertKilledWith(b'GATEWAY_TIMEOUT Path translation timed out.')

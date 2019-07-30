@@ -37,6 +37,7 @@ PACK_BACKEND_PORT = int(config.get('pack_backend_port'))
 REPO_STORE = config.get('repo_store')
 HOOKRPC_PATH = config.get('hookrpc_path') or REPO_STORE
 VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
+VIRTINFO_TIMEOUT = int(config.get('virtinfo_timeout'))
 
 # turnipserver.py is preserved for convenience in development, services
 # in production are run in separate processes.
@@ -45,15 +46,14 @@ VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 # on 9418 (the default git:// port), a smart HTTP frontend on 9419, and
 # a smart SSH frontend on 9422.
 
-hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT)
+hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT, VIRTINFO_TIMEOUT)
 hookrpc_sock_path = os.path.join(
     HOOKRPC_PATH, 'hookrpc_sock_%d' % PACK_BACKEND_PORT)
 reactor.listenTCP(
     PACK_BACKEND_PORT,
     PackBackendFactory(REPO_STORE,
                        hookrpc_handler,
-                       hookrpc_sock_path,
-                       VIRTINFO_ENDPOINT))
+                       hookrpc_sock_path))
 if os.path.exists(hookrpc_sock_path):
     os.unlink(hookrpc_sock_path)
 reactor.listenUNIX(hookrpc_sock_path, HookRPCServerFactory(hookrpc_handler))
@@ -61,7 +61,8 @@ reactor.listenUNIX(hookrpc_sock_path, HookRPCServerFactory(hookrpc_handler))
 reactor.listenTCP(PACK_VIRT_PORT,
                   PackVirtFactory(PACK_BACKEND_HOST,
                                   PACK_BACKEND_PORT,
-                                  VIRTINFO_ENDPOINT))
+                                  VIRTINFO_ENDPOINT,
+                                  VIRTINFO_TIMEOUT))
 reactor.listenTCP(int(config.get('pack_frontend_port')),
                   PackFrontendFactory(PACK_VIRT_HOST,
                                       PACK_VIRT_PORT))

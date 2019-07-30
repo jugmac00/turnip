@@ -27,6 +27,7 @@ from six.moves import xmlrpc_client
 from twisted.internet import (
     defer,
     protocol,
+    reactor as default_reactor,
     )
 from twisted.protocols import basic
 from twisted.web import xmlrpc
@@ -112,11 +113,13 @@ class HookRPCHandler(object):
     here, letting the RPC server know what the hook is talking about.
     """
 
-    def __init__(self, virtinfo_url):
+    def __init__(self, virtinfo_url, virtinfo_timeout, reactor=None):
         self.auth_params = {}
         self.ref_paths = {}
         self.ref_permissions = {}
         self.virtinfo_url = virtinfo_url
+        self.virtinfo_timeout = virtinfo_timeout
+        self.reactor = reactor or default_reactor
 
     def registerKey(self, key, path, auth_params):
         """Register a key with the given path and auth permissions.
@@ -152,11 +155,19 @@ class HookRPCHandler(object):
         missing = [x for x in paths if x not in cached_permissions]
         if missing:
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-            result = yield proxy.callRemote(
-                b'checkRefPermissions',
-                ref_path,
-                [xmlrpc_client.Binary(path) for path in missing],
-                auth_params)
+            try:
+                result = yield proxy.callRemote(
+                    b'checkRefPermissions',
+                    ref_path,
+                    [xmlrpc_client.Binary(path) for path in missing],
+                    auth_params).addTimeout(
+                        self.virtinfo_timeout, self.reactor)
+            except defer.TimeoutError:
+                log_context.log.info(
+                    "checkRefPermissions virtinfo timed out: "
+                    "auth_params={auth_params}, ref_path={ref_path}",
+                    auth_params=auth_params, ref_path=ref_path)
+                raise
             log_context.log.info(
                 "checkRefPermissions virtinfo response: "
                 "auth_params={auth_params}, ref_path={ref_path}",
@@ -177,7 +188,8 @@ class HookRPCHandler(object):
     @defer.inlineCallbacks
     def notify(self, path):
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        yield proxy.callRemote(b'notify', path)
+        yield proxy.callRemote(b'notify', path).addTimeout(
+            self.virtinfo_timeout, self.reactor)
 
     @defer.inlineCallbacks
     def notifyPush(self, proto, args):
@@ -186,7 +198,12 @@ class HookRPCHandler(object):
         path = self.ref_paths[args['key']]
         log_context.log.info(
             "notifyPush request received: ref_path={path}", path=path)
-        yield self.notify(path)
+        try:
+            yield self.notify(path)
+        except defer.TimeoutError:
+            log_context.log.info(
+                "notifyPush timed out: ref_path={path}", path=path)
+            raise
         log_context.log.info("notifyPush done: ref_path={path}", path=path)
 
 
