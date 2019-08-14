@@ -670,8 +670,8 @@ class HTTPAuthResource(resource.Resource):
     def __init__(self, root):
         resource.Resource.__init__(self)
         self.root = root
-        self.putChild('+login', HTTPAuthLoginResource(root))
-        self.putChild('+logout', HTTPAuthLogoutResource(root))
+        self.putChild(b'+login', HTTPAuthLoginResource(root))
+        self.putChild(b'+logout', HTTPAuthLogoutResource(root))
 
     def getChild(self, path, request):
         # Delegate to a child resource without consuming a path element.
@@ -701,7 +701,7 @@ class SmartHTTPFrontendResource(resource.Resource):
         self.openid_provider_root = config.get("openid_provider_root")
         self.site_name = config.get("site_name")
         self.main_site_root = config.get("main_site_root")
-        self.putChild('', SmartHTTPRootResource(self))
+        self.putChild(b'', SmartHTTPRootResource(self))
         cgit_data_path = config.get("cgit_data_path")
         if cgit_data_path is not None:
             static_resource = DirectoryWithoutListings(
@@ -710,7 +710,8 @@ class SmartHTTPFrontendResource(resource.Resource):
             stdir = os.path.join(top, 'static')
             for name in ('launchpad-logo.png', 'notification-private.png'):
                 path = os.path.join(stdir, name)
-                static_resource.putChild(name, static.File(path))
+                static_resource.putChild(
+                    name.encode('UTF-8'), static.File(path))
             with open(os.path.join(cgit_data_path, 'cgit.css'), 'rb') as f:
                 css = f.read()
             with open(os.path.join(stdir, 'ubuntu-webfonts.css'), 'rb') as f:
@@ -720,13 +721,13 @@ class SmartHTTPFrontendResource(resource.Resource):
             with open(os.path.join(stdir, 'private.css'), 'rb') as f:
                 private_css = css + b'\n' + f.read()
             static_resource.putChild(
-                'cgit-public.css', static.Data(css, b'text/css'))
+                b'cgit-public.css', static.Data(css, b'text/css'))
             static_resource.putChild(
-                'cgit-private.css', static.Data(private_css, b'text/css'))
-            self.putChild('static', static_resource)
+                b'cgit-private.css', static.Data(private_css, b'text/css'))
+            self.putChild(b'static', static_resource)
             favicon = os.path.join(stdir, 'launchpad.png')
-            self.putChild('favicon.ico', static.File(favicon))
-            self.putChild('robots.txt', RobotsResource())
+            self.putChild(b'favicon.ico', static.File(favicon))
+            self.putChild(b'robots.txt', RobotsResource())
         cgit_secret_path = config.get("cgit_secret_path")
         if cgit_secret_path:
             with open(cgit_secret_path, 'rb') as cgit_secret_file:
