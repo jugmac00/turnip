@@ -34,15 +34,15 @@ def check_ancestor(old, new):
 
 def determine_permissions_outcome(old, ref, rule_lines):
     rule = rule_lines.get(ref, [])
-    # We have force-push permission, implies push, therefore okay
-    if 'force_push' in rule:
-        return
-    # We are creating a new ref
     if old == GIT_OID_HEX_ZERO:
+        # We are creating a new ref
         if 'create' in rule:
             return
         else:
             return b'You do not have permission to create ' + ref + b'.'
+    # We have force-push permission, implies push, therefore okay
+    if 'force_push' in rule:
+        return
     # We have push permission, everything is okay
     # force_push is checked later (in update-hook)
     if 'push' in rule:
