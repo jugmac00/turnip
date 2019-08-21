@@ -380,8 +380,7 @@ class TestDeterminePermissions(TestCase):
             'old', 'ref', {'ref': ['force_push']})
         self.assertIsNone(output)
 
-    def test_force_push_always_allows(self):
-        # If user has force-push, they can do anything
+    def test_force_push_does_not_imply_create(self):
         output = hook.determine_permissions_outcome(
             pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['force_push']})
-        self.assertIsNone(output)
+        self.assertEqual(b"You do not have permission to create ref.", output)
