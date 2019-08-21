@@ -79,8 +79,12 @@ class RPCServerProtocol(JSONNetstringProtocol):
         if op not in self.methods:
             self.sendValue({"error": "Unknown op: %s" % op})
             return
-        res = yield self.methods[op](self, val)
-        self.sendValue({"result": res})
+        try:
+            res = yield self.methods[op](self, val)
+        except defer.TimeoutError:
+            self.sendValue({"error": "%s timed out" % op})
+        else:
+            self.sendValue({"result": res})
 
     def invalidValueReceived(self, string):
         self.sendValue({"error": "Command must be a JSON object"})

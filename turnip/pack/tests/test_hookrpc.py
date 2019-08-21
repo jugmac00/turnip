@@ -105,6 +105,10 @@ def sync_rpc_method(proto, args):
     return list(args.items())
 
 
+def timeout_rpc_method(proto, args):
+    raise defer.TimeoutError()
+
+
 class TestRPCServerProtocol(TestCase):
     """Test the socket server that handles git hook callbacks."""
 
@@ -113,6 +117,7 @@ class TestRPCServerProtocol(TestCase):
         self.proto = hookrpc.RPCServerProtocol({
             'sync': sync_rpc_method,
             'async': async_rpc_method,
+            'timeout': timeout_rpc_method,
             })
         self.transport = proto_helpers.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
@@ -149,6 +154,11 @@ class TestRPCServerProtocol(TestCase):
         self.assertEqual(
             b'42:{"error": "Command must be a JSON object"},',
             self.transport.value())
+
+    def test_timeout(self):
+        self.proto.dataReceived(b'31:{"op": "timeout", "bar": "baz"},')
+        self.assertEqual(
+            b'30:{"error": "timeout timed out"},', self.transport.value())
 
 
 class TestHookRPCHandler(TestCase):
