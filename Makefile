@@ -78,6 +78,9 @@ lint: $(ENV)
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
 
+run-pack: $(ENV)
+	$(PYTHON) turnipserver.py
+
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
 	$(PIP) install $(PIP_CACHE_ARGS) -d $(PIP_CACHE) \
@@ -98,4 +101,4 @@ build-tarball:
 		--exclude env \
 		./
 
-.PHONY: build check clean dist lint run-api build-tarball
+.PHONY: build check clean dist lint run-api run-pack build-tarball

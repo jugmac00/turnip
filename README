@@ -109,7 +109,7 @@ Running
 
 Pack smart-http/ssh services can be started with:
 
-    python turnipserver.py
+    make run-pack
 
 The HTTP API can be started with:
 
