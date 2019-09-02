@@ -54,7 +54,7 @@ endif
 	$(PIP) install $(PIP_CACHE_ARGS) -c requirements.txt \
 		-e '.[test,deploy]'
 
-check: $(ENV)
+test: $(ENV)
 	$(PYTHON) -m unittest discover $(ARGS) turnip
 
 clean:
@@ -74,6 +74,8 @@ tags:
 lint: $(ENV)
 	@$(FLAKE8) --exclude=__pycache__,version_info.py turnip
 	$(PYTHON) setup.py check --restructuredtext --strict
+
+check: test lint
 
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
@@ -101,4 +103,4 @@ build-tarball:
 		--exclude env \
 		./
 
-.PHONY: build check clean dist lint run-api run-pack build-tarball
+.PHONY: build check clean dist lint run-api run-pack test build-tarball
