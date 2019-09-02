@@ -30,6 +30,7 @@ requires = [
     'zope.interface',
     ]
 test_requires = [
+    'docutils',
     'fixtures',
     'flake8',
     'testtools',
