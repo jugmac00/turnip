@@ -12,14 +12,12 @@ import os.path
 from fixtures import TempDir
 from pygit2 import init_repository
 from testtools import TestCase
-from testtools.deferredruntest import assert_fails_with
 from testtools.matchers import (
     ContainsDict,
     Equals,
     MatchesListwise,
     )
 from twisted.internet import (
-    defer,
     reactor as default_reactor,
     task,
     )
