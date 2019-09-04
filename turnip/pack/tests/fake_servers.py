@@ -64,7 +64,6 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.push_notifications = []
         self.ref_permissions_checks = []
         self.ref_permissions = {}
-        self.ref_permissions_as_dict = False
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
