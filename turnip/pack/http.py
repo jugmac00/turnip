@@ -57,6 +57,8 @@ from turnip.pack.git import (
 from turnip.pack.helpers import (
     encode_packet,
     encode_request,
+    translate_xmlrpc_fault,
+    TurnipFaultCode,
     )
 try:
     from turnip.version_info import version_info
@@ -623,16 +625,18 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
 
     def _translatePathErrback(self, failure, request, session):
         if failure.check(defer.TimeoutError) is not None:
-            code, message = 504, 'Path translation timed out.'
+            code = TurnipFaultCode.GATEWAY_TIMEOUT
+            message = 'Path translation timed out.'
         elif failure.check(xmlrpc.Fault) is not None:
-            code, message = failure.value.faultCode, failure.value.faultString
+            code = translate_xmlrpc_fault(failure.value.faultCode)
+            message = failure.value.faultString
         else:
             code, message = None, 'Unexpected error in translatePath.'
-        if code in (1, 290):
+        if code == TurnipFaultCode.NOT_FOUND:
             error_code = http.NOT_FOUND
-        elif code in (2, 310):
+        elif code == TurnipFaultCode.FORBIDDEN:
             error_code = http.FORBIDDEN
-        elif code in (3, 410):
+        elif code == TurnipFaultCode.UNAUTHORIZED:
             if 'user' in session:
                 error_code = http.FORBIDDEN
                 message = (
@@ -644,7 +648,7 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
             else:
                 self._beginLogin(request, session)
                 return
-        elif code == 504:
+        elif code == TurnipFaultCode.GATEWAY_TIMEOUT:
             error_code = http.GATEWAY_TIMEOUT
         else:
             log.err(failure, "Unexpected error in translatePath")
@@ -780,7 +784,8 @@ class SmartHTTPFrontendResource(resource.Resource):
             translated = yield proxy.callRemote(
                 b'authenticateWithPassword', user, password)
         except xmlrpc.Fault as e:
-            if e.faultCode in (3, 410):
+            code = translate_xmlrpc_fault(e.faultCode)
+            if code == TurnipFaultCode.UNAUTHORIZED:
                 defer.returnValue({})
             else:
                 raise

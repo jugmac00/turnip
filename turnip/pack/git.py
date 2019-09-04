@@ -29,6 +29,7 @@ from turnip.pack.helpers import (
     ensure_config,
     ensure_hooks,
     INCOMPLETE_PKT,
+    translate_xmlrpc_fault,
     )
 
 
@@ -570,14 +571,8 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                     b'NOT_FOUND Repository does not exist.')
             pathname = translated['path']
         except xmlrpc.Fault as e:
-            if e.faultCode in (1, 290):
-                fault_type = b'NOT_FOUND'
-            elif e.faultCode in (2, 310):
-                fault_type = b'FORBIDDEN'
-            elif e.faultCode in (3, 410):
-                fault_type = b'UNAUTHORIZED'
-            else:
-                fault_type = b'INTERNAL_SERVER_ERROR'
+            fault_type = translate_xmlrpc_fault(
+                e.faultCode).name.encode('UTF-8')
             fault_string = e.faultString
             if not isinstance(fault_string, bytes):
                 fault_string = fault_string.encode('UTF-8')
