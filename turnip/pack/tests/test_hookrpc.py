@@ -12,7 +12,10 @@ import contextlib
 import uuid
 
 from six.moves import xmlrpc_client
-from testtools import TestCase
+from testtools import (
+    ExpectedException,
+    TestCase,
+    )
 from testtools.deferredruntest import (
     assert_fails_with,
     AsynchronousDeferredRunTest,
@@ -30,7 +33,10 @@ from twisted.internet import (
     task,
     )
 from twisted.test import proto_helpers
-from twisted.web import server
+from twisted.web import (
+    server,
+    xmlrpc,
+    )
 
 from turnip.pack import hookrpc
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
@@ -109,6 +115,14 @@ def timeout_rpc_method(proto, args):
     raise defer.TimeoutError()
 
 
+def unauthorized_rpc_method(proto, args):
+    raise xmlrpc.Fault(410, 'Authorization required.')
+
+
+def internal_server_error_rpc_method(proto, args):
+    raise xmlrpc.Fault(500, 'Boom')
+
+
 class TestRPCServerProtocol(TestCase):
     """Test the socket server that handles git hook callbacks."""
 
@@ -118,6 +132,8 @@ class TestRPCServerProtocol(TestCase):
             'sync': sync_rpc_method,
             'async': async_rpc_method,
             'timeout': timeout_rpc_method,
+            'unauthorized': unauthorized_rpc_method,
+            'internal_server_error': internal_server_error_rpc_method,
             })
         self.transport = proto_helpers.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
@@ -159,6 +175,19 @@ class TestRPCServerProtocol(TestCase):
         self.proto.dataReceived(b'31:{"op": "timeout", "bar": "baz"},')
         self.assertEqual(
             b'30:{"error": "timeout timed out"},', self.transport.value())
+
+    def test_unauthorized(self):
+        self.proto.dataReceived(b'36:{"op": "unauthorized", "bar": "baz"},')
+        self.assertEqual(
+            b'50:{"error": "UNAUTHORIZED: Authorization required."},',
+            self.transport.value())
+
+    def test_internal_server_error(self):
+        self.proto.dataReceived(
+            b'45:{"op": "internal_server_error", "bar": "baz"},')
+        self.assertEqual(
+            b'40:{"error": "INTERNAL_SERVER_ERROR: Boom"},',
+            self.transport.value())
 
 
 class TestHookRPCHandler(TestCase):
@@ -253,6 +282,47 @@ class TestHookRPCHandler(TestCase):
             clock.advance(15)
             self.assertTrue(d.called)
             return assert_fails_with(d, defer.TimeoutError)
+
+    @defer.inlineCallbacks
+    def test_checkRefPermissions_unauthorized(self):
+        self.virtinfo.ref_permissions = {
+            b'refs/heads/master': ['push'],
+            b'refs/heads/next': ['force_push'],
+            }
+        self.virtinfo.ref_permissions_fault = xmlrpc.Fault(3, 'Unauthorized')
+        encoded_paths = [
+            self.encodeRefPath(ref_path)
+            for ref_path in sorted(self.virtinfo.ref_permissions)]
+        with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
+            permissions = yield self.hookrpc_handler.checkRefPermissions(
+                None, {'key': key, 'paths': encoded_paths})
+        expected_permissions = {
+            self.encodeRefPath(ref_path): []
+            for ref_path in self.virtinfo.ref_permissions}
+        self.assertEqual(expected_permissions, permissions)
+        self.assertCheckedRefPermissions(
+            '/translated', [b'refs/heads/master', b'refs/heads/next'],
+            {'uid': 42})
+
+    @defer.inlineCallbacks
+    def test_checkRefPermissions_internal_server_error(self):
+        self.virtinfo.ref_permissions = {
+            b'refs/heads/master': ['push'],
+            b'refs/heads/next': ['force_push'],
+            }
+        self.virtinfo.ref_permissions_fault = xmlrpc.Fault(500, 'Boom')
+        encoded_paths = [
+            self.encodeRefPath(ref_path)
+            for ref_path in sorted(self.virtinfo.ref_permissions)]
+        with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
+            fault_matcher = MatchesStructure.byEquality(
+                faultCode=500, faultString='Boom')
+            with ExpectedException(xmlrpc.Fault, fault_matcher):
+                yield self.hookrpc_handler.checkRefPermissions(
+                    None, {'key': key, 'paths': encoded_paths})
+        self.assertCheckedRefPermissions(
+            '/translated', [b'refs/heads/master', b'refs/heads/next'],
+            {'uid': 42})
 
     @defer.inlineCallbacks
     def test_notifyPush(self):
