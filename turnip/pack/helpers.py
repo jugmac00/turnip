@@ -7,6 +7,7 @@ from __future__ import (
     unicode_literals,
     )
 
+import enum
 import hashlib
 import os.path
 import re
@@ -182,3 +183,33 @@ def ensure_hooks(repo_root):
             except OSError:
                 # May have raced with another invocation.
                 pass
+
+
+@enum.unique
+class TurnipFaultCode(enum.Enum):
+    """An internal vocabulary of possible faults from the virtinfo service."""
+
+    NOT_FOUND = 1
+    FORBIDDEN = 2
+    UNAUTHORIZED = 3
+    GATEWAY_TIMEOUT = 4
+    INTERNAL_SERVER_ERROR = 5
+
+
+def translate_xmlrpc_fault(code):
+    """Translate an XML-RPC fault code into an internal vocabulary.
+
+    The turnipcake and Launchpad implementations of the virtinfo service
+    return different codes in some cases.
+    """
+    if code in (1, 290):
+        result = TurnipFaultCode.NOT_FOUND
+    elif code in (2, 310):
+        result = TurnipFaultCode.FORBIDDEN
+    elif code in (3, 410):
+        result = TurnipFaultCode.UNAUTHORIZED
+    elif code == 504:
+        result = TurnipFaultCode.GATEWAY_TIMEOUT
+    else:
+        result = TurnipFaultCode.INTERNAL_SERVER_ERROR
+    return result
