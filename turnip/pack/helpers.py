@@ -203,12 +203,13 @@ def translate_xmlrpc_fault(code):
     return different codes in some cases.
     """
     if code in (1, 290):
-        return TurnipFaultCode.NOT_FOUND
+        result = TurnipFaultCode.NOT_FOUND
     elif code in (2, 310):
-        return TurnipFaultCode.FORBIDDEN
+        result = TurnipFaultCode.FORBIDDEN
     elif code in (3, 410):
-        return TurnipFaultCode.UNAUTHORIZED
+        result = TurnipFaultCode.UNAUTHORIZED
     elif code == 504:
-        return TurnipFaultCode.GATEWAY_TIMEOUT
+        result = TurnipFaultCode.GATEWAY_TIMEOUT
     else:
-        return TurnipFaultCode.INTERNAL_SERVER_ERROR
+        result = TurnipFaultCode.INTERNAL_SERVER_ERROR
+    return result
