@@ -12,9 +12,9 @@ VIRTUALENV := virtualenv
 
 DEPENDENCIES_URL := https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
 
-PIP_CACHE_ARGS := -q
+PIP_CACHE_ARGS := -v
 ifneq ($(PIP_SOURCE_DIR),)
-PIP_CACHE_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
+override PIP_CACHE_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
 endif
 
 # Create archives in labelled directories (e.g.
