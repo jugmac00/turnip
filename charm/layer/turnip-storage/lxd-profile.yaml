@@ -1,0 +1,10 @@
+name: turnip-storage
+config:
+    raw.apparmor: |
+        mount fstype=nfs,
+        mount fstype=nfs4,
+        mount fstype=nfsd,
+        mount fstype=rpc_pipefs,
+    security.privileged: true
+description: "Allow NFS mounting for turnip storage"
+devices: {}
