@@ -102,6 +102,7 @@ Run the following::
         sudo add-apt-repository ppa:launchpad/ppa
         sudo apt-get update
         cat system-dependencies.txt charm/packages.txt | sudo xargs apt-get install -y --no-install-recommends
+        make bootstrap
 
 
 Running
