@@ -103,7 +103,7 @@ Run the following::
         sudo apt-get update
         cat system-dependencies.txt charm/packages.txt | sudo xargs apt-get install -y --no-install-recommends
         make bootstrap
-	mkdir -p /var/tmp/git.launchpad.test
+        mkdir -p /var/tmp/git.launchpad.test
 
 Running
 -------
@@ -120,18 +120,13 @@ The HTTP API can be started with:
 Running LP locally as a Git client to Turnip
 -------
 
-Turnip LXD needs to be able to talk to xmlrpc-private.launchpad.test.
+Turnip container needs to be able to talk to xmlrpc-private.launchpad.test.
 
-In your LP LXD edit ~/.gitconfig and add these lines, where USER is your Launchpad username:
+In the Turnip container the hosts file needs to point to the LP container (x.x.x.x is the IP address of LP):
 
-[url "git+ssh://USER@git.launchpad.test/"]
-        insteadof = lptest:
-
-In the Turnip LXD the hosts file needs to point to the LP LXD (10.209.173.1 is the IP address of LP):
-
-	ilasc@turnip:~/turnip$ cat /etc/hosts
+	user@turnip-bionic:~/turnip$ cat /etc/hosts
 	127.0.0.1 localhost
-	10.209.173.1 launchpad.test launchpad.test answers.launchpad.test archive.launchpad.test api.launchpad.test bazaar.launchpad.test bazaar-internal.launchpad.test blueprints.launchpad.test bugs.launchpad.test code.launchpad.test feeds.launchpad.test keyserver.launchpad.test lists.launchpad.test ppa.launchpad.test private-ppa.launchpad.test testopenid.test translations.launchpad.test xmlrpc-private.launchpad.test xmlrpc.launchpad.test
+	x.x.x.x launchpad.test launchpad.test answers.launchpad.test archive.launchpad.test api.launchpad.test bazaar.launchpad.test bazaar-internal.launchpad.test blueprints.launchpad.test bugs.launchpad.test code.launchpad.test feeds.launchpad.test keyserver.launchpad.test lists.launchpad.test ppa.launchpad.test private-ppa.launchpad.test testopenid.test translations.launchpad.test xmlrpc-private.launchpad.test xmlrpc.launchpad.test
 	# The following lines are desirable for IPv6 capable hosts
 	::1 ip6-localhost ip6-loopback
 	fe00::0 ip6-localnet
@@ -140,56 +135,41 @@ In the Turnip LXD the hosts file needs to point to the LP LXD (10.209.173.1 is t
 	ff02::2 ip6-allrouters
 	ff02::3 ip6-allhosts
 
-A basic test that can be performed by dropping into the Turnip LXD shell. Below exception is expected as Repository '1' did not exist when the RPC call was performed, it does show however that Turnip is able to resolve xmlrpc-private.launchpad.test and there is connectivity between LP and Turnip:
-
-	ilasc@thinkpad:~$ sudo lxc shell turnip
-	[sudo] password for ilasc: 
-	mesg: ttyname failed: No such device
-	root@turnip:~# python
-	Python 2.7.15+ (default, Oct  7 2019, 17:39:04) 
-	[GCC 7.4.0] on linux2
-	Type "help", "copyright", "credits" or "license" for more information.
+A basic test that can be performed by dropping into the Turnip container shell. Below exception is expected as Repository '1' did not exist when the RPC call was performed, it does show however that Turnip is able to resolve xmlrpc-private.launchpad.test and there is connectivity between LP and Turnip:
+	user@launchpad:~$ sudo lxc exec turnip python
+	...
 	>>> from xmlrpclib import ServerProxy
 	>>> proxy = ServerProxy('http://xmlrpc-private.launchpad.test:8087/git')
 	>>> proxy.translatePath('1', 'read', {})
 	Traceback (most recent call last):
-	  File "<stdin>", line 1, in <module>
-	  File "/usr/lib/python2.7/xmlrpclib.py", line 1243, in __call__
-	    return self.__send(self.__name, args)
-	  File "/usr/lib/python2.7/xmlrpclib.py", line 1602, in __request
-	    verbose=self.__verbose
-	  File "/usr/lib/python2.7/xmlrpclib.py", line 1283, in request
-	    return self.single_request(host, handler, request_body, verbose)
-	  File "/usr/lib/python2.7/xmlrpclib.py", line 1316, in single_request
-	    return self.parse_response(response)
-	  File "/usr/lib/python2.7/xmlrpclib.py", line 1493, in parse_response
-	    return u.close()
-	  File "/usr/lib/python2.7/xmlrpclib.py", line 800, in close
-	    raise Fault(**self._stack[0])
+	...
 	xmlrpclib.Fault: <Fault 290: "Repository '1' not found.">
 	>>> exit()
-	root@turnip:~#
+	root@turnip-bionic:~#
 
-Create a new repository locally (ilasc@thinkpad:~/repo in LP LXD in below example) and push it to LP&Turnip:
+In your LP container edit ~/.gitconfig and add these lines, where USER is your Launchpad username:
 
-	ilasc@thinkpad:~/repo$ git remote add origin git+ssh://ilasc@git.launchpad.test:9422/~ilasc/+git/repo
-	ilasc@thinkpad:~/repo$ git push --set-upstream origin master
+	[url "git+ssh://USER@git.launchpad.test/"]
+		insteadof = lptest:
+
+Create a new repository locally (user@launchpad:~/repo in LP container in below example) and push it to LP&Turnip:
+
+	user@launchpad:~/repo$ git remote add origin git+ssh://user@git.launchpad.test:9422/~user/+git/repo
+	user@launchpad:~/repo$ git push --set-upstream origin master
 	Counting objects: 3, done.
 	Writing objects: 100% (3/3), 231 bytes | 231.00 KiB/s, done.
 	Total 3 (delta 0), reused 0 (delta 0)
-	remote: Create a merge proposal for branch on Launchpad by visiting:
-	remote: ref_path = :['refs/heads/master']
-	To git+ssh://git.launchpad.test:9422/~ilasc/+git/repo
+	To git+ssh://git.launchpad.test:9422/~user/+git/repo
 	 * [new branch]      master -> master
 	Branch 'master' set up to track remote branch 'master' from 'origin'.
-	ilasc@thinkpad:~/repo$ 
+	user@launchpad:~/repo$ 
 
 
 The LP log for above push:
 
 	10.209.173.202 - "" "xmlrpc-private.launchpad.test" [16/Dec/2019:13:41:13 +0300] "POST /authserver HTTP/1.0" 200 1312 4 0.00622892379761 0.00250482559204 0.00320911407471 "Anonymous" "AuthServerApplication:" "" "Twisted/XMLRPClib"
 	------
-	2019-12-16T13:41:17 INFO lp.code.xmlrpc.git [request-id=057364e1-9e12-48c6-857d-a228c56d88c2] Request received: translatePath('~ilasc/+git/repo', 'write') for 243674
+	2019-12-16T13:41:17 INFO lp.code.xmlrpc.git [request-id=057364e1-9e12-48c6-857d-a228c56d88c2] Request received: translatePath('~user/+git/repo', 'write') for 243674
 	------
 	2019-12-16T13:41:17 INFO lp.code.xmlrpc.git [request-id=057364e1-9e12-48c6-857d-a228c56d88c2] translatePath succeeded: {'writable': True, 'path': '5', 'trailing': '', 'private': False}
 	10.209.173.202 - "" "xmlrpc-private.launchpad.test" [16/Dec/2019:13:41:17 +0300] "POST /git HTTP/1.0" 200 899 21 0.0600020885468 0.00421810150146 0.0549690723419 "Anonymous" "GitApplication:" "" "Twisted/XMLRPClib"
@@ -205,24 +185,14 @@ The LP log for above push:
 	10.209.173.202 - "" "xmlrpc-private.launchpad.test" [16/Dec/2019:13:41:18 +0300] "POST /git HTTP/1.0" 200 588 7 0.0113499164581 0.00207781791687 0.00744009017944 "Anonymous" "GitApplication:" "" "Twisted/XMLRPClib"
 
 
-Your Local LP user must exist in LP - created with "utilities/make-lp-user USER" - and have an ssh key in local LP.
+Your local LP user must exist in LP - created with "utilities/make-lp-user USER" - and have an ssh key in local LP.
 When adding the SSH key to LP if emails can't go out the SSH key addition will fail. 
 One possible workaround is to use Fakeemail: https://github.com/tomwardill/fakeemail
-It is recommended that this is done in a venv:
+It is recommended that this is done in a venv (https://pypi.org/project/pipsi/):
 
-	ilasc@thinkpad:~/FakeEmail-master$ sudo apt install python-pip
-	ilasc@thinkpad:~/FakeEmail-master$ pip --version
-	pip 9.0.1 from /usr/lib/python2.7/dist-packages (python 2.7)
-	ilasc@thinkpad:~/FakeEmail-master$ python --version
-	Python 2.7.15+
-	ilasc@thinkpad:~/FakeEmail-master$ pip install virtualenv
-	ilasc@thinkpad:~/FakeEmail-master$ virtualenv --version
-	15.1.0
-	ilasc@thinkpad:~/FakeEmail-master$ virtualenv venv
-	ilasc@thinkpad:~/FakeEmail-master$ source venv/bin/activate
-	(venv) ilasc@thinkpad:~/FakeEmail-master$ python setup.py install
-	(venv) ilasc@thinkpad:~/FakeEmail-master$ cd venv/
-	(venv) ilasc@thinkpad:~/FakeEmail-master/venv$ sudo bin/fakeemail 25 8082 0.0.0.0
+	user@launchpad:~/FakeEmail-master$ sudo apt install pipsi
+	user@launchpad:~/FakeEmail-master$ pipsi install fakeemail
+	(venv) user@launchpad:~/FakeEmail-master/venv$ sudo bin/fakeemail 25 8082 0.0.0.0
 	Message stored for: root@localhost
 
 
