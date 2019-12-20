@@ -133,13 +133,18 @@ def check_ref_permissions(sock, rpc_key, ref_paths):
         for path, permissions in rule_lines.items()}
 
 
+def get_mp_url(sock, rpc_key, branch):
+    mp_url = rpc_invoke(sock, b'get_mp_url',
+        {'key': rpc_key, 'branch': branch})
+    return mp_url
+
+
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key
     # from the environment.
     rpc_key = os.environ['TURNIP_HOOK_RPC_KEY']
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(os.environ['TURNIP_HOOK_RPC_SOCK'])
-
     hook = os.path.basename(sys.argv[0])
     if hook == 'pre-receive':
         # Verify the proposed changes against rules from the server.
@@ -153,8 +158,20 @@ if __name__ == '__main__':
     elif hook == 'post-receive':
         # Notify the server about the push if there were any changes.
         # Details of the changes aren't currently included.
-        if sys.stdin.readlines():
+        lines = sys.stdin.readlines()
+        if lines:
             rpc_invoke(sock, b'notify_push', {'key': rpc_key})
+        if len(lines) == 1:
+            ref = [p.rstrip(b'\n').split(b' ', 2)[2] for p in lines]
+            branch = ref[0].split('/', 2)[2].rstrip(']')
+            mp_url = get_mp_url(sock, rpc_key, branch)
+            if mp_url is not None:
+                sys.stdout.write('      ' + b'\n')
+                sys.stdout.write("Create a merge proposal for branch "
+                                 "'%s' on Launchpad by visiting:"
+                                 % branch + b'\n')
+                sys.stdout.write('      %s' % mp_url + b'\n')
+                sys.stdout.write('      ' + b'\n')
         sys.exit(0)
     elif hook == 'update':
         ref = sys.argv[1]
