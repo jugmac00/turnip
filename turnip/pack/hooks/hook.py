@@ -16,7 +16,6 @@ import socket
 import subprocess
 import sys
 
-
 # XXX twom 2018-10-23 This should be a pygit2 import, but
 # that currently causes CFFI warnings to be returned to the client.
 GIT_OID_HEX_ZERO = '0'*40
@@ -133,12 +132,6 @@ def check_ref_permissions(sock, rpc_key, ref_paths):
         for path, permissions in rule_lines.items()}
 
 
-def get_mp_url(sock, rpc_key, branch):
-    mp_url = rpc_invoke(sock, b'get_mp_url',
-        {'key': rpc_key, 'branch': branch})
-    return mp_url
-
-
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key
     # from the environment.
@@ -163,15 +156,19 @@ if __name__ == '__main__':
             rpc_invoke(sock, b'notify_push', {'key': rpc_key})
         if len(lines) == 1:
             ref = [p.rstrip(b'\n').split(b' ', 2)[2] for p in lines]
-            branch = ref[0].split('/', 2)[2].rstrip(']')
-            mp_url = get_mp_url(sock, rpc_key, branch)
-            if mp_url is not None:
-                sys.stdout.write('      ' + b'\n')
-                sys.stdout.write("Create a merge proposal for branch "
-                                 "'%s' on Launchpad by visiting:"
-                                 % branch + b'\n')
-                sys.stdout.write('      %s' % mp_url + b'\n')
-                sys.stdout.write('      ' + b'\n')
+            # check for branch ref here (heads and not tags)
+            ref_type = ref[0].split('/', 2)[1]
+            if ref_type == "heads":
+                branch = ref[0].split('/', 2)[2].rstrip(']')
+                mp_url = rpc_invoke(sock, b'get_mp_url',
+                                    {'key': rpc_key, 'branch': branch})
+                if mp_url is not '':
+                    sys.stdout.write(b'      \n')
+                    sys.stdout.write(
+                        b"Create a merge proposal for '%s' on Launchpad by "
+                        b"visiting:\n" % branch)
+                    sys.stdout.write(b'      %s\n' % mp_url)
+                    sys.stdout.write(b'      \n')
         sys.exit(0)
     elif hook == 'update':
         ref = sys.argv[1]

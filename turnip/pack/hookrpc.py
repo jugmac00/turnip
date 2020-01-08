@@ -247,26 +247,22 @@ class HookRPCHandler(object):
         log_context.log.info("notifyPush done: ref_path={path}", path=path)
 
     @defer.inlineCallbacks
-    def getMPurlRPC(self, path, branch):
-        proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        mp_url = yield proxy.callRemote(b'getMPurlRPC', path, branch).addTimeout(
-            self.virtinfo_timeout, self.reactor)
-        defer.returnValue(mp_url)
-
-    @defer.inlineCallbacks
-    def getMPurl(self, proto, args):
+    def getMergeProposalURL(self,  proto, args):
         log_context = HookRPCLogContext(self.auth_params[args['key']])
         path = self.ref_paths[args['key']]
         branch = args['branch']
         log_context.log.info(
-            "getMPurl request received: ref_path={path}", path=path)
+            "getMergeProposalURL request received: ref_path={path}", path=path)
         try:
-            mp_url = yield self.getMPurlRPC(path, branch)
+            proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
+            mp_url = yield proxy.callRemote(b'getMergeProposalURL', path,
+                        branch).addTimeout(self.virtinfo_timeout, self.reactor)
         except defer.TimeoutError:
             log_context.log.info(
-                "getMPurl timed out: ref_path={path}", path=path)
+                "getMergeProposalURL timed out: ref_path={path}", path=path)
             raise
-        log_context.log.info("getMPurl done: ref_path={path}", path=path)
+        log_context.log.info("getMergeProposalURL done: ref_path={path}",
+                             path=path)
         defer.returnValue(mp_url)
 
 
@@ -278,5 +274,5 @@ class HookRPCServerFactory(RPCServerFactory):
         self.methods = {
             'check_ref_permissions': self.hookrpc_handler.checkRefPermissions,
             'notify_push': self.hookrpc_handler.notifyPush,
-            'get_mp_url': self.hookrpc_handler.getMPurl,
+            'get_mp_url': self.hookrpc_handler.getMergeProposalURL,
             }
