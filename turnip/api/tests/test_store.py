@@ -56,6 +56,30 @@ class InitTestCase(TestCase):
         for ref in absent:
             self.assertNotIn(absent, out)
 
+    def assertPackedRefs(self, refs, repo_path):
+        """Assert the exact format of a packed-refs file.
+
+        We're writing this out directly, so make sure it's as we expect.
+
+        :param refs: A mapping from ref names to (oid, peeled_oid) tuples,
+            where peeled_oid may be None if the ref points directly to a
+            commit object.
+        :param repo_path: The path to the .git directory to check.
+        """
+        expected_packed_refs = [
+            b'# pack-refs with: peeled fully-peeled sorted ']
+        for ref_name, (oid, peeled_oid) in sorted(refs.items()):
+            if not isinstance(ref_name, bytes):
+                ref_name = ref_name.encode('utf-8')
+            expected_packed_refs.append(
+                b'%s %s' % (oid.encode('ascii'), ref_name))
+            if peeled_oid is not None:
+                expected_packed_refs.append(
+                    b'^%s' % (peeled_oid.encode('ascii'),))
+        with open(os.path.join(repo_path, 'packed-refs'), 'rb') as packed_refs:
+            self.assertEqual(
+                b'\n'.join(expected_packed_refs) + b'\n', packed_refs.read())
+
     def assertAlternates(self, expected_paths, repo_path):
         alt_path = store.alternates_path(repo_path)
         if not os.path.exists(os.path.dirname(alt_path)):
@@ -72,8 +96,13 @@ class InitTestCase(TestCase):
     def makeOrig(self):
         self.orig_path = os.path.join(self.repo_store, 'orig/')
         orig = RepoFactory(
-            self.orig_path, num_branches=3, num_commits=2).build()
-        self.orig_refs = orig.listall_references()
+            self.orig_path, num_branches=3, num_commits=2, num_tags=2).build()
+        self.orig_refs = {}
+        for ref in orig.references.objects:
+            obj = orig[ref.target]
+            self.orig_refs[ref.name] = (
+                obj.hex,
+                ref.peel().hex if obj.type != pygit2.GIT_OBJ_COMMIT else None)
         self.master_oid = orig.references['refs/heads/master'].target
         self.orig_objs = os.path.join(self.orig_path, '.git/objects')
 
@@ -198,7 +227,9 @@ class InitTestCase(TestCase):
         store.init_repo(to_path, clone_from=self.orig_path, clone_refs=True)
         to = pygit2.Repository(to_path)
         self.assertIsNot(None, to[self.master_oid])
-        self.assertEqual(self.orig_refs, to.listall_references())
+        self.assertEqual(
+            sorted(self.orig_refs), sorted(to.listall_references()))
+        self.assertPackedRefs(self.orig_refs, to_path)
 
         # Advance master and remove branch-2, so that the commit referenced
         # by the original repository's master isn't referenced by any of the
@@ -212,10 +243,10 @@ class InitTestCase(TestCase):
         # Internally, the packs are hardlinked into a subordinate
         # alternate repo, so minimal space is used by the clone.
         self.assertAlternates(['../turnip-subordinate'], to_path)
-        self.assertTrue(
-            os.path.exists(
-                os.path.join(to_path, 'turnip-subordinate')))
+        to_sub_path = os.path.join(to_path, 'turnip-subordinate')
+        self.assertTrue(os.path.exists(to_sub_path))
         self.assertAllLinkCounts(2, self.orig_objs)
+        self.assertPackedRefs(self.orig_refs, to_sub_path)
 
         self.assertAdvertisedRefs(
             [('.have', self.master_oid.hex),
@@ -233,14 +264,15 @@ class InitTestCase(TestCase):
         to = pygit2.Repository(to_path)
         self.assertIsNot(None, to[self.master_oid])
         self.assertEqual([], to.listall_references())
+        self.assertFalse(os.path.exists(os.path.join(to_path, 'packed-refs')))
 
         # Internally, the packs are hardlinked into a subordinate
         # alternate repo, so minimal space is used by the clone.
         self.assertAlternates(['../turnip-subordinate'], to_path)
-        self.assertTrue(
-            os.path.exists(
-                os.path.join(to_path, 'turnip-subordinate')))
+        to_sub_path = os.path.join(to_path, 'turnip-subordinate')
+        self.assertTrue(os.path.exists(to_sub_path))
         self.assertAllLinkCounts(2, self.orig_objs)
+        self.assertPackedRefs(self.orig_refs, to_sub_path)
 
         # No refs exist, but receive-pack advertises the clone_from's
         # refs as extra haves.
@@ -249,13 +281,26 @@ class InitTestCase(TestCase):
 
     def test_clone_of_clone(self):
         self.makeOrig()
-        orig_blob = pygit2.Repository(self.orig_path).create_blob(b'orig')
+        orig = pygit2.Repository(self.orig_path)
+        orig_blob = orig.create_blob(b'orig')
 
         self.assertAllLinkCounts(1, self.orig_objs)
         to_path = os.path.join(self.repo_store, 'to/')
         store.init_repo(to_path, clone_from=self.orig_path)
         self.assertAllLinkCounts(2, self.orig_objs)
-        to_blob = pygit2.Repository(to_path).create_blob(b'to')
+        to = pygit2.Repository(to_path)
+        to_blob = to.create_blob(b'to')
+        to.create_branch(
+            'branch-0',
+            orig[orig.references['refs/heads/branch-1'].target.hex], True)
+        to.create_branch(
+            'new-branch',
+            orig[orig.references['refs/heads/branch-1'].target.hex])
+        packed_refs = dict(self.orig_refs)
+        packed_refs['refs/heads/branch-0'] = (
+            orig.references['refs/heads/branch-1'].target.hex, None)
+        packed_refs['refs/heads/new-branch'] = (
+            orig.references['refs/heads/branch-1'].target.hex, None)
 
         too_path = os.path.join(self.repo_store, 'too/')
         store.init_repo(too_path, clone_from=to_path)
@@ -276,3 +321,10 @@ class InitTestCase(TestCase):
         self.assertIn(orig_blob, too)
         self.assertIn(to_blob, too)
         self.assertIn(too_blob, too)
+
+        # Each clone has refs from its (transitive) parents in its
+        # subordinate.
+        self.assertPackedRefs(
+            self.orig_refs, os.path.join(to_path, 'turnip-subordinate'))
+        self.assertPackedRefs(
+            packed_refs, os.path.join(too_path, 'turnip-subordinate'))
