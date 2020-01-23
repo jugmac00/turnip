@@ -255,8 +255,9 @@ class HookRPCHandler(object):
             "getMergeProposalURL request received: ref_path={path}", path=path)
         try:
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-            mp_url = yield proxy.callRemote(b'getMergeProposalURL', path,
-                        branch).addTimeout(self.virtinfo_timeout, self.reactor)
+            mp_url = yield proxy.callRemote(
+                b'getMergeProposalURL', path, branch).addTimeout(
+                self.virtinfo_timeout, self.reactor)
         except defer.TimeoutError:
             log_context.log.info(
                 "getMergeProposalURL timed out: ref_path={path}", path=path)

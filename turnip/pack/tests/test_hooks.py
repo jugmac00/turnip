@@ -58,6 +58,7 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
         super(MockHookRPCHandler, self).__init__(None, 15)
         self.notifications = []
         self.ref_permissions = {}
+        self.mergeProposalURL = []
 
     def notifyPush(self, proto, args):
         self.notifications.append(self.ref_paths[args['key']])
@@ -66,6 +67,9 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
         return {
             base64.b64encode(ref).decode('UTF-8'): permissions
             for ref, permissions in self.ref_permissions[args['key']].items()}
+
+    def getMergeProposalURL(self, proto, args):
+        self.mergeProposalURL.append((self.ref_paths[args['key']], 'master'))
 
 
 class MockRef(object):

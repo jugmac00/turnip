@@ -341,3 +341,14 @@ class TestHookRPCHandler(TestCase):
             clock.advance(15)
             self.assertTrue(d.called)
             return assert_fails_with(d, defer.TimeoutError)
+
+    @defer.inlineCallbacks
+    def test_getMergeProposalURL(self):
+        clock = task.Clock()
+        self.hookrpc_handler = hookrpc.HookRPCHandler(
+            self.virtinfo_url, 15, reactor=clock)
+
+        with self.registeredKey('/translated') as key:
+            mp_url = yield self.hookrpc_handler.getMergeProposalURL(
+                None, {'key': key, 'branch': 'master'})
+        self.assertIsNotNone(mp_url)

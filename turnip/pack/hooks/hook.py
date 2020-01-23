@@ -31,6 +31,14 @@ def check_ancestor(old, new):
     return return_code == 0
 
 
+def check_default_branch():
+    # if new == GIT_OID_HEX_ZERO:
+    #     return False
+    return_code = subprocess.call(
+        ['git', 'symbolic-ref', 'HEAD'])
+    return return_code == 0
+
+
 def determine_permissions_outcome(old, ref, rule_lines):
     rule = rule_lines.get(ref, [])
     if old == GIT_OID_HEX_ZERO:
@@ -156,19 +164,24 @@ if __name__ == '__main__':
             rpc_invoke(sock, b'notify_push', {'key': rpc_key})
         if len(lines) == 1:
             ref = [p.rstrip(b'\n').split(b' ', 2)[2] for p in lines]
-            # check for branch ref here (heads and not tags)
+            # check for branch ref here (we're interested in
+            # heads and not tags)
             ref_type = ref[0].split('/', 2)[1]
             if ref_type == "heads":
-                branch = ref[0].split('/', 2)[2].rstrip(']')
-                mp_url = rpc_invoke(sock, b'get_mp_url',
-                                    {'key': rpc_key, 'branch': branch})
-                if mp_url is not '':
-                    sys.stdout.write(b'      \n')
-                    sys.stdout.write(
-                        b"Create a merge proposal for '%s' on Launchpad by "
-                        b"visiting:\n" % branch)
-                    sys.stdout.write(b'      %s\n' % mp_url)
-                    sys.stdout.write(b'      \n')
+                pushed_branch = ref[0].split('/', 2)[2].rstrip(']')
+                default_branch = subprocess.check_output(
+                    ['git', 'symbolic-ref', '--short', 'HEAD']).rstrip(b'\n')
+                if pushed_branch != default_branch:
+                    mp_url = rpc_invoke(
+                        sock, b'get_mp_url',
+                        {'key': rpc_key, 'branch': pushed_branch})
+                    if mp_url is not None:
+                        sys.stdout.write(b'      \n')
+                        sys.stdout.write(
+                            b"Create a merge proposal for '%s' on Launchpad by"
+                            b" visiting:\n" % pushed_branch)
+                        sys.stdout.write(b'      %s\n' % mp_url)
+                        sys.stdout.write(b'      \n')
         sys.exit(0)
     elif hook == 'update':
         ref = sys.argv[1]
