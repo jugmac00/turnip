@@ -12,7 +12,7 @@ VIRTUALENV := virtualenv
 
 DEPENDENCIES_URL := https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
 
-PIP_ARGS ?= -q
+PIP_ARGS ?= --quiet
 ifneq ($(PIP_SOURCE_DIR),)
 override PIP_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
 endif
