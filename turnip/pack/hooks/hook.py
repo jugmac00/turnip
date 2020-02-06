@@ -31,12 +31,10 @@ def check_ancestor(old, new):
     return return_code == 0
 
 
-def check_default_branch():
-    # if new == GIT_OID_HEX_ZERO:
-    #     return False
-    return_code = subprocess.call(
-        ['git', 'symbolic-ref', 'HEAD'])
-    return return_code == 0
+def get_default_branch():
+    branch = subprocess.check_output(
+        ['git', 'symbolic-ref', 'HEAD']).rstrip(b'\n')
+    return branch
 
 
 def determine_permissions_outcome(old, ref, rule_lines):
@@ -140,6 +138,26 @@ def check_ref_permissions(sock, rpc_key, ref_paths):
         for path, permissions in rule_lines.items()}
 
 
+def send_mp_url(received_lines):
+    refs = [p.rstrip(b'\n').split(b' ', 2)[2] for p in received_lines]
+    # check for branch ref here (we're interested in
+    # heads and not tags)
+    ref_type = refs[0].split('/', 2)[1]
+    if ref_type == "heads":
+        pushed_branch = refs[0]
+        default_branch = get_default_branch()
+        if pushed_branch != default_branch:
+            mp_url = rpc_invoke(
+                sock, b'get_mp_url',
+                {'key': rpc_key, 'branch': pushed_branch})
+            if mp_url is not None:
+                sys.stdout.write(b'      \n')
+                sys.stdout.write(
+                    b"Create a merge proposal for '%s' on Launchpad by"
+                    b" visiting:\n" % pushed_branch)
+                sys.stdout.write(b'      %s\n' % mp_url)
+                sys.stdout.write(b'      \n')
+
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key
     # from the environment.
@@ -163,25 +181,7 @@ if __name__ == '__main__':
         if lines:
             rpc_invoke(sock, b'notify_push', {'key': rpc_key})
         if len(lines) == 1:
-            ref = [p.rstrip(b'\n').split(b' ', 2)[2] for p in lines]
-            # check for branch ref here (we're interested in
-            # heads and not tags)
-            ref_type = ref[0].split('/', 2)[1]
-            if ref_type == "heads":
-                pushed_branch = ref[0].split('/', 2)[2].rstrip(']')
-                default_branch = subprocess.check_output(
-                    ['git', 'symbolic-ref', '--short', 'HEAD']).rstrip(b'\n')
-                if pushed_branch != default_branch:
-                    mp_url = rpc_invoke(
-                        sock, b'get_mp_url',
-                        {'key': rpc_key, 'branch': pushed_branch})
-                    if mp_url is not None:
-                        sys.stdout.write(b'      \n')
-                        sys.stdout.write(
-                            b"Create a merge proposal for '%s' on Launchpad by"
-                            b" visiting:\n" % pushed_branch)
-                        sys.stdout.write(b'      %s\n' % mp_url)
-                        sys.stdout.write(b'      \n')
+            send_mp_url(lines)
         sys.exit(0)
     elif hook == 'update':
         ref = sys.argv[1]

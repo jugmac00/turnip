@@ -97,8 +97,8 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             (xmlrpc_client.Binary(ref), permissions)
             for ref, permissions in self.ref_permissions.items()]
 
-    def xmlrpc_getMergeProposalURL(self, path, branch):
-        self.push_merge_proposal_url.append((path, branch))
+    def xmlrpc_getMergeProposalURL(self, path, branch, auth_params):
+        self.push_merge_proposal_url.append((path, branch, auth_params))
         if self.push_merge_proposal_url_fault is not None:
             raise self.push_merge_proposal_url_fault
         else:

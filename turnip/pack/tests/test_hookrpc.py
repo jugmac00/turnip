@@ -348,7 +348,7 @@ class TestHookRPCHandler(TestCase):
         self.hookrpc_handler = hookrpc.HookRPCHandler(
             self.virtinfo_url, 15, reactor=clock)
 
-        with self.registeredKey('/translated') as key:
+        with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
             mp_url = yield self.hookrpc_handler.getMergeProposalURL(
-                None, {'key': key, 'branch': 'master'})
+                None, {'key': key, 'branch': 'master', 'uid': 4})
         self.assertIsNotNone(mp_url)

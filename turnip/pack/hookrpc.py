@@ -247,21 +247,49 @@ class HookRPCHandler(object):
         log_context.log.info("notifyPush done: ref_path={path}", path=path)
 
     @defer.inlineCallbacks
-    def getMergeProposalURL(self,  proto, args):
+    def getMergeProposalURL(self, proto, args):
         log_context = HookRPCLogContext(self.auth_params[args['key']])
         path = self.ref_paths[args['key']]
+        auth_params = self.auth_params[args['key']]
         branch = args['branch']
         log_context.log.info(
             "getMergeProposalURL request received: ref_path={path}", path=path)
+        mp_url = None
         try:
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
             mp_url = yield proxy.callRemote(
-                b'getMergeProposalURL', path, branch).addTimeout(
+                b'getMergeProposalURL', path, branch, auth_params).addTimeout(
                 self.virtinfo_timeout, self.reactor)
+        except xmlrpc.Fault as e:
+            code = translate_xmlrpc_fault(e.faultCode)
+            if code in (
+                    TurnipFaultCode.NOT_FOUND,
+                    TurnipFaultCode.UNAUTHORIZED,
+                    ):
+                # These faults can happen with unlucky timing: a NOT_FAULT
+                # fault can happen if the repository was removed from disk
+                # between translatePath and checkRefPermissions (although
+                # that's impossible in practice with Launchpad's
+                # implementation); similarly, an UNAUTHORIZED fault can
+                # happen if the user's access to the repository was removed
+                # between translatePath and checkRefPermissions.  Just
+                # treat this as if the user has no permissions on any ref.
+                log_context.log.info(
+                    "getMergeProposalURL virtinfo raised Unauthorized: "
+                    "auth_params={auth_params}, ref_path={ref_path}",
+                    auth_params=auth_params, branch=branch)
+                mp_url = None
+            else:
+                log_context.log.info(
+                    "getMergeProposalURL virtinfo raised "
+                    "{fault_code} {fault_string}: "
+                    "auth_params={auth_params}, ref_path={ref_path}",
+                    fault_code=code.name, fault_string=e.faultString,
+                    auth_params=auth_params, branch=branch)
         except defer.TimeoutError:
             log_context.log.info(
                 "getMergeProposalURL timed out: ref_path={path}", path=path)
-            raise
+            mp_url = None
         log_context.log.info("getMergeProposalURL done: ref_path={path}",
                              path=path)
         defer.returnValue(mp_url)
