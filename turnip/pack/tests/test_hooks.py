@@ -264,7 +264,7 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
     @defer.inlineCallbacks
     def test_no_merge_proposal_URL(self):
 
-        def patched_get_default_branch(): \
+        def patched_get_default_branch():
             return u'/ref/heads/master'
 
         self.useFixture(MonkeyPatch(
@@ -275,6 +275,7 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         output = hook.send_mp_url(['abc abc refs/heads/master\n'])
         self.assertNotIn(
             [b'Create a merge proposal'], output)
+
 
 class TestUpdateHook(TestCase):
     """Tests for the git update hook"""
