@@ -399,7 +399,13 @@ def _add_conflicted_files(repo, index):
             if ours is None and theirs is None:
                 # A delete/delete conflict?  We probably shouldn't get here,
                 # but if we do then the resolution is obvious.
-                index.remove(path)
+                try:
+                    index.remove(path)
+                except IOError:
+                    # It's ok to ignore exception here. The file probably got
+                    # renamed to something else and is not in the index
+                    # anymore.
+                    pass
             else:
                 if ours is None or theirs is None:
                     # A modify/delete conflict.  Turn the "delete" side into
