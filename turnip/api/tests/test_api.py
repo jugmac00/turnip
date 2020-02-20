@@ -409,17 +409,15 @@ class ApiTestCase(TestCase):
             b'diff --git a/foo.txt b/bar.txt\n', resp.json_body['patch'])
 
     def test_repo_diff_rename_and_change_content_conflict(self):
-        # Create repo1 with foo.txt
+        # Create repo1 with foo.txt.
         repo1 = RepoFactory(self.repo_store)
         c1 = repo1.add_commit('foo\n', 'foo.txt')
         repo1.set_head(c1)
 
-        # Fork and change the content of foo.txt in repo2
+        # Fork and change the content of foo.txt in repo2.
         repo2_name = uuid.uuid4().hex
         repo2 = RepoFactory(
             os.path.join(self.repo_root, repo2_name), clone_from=repo1)
-        # Making sure foo.txt is in the index after fork.
-        repo2.add_commit('foo\n', 'foo.txt')
 
         # Rename foo.txt to bar.txt in repo2
         repo2.repo.index.remove('foo.txt')
