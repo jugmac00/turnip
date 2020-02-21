@@ -15,14 +15,13 @@ import os
 from twisted.application import service
 from twisted.scripts.twistd import ServerOptions
 
-from turnip.config import TurnipConfig
+from turnip.config import config
 from turnip.log import RotatableFileLogObserver
 from turnip.pack.ssh import SmartSSHService
 
 
 def getSmartSSHService():
 
-    config = TurnipConfig()
     log_path = config.get('turnip_log_dir')
 
     return SmartSSHService(

@@ -16,7 +16,7 @@ from twisted.application import (
     )
 from twisted.scripts.twistd import ServerOptions
 
-from turnip.config import TurnipConfig
+from turnip.config import config
 from turnip.log import RotatableFileLogObserver
 from turnip.pack.git import PackFrontendFactory
 
@@ -24,7 +24,6 @@ from turnip.pack.git import PackFrontendFactory
 def getPackFrontendService():
     """Return a PackFrontend Service."""
 
-    config = TurnipConfig()
     return internet.TCPServer(
         int(config.get('pack_frontend_port')),
         PackFrontendFactory(config.get('pack_virt_host'),
