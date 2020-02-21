@@ -16,7 +16,7 @@ class TurnipConfig(object):
         config_file_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), 'config.yaml')
         with open(config_file_path) as config_file:
-            self.defaults = yaml.load(config_file, Loader=yaml.SafeLoader)
+            self.defaults = yaml.safe_load(config_file)
 
     def get(self, key):
         return os.getenv(key.upper()) or self.defaults.get(key.lower()) or ''
