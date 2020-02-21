@@ -10,7 +10,7 @@ from cornice.util import extract_json_data
 from pygit2 import GitError
 import pyramid.httpexceptions as exc
 
-from turnip.config import TurnipConfig
+from turnip.config import config
 from turnip.api import store
 
 
@@ -36,7 +36,6 @@ def validate_path(func):
 
 class BaseAPI(object):
     def __init__(self):
-        config = TurnipConfig()
         self.repo_store = config.get('repo_store')
 
 

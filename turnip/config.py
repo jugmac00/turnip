@@ -7,6 +7,10 @@ import os
 
 import yaml
 
+__all__ = [
+    'config',
+    ]
+
 
 class TurnipConfig(object):
     """Return configuration from environment or defaults."""
@@ -20,3 +24,6 @@ class TurnipConfig(object):
 
     def get(self, key):
         return os.getenv(key.upper()) or self.defaults.get(key.lower()) or ''
+
+
+config = TurnipConfig()
