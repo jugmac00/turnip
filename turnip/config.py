@@ -13,9 +13,10 @@ class TurnipConfig(object):
 
     def __init__(self):
         """Load default configuration from config.yaml"""
-        config_file = open(os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 'config.yaml'))
-        self.defaults = yaml.load(config_file)
+        config_file_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), 'config.yaml')
+        with open(config_file_path) as config_file:
+            self.defaults = yaml.load(config_file, Loader=yaml.SafeLoader)
 
     def get(self, key):
         return os.getenv(key.upper()) or self.defaults.get(key.lower()) or ''
