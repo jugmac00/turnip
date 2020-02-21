@@ -12,7 +12,7 @@ import os
 from twisted.internet import reactor
 from twisted.web import server
 
-from turnip.config import TurnipConfig
+from turnip.config import config
 from turnip.pack.git import (
     PackBackendFactory,
     PackFrontendFactory,
@@ -27,7 +27,6 @@ from turnip.pack.ssh import SmartSSHService
 
 data_dir = os.path.join(
     os.path.dirname(__file__), "turnip", "pack", "tests", "data")
-config = TurnipConfig()
 
 LOG_PATH = config.get('turnip_log_dir')
 PACK_VIRT_HOST = config.get('pack_virt_host')

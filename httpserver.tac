@@ -12,7 +12,7 @@ from twisted.application import (
 from twisted.scripts.twistd import ServerOptions
 from twisted.web import server
 
-from turnip.config import TurnipConfig
+from turnip.config import config
 from turnip.log import RotatableFileLogObserver
 from turnip.pack.http import SmartHTTPFrontendResource
 
@@ -20,7 +20,6 @@ from turnip.pack.http import SmartHTTPFrontendResource
 def getSmartHTTPService():
     """Return a SmartHTTP frontend service."""
 
-    config = TurnipConfig()
     smarthttp_site = server.Site(SmartHTTPFrontendResource(config))
     return internet.TCPServer(
         int(config.get('smart_http_port')), smarthttp_site)
