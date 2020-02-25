@@ -31,10 +31,13 @@ def check_ancestor(old, new):
     return return_code == 0
 
 
-def get_default_branch():
+def is_default_branch(pushed_branch):
     branch = subprocess.check_output(
         ['git', 'symbolic-ref', 'HEAD']).rstrip(b'\n')
-    return branch
+    if pushed_branch == branch:
+        return True
+    else:
+        return False
 
 
 def determine_permissions_outcome(old, ref, rule_lines):
@@ -145,8 +148,7 @@ def send_mp_url(received_lines):
     ref_type = refs[0].split('/', 2)[1]
     if ref_type == "heads":
         pushed_branch = refs[0]
-        default_branch = get_default_branch()
-        if pushed_branch != default_branch:
+        if not is_default_branch(pushed_branch):
             mp_url = rpc_invoke(
                 sock, b'get_mp_url',
                 {'key': rpc_key, 'branch': pushed_branch})

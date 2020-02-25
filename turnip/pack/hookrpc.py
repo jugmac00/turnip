@@ -179,7 +179,7 @@ class HookRPCHandler(object):
                         TurnipFaultCode.NOT_FOUND,
                         TurnipFaultCode.UNAUTHORIZED,
                         ):
-                    # These faults can happen with unlucky timing: a NOT_FAULT
+                    # These faults can happen with unlucky timing: a NOT_FOUND
                     # fault can happen if the repository was removed from disk
                     # between translatePath and checkRefPermissions (although
                     # that's impossible in practice with Launchpad's
@@ -289,7 +289,7 @@ class HookRPCHandler(object):
         except defer.TimeoutError:
             log_context.log.info(
                 "getMergeProposalURL timed out: ref_path={path}", path=path)
-            mp_url = None
+            raise
         log_context.log.info("getMergeProposalURL done: ref_path={path}",
                              path=path)
         defer.returnValue(mp_url)
