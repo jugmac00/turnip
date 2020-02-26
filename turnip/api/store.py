@@ -396,28 +396,31 @@ def _add_conflicted_files(repo, index):
             path = conflict_entry.path
             conflicts.add(path)
             ancestor, ours, theirs = conflict
+
+            # Skip any further check if it's a delete/delete conflict:
+            # the file got renamed or deleted from both branches. Nothing to
+            # merge and no useful conflict diff to generate.
             if ours is None and theirs is None:
-                # A delete/delete conflict?  We probably shouldn't get here,
-                # but if we do then the resolution is obvious.
-                index.remove(path)
-            else:
-                if ours is None or theirs is None:
-                    # A modify/delete conflict.  Turn the "delete" side into
-                    # a fake empty file so that we can generate a useful
-                    # conflict diff.
-                    empty_oid = repo.create_blob(b'')
-                    if ours is None:
-                        ours = IndexEntry(
-                            path, empty_oid, conflict_entry.mode)
-                    if theirs is None:
-                        theirs = IndexEntry(
-                            path, empty_oid, conflict_entry.mode)
-                merged_file = repo.merge_file_from_index(
-                    ancestor, ours, theirs)
-                # merge_file_from_index gratuitously decodes as UTF-8, so
-                # encode it back again.
-                blob_oid = repo.create_blob(merged_file.encode('utf-8'))
-                index.add(IndexEntry(path, blob_oid, conflict_entry.mode))
+                del index.conflicts[path]
+                continue
+
+            if ours is None or theirs is None:
+                # A modify/delete conflict.  Turn the "delete" side into
+                # a fake empty file so that we can generate a useful
+                # conflict diff.
+                empty_oid = repo.create_blob(b'')
+                if ours is None:
+                    ours = IndexEntry(
+                        path, empty_oid, conflict_entry.mode)
+                if theirs is None:
+                    theirs = IndexEntry(
+                        path, empty_oid, conflict_entry.mode)
+            merged_file = repo.merge_file_from_index(
+                ancestor, ours, theirs)
+            # merge_file_from_index gratuitously decodes as UTF-8, so
+            # encode it back again.
+            blob_oid = repo.create_blob(merged_file.encode('utf-8'))
+            index.add(IndexEntry(path, blob_oid, conflict_entry.mode))
             del index.conflicts[path]
     return conflicts
 

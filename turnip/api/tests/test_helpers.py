@@ -162,7 +162,7 @@ class RepoFactory(object):
         """Return a pygit2 repo object cloned from an existing factory repo."""
         clone_from_url = urllib.parse.urljoin(
             'file:', urllib.request.pathname2url(repo_factory.repo.path))
-        return clone_repository(clone_from_url, self.repo_path, bare=True)
+        return clone_repository(clone_from_url, self.repo_path, bare=False)
 
     def build(self):
         """Return a repo, optionally with generated commits and tags."""
