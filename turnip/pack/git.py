@@ -560,7 +560,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             auth_params = self.createAuthParams(params)
             self.log.info("Translating request.")
             translated = yield proxy.callRemote(
-                b'translatePath', pathname, permission,
+                'translatePath', pathname, permission,
                 auth_params).addTimeout(
                     self.factory.virtinfo_timeout, self.factory.reactor)
             self.log.info(
