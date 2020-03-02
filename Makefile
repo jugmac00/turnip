@@ -49,7 +49,7 @@ endif
 	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
-	$(VIRTUALENV) --never-download $(ENV)
+	$(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
 	$(PIP) install $(PIP_ARGS) -r bootstrap-requirements.txt
 	$(PIP) install $(PIP_ARGS) -c requirements.txt \
 		-e '.[test,deploy]'

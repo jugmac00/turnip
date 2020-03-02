@@ -111,7 +111,7 @@ def ensure_config(repo_root):
     about concurrency.
     """
     with open('git.config.yaml') as config_file:
-        git_config_defaults = yaml.load(config_file)
+        git_config_defaults = yaml.safe_load(config_file)
     config = Repository(repo_root).config
     for key, val in git_config_defaults.items():
         config[key] = val
