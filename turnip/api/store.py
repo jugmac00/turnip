@@ -335,12 +335,15 @@ def get_refs(repo_store, repo_name, exclude_prefixes=None):
     """Return all refs for a git repository."""
     with open_repo(repo_store, repo_name) as repo:
         refs = {}
-        for ref in repo.listall_references():
-            git_object = repo.references[ref].peel()
+        for ref_obj in repo.listall_reference_objects():
             # Filter non-unicode refs, as refs are treated as unicode
             # given json is unable to represent arbitrary byte strings.
             try:
-                ref = ref.decode('utf-8')
+                if hasattr(ref_obj.name, 'decode'):  # py2
+                    ref = ref_obj.name.decode('utf-8')
+                else:  # py3
+                    ref = bytes(ref_obj.name, 'utf-8')
+                git_object = repo.references[ref].peel()
             except UnicodeDecodeError:
                 pass
             else:

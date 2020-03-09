@@ -5,6 +5,7 @@ import contextlib
 import fnmatch
 import itertools
 import os
+import subprocess
 import uuid
 
 from six.moves import urllib
@@ -13,7 +14,6 @@ from pygit2 import (
     clone_repository,
     init_repository,
     GIT_FILEMODE_BLOB,
-    GIT_OBJ_COMMIT,
     IndexEntry,
     Repository,
     Signature,
@@ -96,9 +96,9 @@ class RepoFactory(object):
 
     def add_tag(self, tag_name, tag_message, oid):
         """Create a tag from tag_name and oid."""
-        repo = self.repo
-        repo.create_tag(tag_name, oid, GIT_OBJ_COMMIT,
-                        self.committer, tag_message)
+        subprocess.check_call(
+            ['git', '-C', self.repo_path,
+             'tag', '-m', tag_message, tag_name, oid.hex])
 
     def makeSignature(self, name, email, encoding='utf-8'):
         """Return an author or committer signature."""
