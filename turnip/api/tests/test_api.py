@@ -230,8 +230,8 @@ class ApiTestCase(TestCase):
         """Ensure unicode refs are included in ref collection."""
         factory = RepoFactory(self.repo_store)
         commit_oid = factory.add_commit('foo', 'foobar.txt')
-        tag = u'おいしいイカ'.encode('utf8')
-        tag_message = u'かわいい タコ'.encode('utf8')
+        tag = u'おいしいイカ'.encode('utf-8')
+        tag_message = u'かわいい タコ'.encode('utf-8')
         factory.add_tag(tag, tag_message, commit_oid)
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
