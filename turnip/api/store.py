@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import uuid
+from six import ensure_binary
 
 from pygit2 import (
     GitError,
@@ -333,6 +334,10 @@ def repack(repo_path, ignore_alternates=False, single=False,
 
 def get_refs(repo_store, repo_name, exclude_prefixes=None):
     """Return all refs for a git repository."""
+    if exclude_prefixes:
+        # Convert exclude_prefixes to bytes, since refs will be bytes too.
+        exclude_prefixes = [ensure_binary(i, 'utf-8')
+                            for i in exclude_prefixes]
     with open_repo(repo_store, repo_name) as repo:
         refs = {}
         for ref_obj in repo.listall_reference_objects():
