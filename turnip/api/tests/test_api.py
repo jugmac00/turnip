@@ -638,7 +638,7 @@ class ApiTestCase(TestCase):
         """Ensure signatures are correct."""
         factory = RepoFactory(self.repo_store)
         committer = factory.makeSignature(u'村上 春樹'.encode('utf-8'),
-                                          u'tsukuru@猫の町.co.jp'.encode('utf-8'),
+                                          u'tsukuru@猫の町.co.jp'.encode('utf8'),
                                           encoding='utf-8')
         author = factory.makeSignature(
             u'Владимир Владимирович Набоков'.encode('utf-8'),
@@ -672,7 +672,7 @@ class ApiTestCase(TestCase):
     def test_repo_get_non_unicode_log(self):
         """Ensure that non-unicode data is discarded."""
         factory = RepoFactory(self.repo_store)
-        message = '\xe9\xe9\xe9'  # latin-1
+        message = b'\xe9\xe9\xe9'  # latin-1
         oid = factory.add_commit(message, 'foo.py')
         resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid))
         self.assertEqual(message.decode('utf-8', 'replace'),

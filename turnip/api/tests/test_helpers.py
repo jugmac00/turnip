@@ -8,6 +8,7 @@ import os
 import subprocess
 import uuid
 
+import six
 from six.moves import urllib
 
 from pygit2 import (
@@ -102,6 +103,10 @@ class RepoFactory(object):
 
     def makeSignature(self, name, email, encoding='utf-8'):
         """Return an author or committer signature."""
+        # xxx: pappacena 2020-03-09:
+        # email should always be str on python3, but pygit2
+        # doesn't enforce the same for name.
+        email = six.ensure_str(email)
         return Signature(name, email, encoding=encoding)
 
     def stage(self, path, content):
