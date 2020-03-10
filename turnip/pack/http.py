@@ -660,7 +660,7 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         identity_url = session.get('identity_url', self.anonymous_id)
         proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint, allowNone=True)
         d = proxy.callRemote(
-            b'translatePath', request.path, b'read',
+            'translatePath', request.path, b'read',
             {'uid': identity_url, 'can-authenticate': True})
         d.addTimeout(self.root.virtinfo_timeout, self.root.reactor)
         d.addCallback(self._translatePathCallback, request)
@@ -782,7 +782,7 @@ class SmartHTTPFrontendResource(resource.Resource):
         proxy = xmlrpc.Proxy(self.virtinfo_endpoint)
         try:
             translated = yield proxy.callRemote(
-                b'authenticateWithPassword', user, password)
+                'authenticateWithPassword', user, password)
         except xmlrpc.Fault as e:
             code = translate_xmlrpc_fault(e.faultCode)
             if code == TurnipFaultCode.UNAUTHORIZED:
