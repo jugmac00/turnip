@@ -118,7 +118,7 @@ class InitTestCase(TestCase):
         store.init_repo(repo_path)
         repo_config = pygit2.Repository(repo_path).config
         with open('git.config.yaml') as f:
-            yaml_config = yaml.load(f)
+            yaml_config = yaml.safe_load(f)
 
         self.assertEqual(bool(yaml_config['core.logallrefupdates']),
                          bool(repo_config['core.logallrefupdates']))
