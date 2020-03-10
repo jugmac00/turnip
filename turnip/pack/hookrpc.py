@@ -168,7 +168,7 @@ class HookRPCHandler(object):
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
             try:
                 result = yield proxy.callRemote(
-                    b'checkRefPermissions',
+                    'checkRefPermissions',
                     ref_path,
                     [xmlrpc_client.Binary(path) for path in missing],
                     auth_params).addTimeout(
@@ -228,7 +228,7 @@ class HookRPCHandler(object):
     @defer.inlineCallbacks
     def notify(self, path):
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        yield proxy.callRemote(b'notify', path).addTimeout(
+        yield proxy.callRemote('notify', path).addTimeout(
             self.virtinfo_timeout, self.reactor)
 
     @defer.inlineCallbacks
