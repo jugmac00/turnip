@@ -75,7 +75,10 @@ lint: $(ENV)
 	@$(FLAKE8) --exclude=__pycache__,version_info.py turnip
 	$(PYTHON) setup.py check --restructuredtext --strict
 
-check: test lint
+pip-check: $(ENV)
+	$(PIP) check
+
+check: pip-check test lint
 
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
