@@ -10,6 +10,7 @@ from __future__ import (
 
 import base64
 import os.path
+import subprocess
 import uuid
 
 from fixtures import (
@@ -70,11 +71,10 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
             for ref, permissions in self.ref_permissions[args['key']].items()}
 
     def getMergeProposalURL(self, proto, args):
-        self.mergeProposalURL.append((self.ref_paths[args['key']], 'master'))
+        return 'http://mp-url.test'
 
     def send_mp_url(self, args):
-        return 'test'
-
+        return 'test'           
 
 class MockRef(object):
 
@@ -149,14 +149,20 @@ class HookTestMixin(object):
         super(HookTestMixin, self).setUp()
         self.hookrpc_handler = MockHookRPCHandler()
         self.hookrpc = hookrpc.HookRPCServerFactory(self.hookrpc_handler)
-        dir = self.useFixture(TempDir()).path
-        self.hookrpc_sock_path = os.path.join(dir, 'hookrpc_sock')
+
+        self.repo_dir = os.path.join(self.useFixture(TempDir()).path, '.git')
+        os.mkdir(self.repo_dir)
+
+        subprocess.check_output(
+            ['git', 'init', self.repo_dir])
+
+        self.hookrpc_sock_path = os.path.join(self.repo_dir, 'hookrpc_sock')
         self.hookrpc_port = reactor.listenUNIX(
             self.hookrpc_sock_path, self.hookrpc)
         self.addCleanup(self.hookrpc_port.stopListening)
-        hooks_dir = os.path.join(dir, 'hooks')
+        hooks_dir = os.path.join(self.repo_dir, 'hooks')
         os.mkdir(hooks_dir)
-        ensure_hooks(dir)
+        ensure_hooks(self.repo_dir)
         self.hook_path = os.path.join(hooks_dir, self.hook_name)
 
     def encodeRefs(self, updates):
@@ -193,6 +199,15 @@ class HookTestMixin(object):
             self.encodeRefs(updates), permissions)
         self.assertEqual((1, message, b''), (code, out, err))
 
+    @defer.inlineCallbacks
+    def assert_MP_URL_Received(self, updates, permissions):
+        mp_url_message = (
+                    b"Create a merge proposal for '%s' on Launchpad by"
+                    b" visiting:\n" % updates[0][0])
+        code, out, err = yield self.invokeHook(
+            self.encodeRefs(updates), permissions)
+        self.assertEqual((0, b''), (code, err))
+        self.assertIn(mp_url_message, out)
 
 class TestPreReceiveHook(HookTestMixin, TestCase):
     """Tests for the git pre-receive hook."""
@@ -255,7 +270,7 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
     @defer.inlineCallbacks
     def test_notifies(self):
         # The notification callback is invoked with the storage path.
-        yield self.assertAccepted(
+        yield self.assert_MP_URL_Received(
             [(b'refs/heads/foo', self.old_sha1, self.new_sha1)], [])
         self.assertEqual(['/translated'], self.hookrpc_handler.notifications)
 
@@ -265,20 +280,11 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         yield self.assertAccepted([], [])
         self.assertEqual([], self.hookrpc_handler.notifications)
 
-    # @defer.inlineCallbacks
-    # def test_no_merge_proposal_URL(self):
-    #
-    #     def patched_get_default_branch():
-    #         return u'/ref/heads/master'
-    #
-    #     self.useFixture(MonkeyPatch(
-    #         'turnip.pack.hooks.hook.get_default_branch',
-    #         patched_get_default_branch
-    #     ))
-    #
-    #     output = hook.send_mp_url(['abc abc refs/heads/master\n'])
-    #     self.assertNotIn(
-    #         [b'Create a merge proposal'], output)
+    @defer.inlineCallbacks
+    def test_no_merge_proposal_URL(self):
+        yield self.assert_MP_URL_Received(
+            [(b'refs/heads/master', self.old_sha1, self.new_sha1)],
+            {b'refs/heads/master': ['push']})
 
 
 class TestUpdateHook(TestCase):
