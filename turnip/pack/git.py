@@ -350,6 +350,7 @@ class PackClientFactory(protocol.ClientFactory):
     def buildProtocol(self, *args, **kwargs):
         p = protocol.ClientFactory.buildProtocol(self, *args, **kwargs)
         p.setPeer(self.server)
+        self.deferred.callback(None)
         return p
 
     def clientConnectionFailed(self, connector, reason):
