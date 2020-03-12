@@ -264,7 +264,7 @@ class TestPackVirtServerProtocol(TestCase):
         proto.got_request = True
         yield proto.requestReceived(b'git-upload-pack', b'/example', {})
         self.assertEqual(
-            proto.pathname, hashlib.sha256(b'/example').hexdigest())
+            hashlib.sha256(b'/example').hexdigest(), proto.pathname)
         backend_factory.test_protocol.transport.loseConnection()
 
     def test_translatePath_timeout(self):
