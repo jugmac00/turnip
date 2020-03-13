@@ -32,9 +32,9 @@ def check_ancestor(old, new):
 
 
 def is_default_branch(pushed_branch):
-    branch = subprocess.check_output(
+    default_branch = subprocess.check_output(
         ['git', 'symbolic-ref', 'HEAD']).rstrip(b'\n')
-    if pushed_branch == branch:
+    if pushed_branch == default_branch:
         return True
     else:
         return False
