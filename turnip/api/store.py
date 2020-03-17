@@ -26,7 +26,6 @@ from pygit2 import (
     Oid,
     Repository,
     )
-from six import ensure_binary
 from turnip.pack.helpers import ensure_config
 
 
