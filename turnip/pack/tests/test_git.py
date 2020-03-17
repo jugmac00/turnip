@@ -7,6 +7,7 @@ from __future__ import (
     unicode_literals,
     )
 
+import hashlib
 import os.path
 
 from fixtures import TempDir
@@ -17,7 +18,9 @@ from testtools.matchers import (
     Equals,
     MatchesListwise,
     )
+from testtools.twistedsupport import AsynchronousDeferredRunTest
 from twisted.internet import (
+    defer,
     reactor as default_reactor,
     task,
     )
@@ -213,14 +216,56 @@ class TestPackBackendProtocol(TestCase):
         self.assertKilledWith(b'Symbolic ref target may not contain " "')
 
 
+class DummyPackBackendFactory(git.PackBackendFactory):
+
+    test_protocol = None
+
+    def buildProtocol(self, *args, **kwargs):
+        self.test_protocol = git.PackBackendFactory.buildProtocol(
+            self, *args, **kwargs)
+        return self.test_protocol
+
+
 class TestPackVirtServerProtocol(TestCase):
     """Test the Git pack virt protocol."""
+
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     def assertKilledWith(self, message):
         self.assertFalse(self.transport.connected)
         self.assertEqual(
             (b'ERR turnip virt error: ' + message + b'\n', b''),
             helpers.decode_packet(self.transport.value()))
+
+    @defer.inlineCallbacks
+    def test_translatePath(self):
+        root = self.useFixture(TempDir()).path
+        hookrpc_handler = MockHookRPCHandler()
+        hookrpc_sock = os.path.join(root, 'hookrpc_sock')
+        backend_factory = DummyPackBackendFactory(
+            root, hookrpc_handler, hookrpc_sock)
+        backend_factory.protocol = DummyPackBackendProtocol
+        backend_listener = default_reactor.listenTCP(0, backend_factory)
+        backend_port = backend_listener.getHost().port
+        self.addCleanup(backend_listener.stopListening)
+        virtinfo = FakeVirtInfoService(allowNone=True)
+        virtinfo_listener = default_reactor.listenTCP(0, server.Site(virtinfo))
+        virtinfo_port = virtinfo_listener.getHost().port
+        virtinfo_url = b'http://localhost:%d/' % virtinfo_port
+        self.addCleanup(virtinfo_listener.stopListening)
+        factory = git.PackVirtFactory(
+            b'localhost', backend_port, virtinfo_url, 5)
+        proto = git.PackVirtServerProtocol()
+        proto.factory = factory
+        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport.protocol = proto
+        proto.makeConnection(self.transport)
+        proto.pauseProducing()
+        proto.got_request = True
+        yield proto.requestReceived(b'git-upload-pack', b'/example', {})
+        self.assertEqual(
+            hashlib.sha256(b'/example').hexdigest(), proto.pathname)
+        backend_factory.test_protocol.transport.loseConnection()
 
     def test_translatePath_timeout(self):
         root = self.useFixture(TempDir()).path
