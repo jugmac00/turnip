@@ -633,7 +633,7 @@ class ApiTestCase(TestCase):
         """Ensure signatures are correct."""
         factory = RepoFactory(self.repo_store)
         committer = factory.makeSignature(u'村上 春樹'.encode('utf-8'),
-                                          u'tsukuru@猫の町.co.jp'.encode('utf8'),
+                                          u'tsukuru@猫の町.co.jp'.encode('utf-8'),
                                           encoding='utf-8')
         author = factory.makeSignature(
             u'Владимир Владимирович Набоков'.encode('utf-8'),

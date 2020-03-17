@@ -334,20 +334,15 @@ def repack(repo_path, ignore_alternates=False, single=False,
 
 def get_refs(repo_store, repo_name, exclude_prefixes=None):
     """Return all refs for a git repository."""
-    if exclude_prefixes:
-        # Convert exclude_prefixes to bytes, since refs will be bytes too.
-        exclude_prefixes = [ensure_binary(i, 'utf-8')
-                            for i in exclude_prefixes]
     with open_repo(repo_store, repo_name) as repo:
         refs = {}
         for ref_obj in repo.listall_reference_objects():
             # Filter non-unicode refs, as refs are treated as unicode
             # given json is unable to represent arbitrary byte strings.
             try:
-                if hasattr(ref_obj.name, 'decode'):  # py2
-                    ref = ref_obj.name.decode('utf-8')
-                else:  # py3
-                    ref = bytes(ref_obj.name, 'utf-8')
+                ref = ref_obj.name
+                if isinstance(ref, bytes):
+                    ref = ref.decode('utf-8')
                 git_object = repo.references[ref].peel()
             except UnicodeDecodeError:
                 pass
