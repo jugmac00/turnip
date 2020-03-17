@@ -8,17 +8,16 @@ import os
 import subprocess
 import uuid
 
-import six
-from six.moves import urllib
-
 from pygit2 import (
     clone_repository,
-    init_repository,
     GIT_FILEMODE_BLOB,
     IndexEntry,
+    init_repository,
     Repository,
     Signature,
     )
+import six
+from six.moves import urllib
 
 
 def get_revlist(repo):

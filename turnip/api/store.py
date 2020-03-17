@@ -2,32 +2,31 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 import base64
-from contextlib2 import (
-    contextmanager,
-    ExitStack,
-    )
 import itertools
 import os
 import re
 import shutil
 import subprocess
 import uuid
-from six import ensure_binary
 
+from contextlib2 import (
+    contextmanager,
+    ExitStack,
+    )
 from pygit2 import (
-    GitError,
     GIT_OBJ_BLOB,
     GIT_OBJ_COMMIT,
-    GIT_OBJ_TREE,
     GIT_OBJ_TAG,
+    GIT_OBJ_TREE,
     GIT_REF_OID,
     GIT_SORT_TOPOLOGICAL,
+    GitError,
     IndexEntry,
     init_repository,
     Oid,
     Repository,
     )
-
+from six import ensure_binary
 from turnip.pack.helpers import ensure_config
 
 
