@@ -49,7 +49,7 @@ endif
 	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
-	$(VIRTUALENV) --never-download $(ENV)
+	$(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
 	$(PIP) install $(PIP_ARGS) -r bootstrap-requirements.txt
 	$(PIP) install $(PIP_ARGS) -c requirements.txt \
 		-e '.[test,deploy]'
@@ -75,7 +75,10 @@ lint: $(ENV)
 	@$(FLAKE8) --exclude=__pycache__,version_info.py turnip
 	$(PYTHON) setup.py check --restructuredtext --strict
 
-check: test lint
+pip-check: $(ENV)
+	$(PIP) check
+
+check: pip-check test lint
 
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload

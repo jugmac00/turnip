@@ -43,7 +43,7 @@ class BaseAPI(object):
 class RepoAPI(BaseAPI):
     """Provides HTTP API for repository actions."""
 
-    def __init__(self, request):
+    def __init__(self, request, context=None):
         super(RepoAPI, self).__init__()
         self.request = request
 
@@ -127,7 +127,7 @@ class RepoAPI(BaseAPI):
 class RepackAPI(BaseAPI):
     """Provides HTTP API for repository repacking."""
 
-    def __init__(self, request):
+    def __init__(self, request, context=None):
         super(RepackAPI, self).__init__()
         self.request = request
 
@@ -158,7 +158,7 @@ class RepackAPI(BaseAPI):
 class RefAPI(BaseAPI):
     """Provides HTTP API for git references."""
 
-    def __init__(self, request):
+    def __init__(self, request, context=None):
         super(RefAPI, self).__init__()
         self.request = request
 
@@ -190,7 +190,7 @@ class DiffAPI(BaseAPI):
     to `git diff $(git-merge-base A B) B`.
     {name} can be two : separated repositories, for a cross repository diff.
     """
-    def __init__(self, request):
+    def __init__(self, request, context=None):
         super(DiffAPI, self).__init__()
         self.request = request
 
@@ -222,7 +222,7 @@ class DiffMergeAPI(BaseAPI):
     {head} will be merged into {base} and the diff from {base} returned.
     {name} can be two : separated repositories, for a cross repository diff.
     """
-    def __init__(self, request):
+    def __init__(self, request, context=None):
         super(DiffMergeAPI, self).__init__()
         self.request = request
 
@@ -247,7 +247,7 @@ class DiffMergeAPI(BaseAPI):
 class CommitAPI(BaseAPI):
     """Provides HTTP API for git commits."""
 
-    def __init__(self, request):
+    def __init__(self, request, context=None):
         super(CommitAPI, self).__init__()
         self.request = request
 
@@ -275,7 +275,7 @@ class CommitAPI(BaseAPI):
 class LogAPI(BaseAPI):
     """Provides HTTP API for git logs."""
 
-    def __init__(self, request):
+    def __init__(self, request, context=None):
         super(LogAPI, self).__init__()
         self.request = request
 
@@ -297,7 +297,7 @@ class LogAPI(BaseAPI):
 class DetectMergesAPI(BaseAPI):
     """Provides HTTP API for detecting merges."""
 
-    def __init__(self, request):
+    def __init__(self, request, context=None):
         super(DetectMergesAPI, self).__init__()
         self.request = request
 
@@ -326,7 +326,7 @@ class DetectMergesAPI(BaseAPI):
 class BlobAPI(BaseAPI):
     """Provides HTTP API for fetching blobs."""
 
-    def __init__(self, request):
+    def __init__(self, request, context=None):
         super(BlobAPI, self).__init__()
         self.request = request
 
