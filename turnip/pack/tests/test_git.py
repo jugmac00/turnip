@@ -23,8 +23,8 @@ from twisted.internet import (
     defer,
     reactor as default_reactor,
     task,
+    testing,
     )
-from twisted.test import proto_helpers
 from twisted.web import server
 
 from turnip.pack import (
@@ -51,7 +51,7 @@ class TestPackServerProtocol(TestCase):
     def setUp(self):
         super(TestPackServerProtocol, self).setUp()
         self.proto = DummyPackServerProtocol()
-        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
 
@@ -130,7 +130,7 @@ class TestPackBackendProtocol(TestCase):
             self.root, self.hookrpc_handler, self.hookrpc_sock)
         self.proto = DummyPackBackendProtocol()
         self.proto.factory = self.factory
-        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
 
@@ -257,7 +257,7 @@ class TestPackVirtServerProtocol(TestCase):
             b'localhost', backend_port, virtinfo_url, 5)
         proto = git.PackVirtServerProtocol()
         proto.factory = factory
-        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = proto
         proto.makeConnection(self.transport)
         proto.pauseProducing()
@@ -285,7 +285,7 @@ class TestPackVirtServerProtocol(TestCase):
             b'localhost', backend_port, virtinfo_url, 15, reactor=clock)
         proto = git.PackVirtServerProtocol()
         proto.factory = factory
-        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = proto
         proto.makeConnection(self.transport)
         d = proto.requestReceived(b'git-upload-pack', b'/example', {})

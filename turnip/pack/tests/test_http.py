@@ -15,8 +15,8 @@ from twisted.internet import (
     defer,
     reactor as default_reactor,
     task,
+    testing,
     )
-from twisted.test import proto_helpers
 from twisted.web import server
 from twisted.web.test import requesthelper
 
@@ -80,8 +80,7 @@ class FakeRoot(object):
         return {}
 
     def connectToBackend(self, client_factory):
-        self.backend_transport = (
-            proto_helpers.StringTransportWithDisconnection())
+        self.backend_transport = testing.StringTransportWithDisconnection()
         p = client_factory.buildProtocol(None)
         self.backend_transport.protocol = p
         p.makeConnection(self.backend_transport)
