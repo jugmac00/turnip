@@ -266,7 +266,7 @@ class HookRPCHandler(object):
                     TurnipFaultCode.NOT_FOUND,
                     TurnipFaultCode.UNAUTHORIZED,
                     ):
-                # These faults can happen with unlucky timing: a NOT_FAULT
+                # These faults can happen with unlucky timing: a NOT_FOUND
                 # fault can happen if the repository was removed from disk
                 # between translatePath and checkRefPermissions (although
                 # that's impossible in practice with Launchpad's
@@ -278,7 +278,6 @@ class HookRPCHandler(object):
                     "getMergeProposalURL virtinfo raised Unauthorized: "
                     "auth_params={auth_params}, ref_path={ref_path}",
                     auth_params=auth_params, branch=branch)
-                mp_url = None
             else:
                 log_context.log.info(
                     "getMergeProposalURL virtinfo raised "

@@ -62,7 +62,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.translations = []
         self.authentications = []
         self.push_notifications = []
-        self.merge_proposal_url = 'http://bogus.com'
+        self.merge_proposal_url = 'http://bogus.test'
         self.merge_proposal_url_fault = None
         self.ref_permissions_checks = []
         self.ref_permissions = {}

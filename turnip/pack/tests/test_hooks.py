@@ -192,10 +192,10 @@ class HookTestMixin(object):
         self.assertEqual((1, message, b''), (code, out, err))
 
     @defer.inlineCallbacks
-    def assert_MP_URL_Received(self, updates, permissions):
+    def assertMergeProposalURLReceived(self, updates, permissions):
         mp_url_message = (
             b"Create a merge proposal for '%s' on Launchpad by"
-            b" visiting:\n" % updates[0][0])
+            b" visiting:\n" % updates[0][0].split(b'/', 2)[2])
         code, out, err = yield self.invokeHook(
             self.encodeRefs(updates), permissions)
         self.assertEqual((0, b''), (code, err))
@@ -263,7 +263,7 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
     @defer.inlineCallbacks
     def test_notifies(self):
         # The notification callback is invoked with the storage path.
-        yield self.assert_MP_URL_Received(
+        yield self.assertMergeProposalURLReceived(
             [(b'refs/heads/foo', self.old_sha1, self.new_sha1)], [])
         self.assertEqual(['/translated'], self.hookrpc_handler.notifications)
 
@@ -282,8 +282,8 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
             default_branch = subprocess.check_output(
                 ['git', 'symbolic-ref', 'HEAD']
                 ).rstrip(b'\n')
-            pushed_branch = str(default_branch+'notdefault')
-            yield self.assert_MP_URL_Received([(
+            pushed_branch = str(default_branch + 'notdefault')
+            yield self.assertMergeProposalURLReceived([(
                 b'%s' % pushed_branch,
                 self.old_sha1, self.new_sha1)],
                 {b'%s' % pushed_branch: ['push']})

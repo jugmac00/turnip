@@ -376,11 +376,11 @@ class TestHookRPCHandler(TestCase):
         with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
             mp_url = yield self.hookrpc_handler.getMergeProposalURL(
                 None, {'key': key, 'branch': 'master', 'uid': 4})
-        self.assertEqual(None, mp_url)
+        self.assertIsNone(mp_url)
 
         self.virtinfo.merge_proposal_url_fault = xmlrpc.Fault(
             1, 'NOT_FOUND')
         with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
             mp_url = yield self.hookrpc_handler.getMergeProposalURL(
                 None, {'key': key, 'branch': 'master', 'uid': 4})
-        self.assertEqual(None, mp_url)
+        self.assertIsNone(mp_url)

@@ -33,11 +33,8 @@ def check_ancestor(old, new):
 
 def is_default_branch(pushed_branch):
     default_branch = subprocess.check_output(
-        ['git', 'symbolic-ref', 'HEAD']).rstrip(b'\n')
-    if pushed_branch == default_branch:
-        return True
-    else:
-        return False
+        ['git', 'symbolic-ref', 'HEAD']).rstrip(b'\n').split(b'/', 2)[2]
+    return pushed_branch == default_branch
 
 
 def determine_permissions_outcome(old, ref, rule_lines):
@@ -141,13 +138,14 @@ def check_ref_permissions(sock, rpc_key, ref_paths):
         for path, permissions in rule_lines.items()}
 
 
-def send_mp_url(received_lines):
-    refs = [p.rstrip(b'\n').split(b' ', 2)[2] for p in received_lines]
+def send_mp_url(received_line):
+    refs = received_line.rstrip(b'\n').split(b' ', 2)[2]
+
     # check for branch ref here (we're interested in
     # heads and not tags)
-    ref_type = refs[0].split('/', 2)[1]
-    if ref_type == "heads":
-        pushed_branch = refs[0]
+
+    if refs.startswith(b'refs/heads/'):
+        pushed_branch = refs[len(b"refs/heads/"):]
         if not is_default_branch(pushed_branch):
             mp_url = rpc_invoke(
                 sock, b'get_mp_url',
@@ -183,7 +181,7 @@ if __name__ == '__main__':
         if lines:
             rpc_invoke(sock, b'notify_push', {'key': rpc_key})
         if len(lines) == 1:
-            send_mp_url(lines)
+            send_mp_url(lines[0])
         sys.exit(0)
     elif hook == 'update':
         ref = sys.argv[1]
