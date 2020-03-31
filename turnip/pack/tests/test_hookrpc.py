@@ -31,8 +31,8 @@ from twisted.internet import (
     defer,
     reactor,
     task,
+    testing,
     )
-from twisted.test import proto_helpers
 from twisted.web import (
     server,
     xmlrpc,
@@ -72,7 +72,7 @@ class TestJSONNetStringProtocol(TestCase):
     def setUp(self):
         super(TestJSONNetStringProtocol, self).setUp()
         self.proto = DummyJSONNetstringProtocol()
-        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
 
@@ -135,7 +135,7 @@ class TestRPCServerProtocol(TestCase):
             'unauthorized': unauthorized_rpc_method,
             'internal_server_error': internal_server_error_rpc_method,
             })
-        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
 
