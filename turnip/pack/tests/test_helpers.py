@@ -87,6 +87,27 @@ class TestDecodeRequest(TestCase):
         e = self.assertRaises(ValueError, helpers.decode_request, req)
         self.assertEqual(message, str(e).encode('utf-8'))
 
+    def test_hide_extra_params_after_2_null_bytes(self):
+        # We hide extra params behind 2 NUL bytes
+        req = b'git-upload-pack /test_repo\0host=git.launchpad.test\0\0ver=2\0'
+        self.assertEqual(
+            (b'git-upload-pack', b'/test_repo',
+                {b'host': 'git.launchpad.test'}),
+            helpers.decode_request(req))
+
+    def test_rejects_extra_params_without_end_null_bytes(self):
+        # Extra params after 2 must be NUL-terminated
+        self.assertInvalid(
+            b'git-upload-pack /some/path\0host=git.launchpad.test\0\0ver=2',
+            b'Invalid git-proto-request')
+
+    def test_allow_2_end_nul_bytes(self):
+        req = b'git-upload-pack /test_repo\0host=git.launchpad.test\0\0'
+        self.assertEqual(
+            (b'git-upload-pack', b'/test_repo',
+                {b'host': 'git.launchpad.test'}),
+            helpers.decode_request(req))
+
     def test_without_parameters(self):
         self.assertEqual(
             (b'git-do-stuff', b'/some/path', {}),
