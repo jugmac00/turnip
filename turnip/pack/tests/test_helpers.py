@@ -87,18 +87,38 @@ class TestDecodeRequest(TestCase):
         e = self.assertRaises(ValueError, helpers.decode_request, req)
         self.assertEqual(message, str(e).encode('utf-8'))
 
-    def test_hide_extra_params_after_2_null_bytes(self):
-        # We hide extra params behind 2 NUL bytes
+    def test_parse_extra_param_after_2_null_bytes(self):
+        # We parse extra params behind 2 NUL bytes
         req = b'git-upload-pack /test_repo\0host=git.launchpad.test\0\0ver=2\0'
         self.assertEqual(
             (b'git-upload-pack', b'/test_repo',
-                {b'host': 'git.launchpad.test'}),
+                {b'host': 'git.launchpad.test', 'ver': '2'}),
             helpers.decode_request(req))
 
-    def test_rejects_extra_params_without_end_null_bytes(self):
-        # Extra params after 2 must be NUL-terminated
+    def test_parse_multiple_extra_params_after_2_null_bytes(self):
+        # We parse extra params behind 2 NUL bytes
+        req = (b'git-upload-pack /test_repo\0'
+               b'host=git.launchpad.test\0\0'
+               b'ver=2\0\0param2=value2\0\0param3=value3\0'
+               )
+        self.assertEqual(
+            (b'git-upload-pack', b'/test_repo',
+                {b'host': 'git.launchpad.test', 'ver': '2',
+                 'param2': 'value2', 'param3': 'value3'}),
+            helpers.decode_request(req))
+
+    def test_rejects_extra_param_without_end_null_bytes(self):
+        # Extra param after 2 NUL bytes must be NUL-terminated
         self.assertInvalid(
             b'git-upload-pack /some/path\0host=git.launchpad.test\0\0ver=2',
+            b'Invalid git-proto-request')
+
+    def test_rejects_multiple_extra_params_after_2_null_bytes(self):
+        req = (b'git-upload-pack /test_repo\0'
+               b'host=git.launchpad.test\0\0ver=2\0\0param2=some_value')
+        # Extra params after 2 NUL bytes must be NUL-terminated
+        self.assertInvalid(
+            req,
             b'Invalid git-proto-request')
 
     def test_allow_2_end_nul_bytes(self):

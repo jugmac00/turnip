@@ -80,19 +80,19 @@ def decode_request(data):
         raise ValueError('Invalid git-proto-request')
     pathname = bits[0]
     params = {}
-    index = 0
-    for param in bits[1:-1]:
+    for index, param in enumerate(bits[1:-1]):
         if param == '':
             if (index < len(bits)-1):
-                # hide extra params afer 2 NUL bytes
-                return (command, pathname, params)
+                # we skip over the second NUL byte here
+                # and move on to the extra parameter after
+                # the 2 NUL bytes to parse it
+                continue
         if b'=' not in param:
             raise ValueError('Parameters must have values')
         name, value = param.split(b'=', 1)
         if name in params:
             raise ValueError('Parameters must not be repeated')
         params[name] = value
-        index += 1
     return (command, pathname, params)
 
 
