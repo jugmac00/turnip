@@ -81,8 +81,8 @@ def decode_request(data):
     pathname = bits[0]
     params = {}
     for index, param in enumerate(bits[1:-1]):
-        if param == '':
-            if (index < len(bits)-1):
+        if param == b'':
+            if (index < len(bits) - 1):
                 # we skip over the second NUL byte here
                 # and move on to the extra parameter after
                 # the 2 NUL bytes to parse it
