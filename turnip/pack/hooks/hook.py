@@ -33,7 +33,7 @@ def check_ancestor(old, new):
 
 def is_default_branch(pushed_branch):
     default_branch = subprocess.check_output(
-        ['git', 'symbolic-ref', 'HEAD']).rstrip(b'\n').split(b'/', 2)[2]
+        ['git', 'symbolic-ref', 'HEAD']).rstrip(b'\n')
     return pushed_branch == default_branch
 
 
@@ -139,13 +139,13 @@ def check_ref_permissions(sock, rpc_key, ref_paths):
 
 
 def send_mp_url(received_line):
-    refs = received_line.rstrip(b'\n').split(b' ', 2)[2]
+    ref = received_line.rstrip(b'\n').split(b' ', 2)[2]
 
     # check for branch ref here (we're interested in
     # heads and not tags)
 
-    if refs.startswith(b'refs/heads/'):
-        pushed_branch = refs[len(b"refs/heads/"):]
+    if ref.startswith(b'refs/heads/') and not is_default_branch(ref):
+        pushed_branch = ref[len(b'refs/heads/'):]
         if not is_default_branch(pushed_branch):
             mp_url = rpc_invoke(
                 sock, b'get_mp_url',
