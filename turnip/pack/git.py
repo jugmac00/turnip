@@ -36,7 +36,7 @@ from turnip.pack.helpers import (
 ERROR_PREFIX = b'ERR '
 VIRT_ERROR_PREFIX = b'turnip virt error: '
 
-SAFE_PARAMS = frozenset(['host'])
+SAFE_PARAMS = frozenset(['host', 'version'])
 
 
 class RequestIDLogger(Logger):
@@ -350,6 +350,7 @@ class PackClientFactory(protocol.ClientFactory):
     def buildProtocol(self, *args, **kwargs):
         p = protocol.ClientFactory.buildProtocol(self, *args, **kwargs)
         p.setPeer(self.server)
+        self.deferred.callback(None)
         return p
 
     def clientConnectionFailed(self, connector, reason):
@@ -560,7 +561,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             auth_params = self.createAuthParams(params)
             self.log.info("Translating request.")
             translated = yield proxy.callRemote(
-                b'translatePath', pathname, permission,
+                'translatePath', pathname, permission,
                 auth_params).addTimeout(
                     self.factory.virtinfo_timeout, self.factory.reactor)
             self.log.info(

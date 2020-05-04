@@ -12,9 +12,9 @@ VIRTUALENV := virtualenv
 
 DEPENDENCIES_URL := https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
 
-PIP_CACHE_ARGS ?= -q
+PIP_ARGS ?= --quiet
 ifneq ($(PIP_SOURCE_DIR),)
-override PIP_CACHE_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
+override PIP_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
 endif
 
 # Create archives in labelled directories (e.g.
@@ -49,9 +49,9 @@ endif
 	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
-	$(VIRTUALENV) --never-download $(ENV)
-	$(PIP) install $(PIP_CACHE_ARGS) -r bootstrap-requirements.txt
-	$(PIP) install $(PIP_CACHE_ARGS) -c requirements.txt \
+	$(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
+	$(PIP) install $(PIP_ARGS) -r bootstrap-requirements.txt
+	$(PIP) install $(PIP_ARGS) -c requirements.txt \
 		-e '.[test,deploy]'
 
 test: $(ENV)
@@ -75,7 +75,10 @@ lint: $(ENV)
 	@$(FLAKE8) --exclude=__pycache__,version_info.py turnip
 	$(PYTHON) setup.py check --restructuredtext --strict
 
-check: test lint
+pip-check: $(ENV)
+	$(PIP) check
+
+check: pip-check test lint
 
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
@@ -85,7 +88,7 @@ run-pack: $(ENV)
 
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
-	$(PIP) install $(PIP_CACHE_ARGS) -d $(PIP_CACHE) \
+	$(PIP) install $(PIP_ARGS) -d $(PIP_CACHE) \
 		-r bootstrap-requirements.txt \
 		-r requirements.txt
 

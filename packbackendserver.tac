@@ -18,7 +18,7 @@ from twisted.application import (
     )
 from twisted.scripts.twistd import ServerOptions
 
-from turnip.config import TurnipConfig
+from turnip.config import config
 from turnip.log import RotatableFileLogObserver
 from turnip.pack.git import PackBackendFactory
 from turnip.pack.hookrpc import (
@@ -30,7 +30,6 @@ from turnip.pack.hookrpc import (
 def getPackBackendServices():
     """Return PackBackendFactory and HookRPC services."""
 
-    config = TurnipConfig()
     repo_store = config.get('repo_store')
     pack_backend_port = int(config.get('pack_backend_port'))
     hookrpc_handler = HookRPCHandler(

@@ -7,6 +7,7 @@ from __future__ import (
     unicode_literals,
     )
 
+import hashlib
 import os.path
 
 from fixtures import TempDir
@@ -17,11 +18,13 @@ from testtools.matchers import (
     Equals,
     MatchesListwise,
     )
+from testtools.twistedsupport import AsynchronousDeferredRunTest
 from twisted.internet import (
+    defer,
     reactor as default_reactor,
     task,
+    testing,
     )
-from twisted.test import proto_helpers
 from twisted.web import server
 
 from turnip.pack import (
@@ -48,7 +51,7 @@ class TestPackServerProtocol(TestCase):
     def setUp(self):
         super(TestPackServerProtocol, self).setUp()
         self.proto = DummyPackServerProtocol()
-        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
 
@@ -115,6 +118,53 @@ class DummyPackBackendProtocol(git.PackBackendProtocol):
         self.test_process = (cmd, args, env)
 
 
+class TestPackFrontendServerProtocol(TestCase):
+
+    def setUp(self):
+        super(TestPackFrontendServerProtocol, self).setUp()
+        self.factory = git.PackFrontendFactory('example.com', 12345)
+        self.proto = git.PackFrontendServerProtocol()
+        self.proto.factory = self.factory
+        self.transport = testing.StringTransportWithDisconnection()
+        self.transport.protocol = self.proto
+        self.proto.makeConnection(self.transport)
+
+    def assertKilledWith(self, message):
+        self.assertFalse(self.transport.connected)
+        self.assertEqual(
+            (b'ERR ' + message + b'\n', b''),
+            helpers.decode_packet(self.transport.value()))
+
+    def test_git_receive(self):
+        self.proto.pauseProducing()
+        self.proto.got_request = True
+        yield self.proto.requestReceived(
+            b'git-upload-pack', b'/foo.git', {b'host': b'example.com'})
+        self.assertEqual(b'git-upload-pack', self.proto.command)
+        self.transport.loseConnection()
+
+    def test_git_receive_with_version_param(self):
+        self.proto.pauseProducing()
+        self.proto.got_request = True
+        yield self.proto.requestReceived(
+            b'git-upload-pack', b'/test_repo',
+            {b'host': 'example.com', 'version': '2'}),
+        self.assertIn(b'host', self.proto.params)
+        self.assertIn('version', self.proto.params)
+        self.transport.loseConnection()
+
+    def test_git_receive_with_extra_undefined_params(self):
+        self.proto.pauseProducing()
+        self.proto.got_request = True
+        yield self.proto.requestReceived(
+            b'git-upload-pack', b'/test_repo',
+            {b'host': 'example.com', 'version': '2',
+             'undefined_param': 'value'}),
+        self.assertIsNone(self.proto.params)
+        self.assertKilledWith(b'Illegal request parameters')
+        self.transport.loseConnection()
+
+
 class TestPackBackendProtocol(TestCase):
     """Test the Git pack backend protocol."""
 
@@ -127,7 +177,7 @@ class TestPackBackendProtocol(TestCase):
             self.root, self.hookrpc_handler, self.hookrpc_sock)
         self.proto = DummyPackBackendProtocol()
         self.proto.factory = self.factory
-        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
 
@@ -213,14 +263,56 @@ class TestPackBackendProtocol(TestCase):
         self.assertKilledWith(b'Symbolic ref target may not contain " "')
 
 
+class DummyPackBackendFactory(git.PackBackendFactory):
+
+    test_protocol = None
+
+    def buildProtocol(self, *args, **kwargs):
+        self.test_protocol = git.PackBackendFactory.buildProtocol(
+            self, *args, **kwargs)
+        return self.test_protocol
+
+
 class TestPackVirtServerProtocol(TestCase):
     """Test the Git pack virt protocol."""
+
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     def assertKilledWith(self, message):
         self.assertFalse(self.transport.connected)
         self.assertEqual(
             (b'ERR turnip virt error: ' + message + b'\n', b''),
             helpers.decode_packet(self.transport.value()))
+
+    @defer.inlineCallbacks
+    def test_translatePath(self):
+        root = self.useFixture(TempDir()).path
+        hookrpc_handler = MockHookRPCHandler()
+        hookrpc_sock = os.path.join(root, 'hookrpc_sock')
+        backend_factory = DummyPackBackendFactory(
+            root, hookrpc_handler, hookrpc_sock)
+        backend_factory.protocol = DummyPackBackendProtocol
+        backend_listener = default_reactor.listenTCP(0, backend_factory)
+        backend_port = backend_listener.getHost().port
+        self.addCleanup(backend_listener.stopListening)
+        virtinfo = FakeVirtInfoService(allowNone=True)
+        virtinfo_listener = default_reactor.listenTCP(0, server.Site(virtinfo))
+        virtinfo_port = virtinfo_listener.getHost().port
+        virtinfo_url = b'http://localhost:%d/' % virtinfo_port
+        self.addCleanup(virtinfo_listener.stopListening)
+        factory = git.PackVirtFactory(
+            b'localhost', backend_port, virtinfo_url, 5)
+        proto = git.PackVirtServerProtocol()
+        proto.factory = factory
+        self.transport = testing.StringTransportWithDisconnection()
+        self.transport.protocol = proto
+        proto.makeConnection(self.transport)
+        proto.pauseProducing()
+        proto.got_request = True
+        yield proto.requestReceived(b'git-upload-pack', b'/example', {})
+        self.assertEqual(
+            hashlib.sha256(b'/example').hexdigest(), proto.pathname)
+        backend_factory.test_protocol.transport.loseConnection()
 
     def test_translatePath_timeout(self):
         root = self.useFixture(TempDir()).path
@@ -240,7 +332,7 @@ class TestPackVirtServerProtocol(TestCase):
             b'localhost', backend_port, virtinfo_url, 15, reactor=clock)
         proto = git.PackVirtServerProtocol()
         proto.factory = factory
-        self.transport = proto_helpers.StringTransportWithDisconnection()
+        self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = proto
         proto.makeConnection(self.transport)
         d = proto.requestReceived(b'git-upload-pack', b'/example', {})

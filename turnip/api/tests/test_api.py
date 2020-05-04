@@ -408,6 +408,42 @@ class ApiTestCase(TestCase):
         self.assertIn(
             b'diff --git a/foo.txt b/bar.txt\n', resp.json_body['patch'])
 
+    def test_repo_diff_rename_and_change_content_conflict(self):
+        # Create repo1 with foo.txt.
+        repo1 = RepoFactory(self.repo_store)
+        c1 = repo1.add_commit('foo\n', 'foo.txt')
+        repo1.set_head(c1)
+
+        # Fork and change the content of foo.txt in repo2.
+        repo2_name = uuid.uuid4().hex
+        repo2 = RepoFactory(
+            os.path.join(self.repo_root, repo2_name), clone_from=repo1)
+
+        # Rename foo.txt to bar.txt in repo2
+        repo2.repo.index.remove('foo.txt')
+        c2 = repo2.add_commit('foo\n', 'bar.txt', parents=[c1])
+
+        # Do the same renaming on the original repo, with a change.
+        repo1.repo.index.remove('foo.txt')
+        c3 = repo2.add_commit('foo something\n', 'bar.txt', parents=[c1])
+
+        resp = self.app.get('/repo/{}:{}/compare-merge/{}:{}'.format(
+            self.repo_path, repo2_name, c2, c3))
+
+        self.assertEqual([u'bar.txt', u'foo.txt'], resp.json['conflicts'])
+        self.assertEqual(dedent("""\
+            diff --git a/bar.txt b/bar.txt
+            index 257cc56..0290da8 100644
+            --- a/bar.txt
+            +++ b/bar.txt
+            @@ -1 +1,5 @@
+            +<<<<<<< bar.txt
+             foo
+            +=======
+            +foo something
+            +>>>>>>> bar.txt
+            """), resp.json['patch'])
+
     def test_repo_diff_merge(self):
         """Ensure expected changes exist in diff patch."""
         repo = RepoFactory(self.repo_store)

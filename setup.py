@@ -12,7 +12,7 @@ from setuptools import (
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-with open(os.path.join(here, 'README')) as f:
+with open(os.path.join(here, 'README.rst')) as f:
     README = f.read()
 with open(os.path.join(here, 'NEWS')) as f:
     README += "\n\n" + f.read()
@@ -54,6 +54,7 @@ setup(
     maintainer_email='lazr-developers@lists.launchpad.net',
     description='turnip',
     long_description=README,
+    long_description_content_type='text/x-rst',
     license='AGPL v3',
     url='https://launchpad.net/turnip',
     download_url='https://launchpad.net/turnip/+download',

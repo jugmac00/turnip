@@ -19,6 +19,7 @@ from pygit2 import (
     GIT_OBJ_COMMIT,
     GIT_OBJ_TREE,
     GIT_OBJ_TAG,
+    GIT_REF_OID,
     GIT_SORT_TOPOLOGICAL,
     IndexEntry,
     init_repository,
@@ -109,10 +110,66 @@ def write_alternates(repo_path, alternate_repo_paths):
 object_dir_re = re.compile(r'\A[0-9a-f][0-9a-f]\Z')
 
 
+def copy_refs(from_root, to_root):
+    """Copy refs from one .git directory to another.
+
+    The refs may clobber existing ones.  Refs that can be packed are
+    returned as a dictionary rather than imported immediately, and should be
+    written using `write_packed_refs` (this approach makes it easier to
+    merge refs from multiple repositories).
+    """
+    from_repo = Repository(from_root)
+    to_repo = Repository(to_root)
+    packable_refs = {}
+    for ref in from_repo.references.objects:
+        if ref.type == GIT_REF_OID:
+            obj = from_repo.get(ref.target)
+            if obj is not None:
+                if obj.type == GIT_OBJ_TAG:
+                    try:
+                        peeled_oid = ref.peel().id
+                    except (ValueError, GitError):
+                        # Fall back to leaving the ref unpacked.
+                        pass
+                    else:
+                        packable_refs[ref.raw_name] = (obj.id, peeled_oid)
+                else:
+                    packable_refs[ref.raw_name] = (obj.id, None)
+        if ref.raw_name not in packable_refs:
+            to_repo.references.create(
+                ref, from_repo.references[ref].target, force=True)
+    return packable_refs
+
+
+def write_packed_refs(root, packable_refs):
+    """Write out a packed-refs file in one go.
+
+    The format is undocumented except in source comments, but libgit2
+    implements it as well (albeit not in a way we can use), so it should be
+    safe enough to implement it here.  Doing it this way is faster over NFS
+    for repositories with lots of refs than using libgit2 with its proper
+    locking or even copying refs individually, since we don't incur an fsync
+    for each ref.
+    """
+    if packable_refs:
+        with open(os.path.join(root, 'packed-refs'), 'wb') as packed_refs:
+            packed_refs.write(
+                b'# pack-refs with: peeled fully-peeled sorted \n')
+            for ref_name, (oid, peeled_oid) in sorted(packable_refs.items()):
+                packed_refs.write(
+                    b'%s %s\n' % (oid.hex.encode('ascii'), ref_name))
+                if peeled_oid is not None:
+                    packed_refs.write(
+                        b'^%s\n' % (peeled_oid.hex.encode('ascii'),))
+
+
 def import_into_subordinate(sub_root, from_root):
     """Import all of a repo's objects and refs into another.
 
-    The refs may clobber existing ones."""
+    The refs may clobber existing ones.  Refs that can be packed are
+    returned as a dictionary rather than imported immediately, and should be
+    written using `write_packed_refs`.
+    """
     for dirname in os.listdir(os.path.join(from_root, 'objects')):
         # We want to hardlink any children of the loose fanout or pack
         # directories.
@@ -134,11 +191,7 @@ def import_into_subordinate(sub_root, from_root):
     # TODO: This should ensure that we don't overwrite anything. The
     # alternate's refs are only used as extra .haves on push, so it
     # wouldn't hurt to mangle the names.
-    from_repo = Repository(from_root)
-    sub_repo = Repository(sub_root)
-    for ref in from_repo.listall_references():
-        sub_repo.references.create(
-            ref, from_repo.references[ref].target, force=True)
+    return copy_refs(from_root, sub_root)
 
 
 class AlreadyExistsError(GitError):
@@ -164,10 +217,12 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         # extra haves without polluting refs in the real repo.
         sub_path = os.path.join(repo_path, 'turnip-subordinate')
         init_repository(sub_path, True)
+        packable_refs = {}
         if os.path.exists(os.path.join(clone_from, 'turnip-subordinate')):
-            import_into_subordinate(
-                sub_path, os.path.join(clone_from, 'turnip-subordinate'))
-        import_into_subordinate(sub_path, clone_from)
+            packable_refs.update(import_into_subordinate(
+                sub_path, os.path.join(clone_from, 'turnip-subordinate')))
+        packable_refs.update(import_into_subordinate(sub_path, clone_from))
+        write_packed_refs(sub_path, packable_refs)
 
     new_alternates = []
     if alternate_repo_paths:
@@ -181,10 +236,8 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         # can just copy all refs from the origin. Unlike
         # pygit2.clone_repository, this won't set up a remote.
         # TODO: Filter out internal (eg. MP) refs.
-        from_repo = Repository(clone_from)
-        to_repo = Repository(repo_path)
-        for ref in from_repo.listall_references():
-            to_repo.references.create(ref, from_repo.references[ref].target)
+        packable_refs = copy_refs(clone_from, repo_path)
+        write_packed_refs(repo_path, packable_refs)
 
     ensure_config(repo_path)  # set repository configuration defaults
 
@@ -343,28 +396,31 @@ def _add_conflicted_files(repo, index):
             path = conflict_entry.path
             conflicts.add(path)
             ancestor, ours, theirs = conflict
+
+            # Skip any further check if it's a delete/delete conflict:
+            # the file got renamed or deleted from both branches. Nothing to
+            # merge and no useful conflict diff to generate.
             if ours is None and theirs is None:
-                # A delete/delete conflict?  We probably shouldn't get here,
-                # but if we do then the resolution is obvious.
-                index.remove(path)
-            else:
-                if ours is None or theirs is None:
-                    # A modify/delete conflict.  Turn the "delete" side into
-                    # a fake empty file so that we can generate a useful
-                    # conflict diff.
-                    empty_oid = repo.create_blob(b'')
-                    if ours is None:
-                        ours = IndexEntry(
-                            path, empty_oid, conflict_entry.mode)
-                    if theirs is None:
-                        theirs = IndexEntry(
-                            path, empty_oid, conflict_entry.mode)
-                merged_file = repo.merge_file_from_index(
-                    ancestor, ours, theirs)
-                # merge_file_from_index gratuitously decodes as UTF-8, so
-                # encode it back again.
-                blob_oid = repo.create_blob(merged_file.encode('utf-8'))
-                index.add(IndexEntry(path, blob_oid, conflict_entry.mode))
+                del index.conflicts[path]
+                continue
+
+            if ours is None or theirs is None:
+                # A modify/delete conflict.  Turn the "delete" side into
+                # a fake empty file so that we can generate a useful
+                # conflict diff.
+                empty_oid = repo.create_blob(b'')
+                if ours is None:
+                    ours = IndexEntry(
+                        path, empty_oid, conflict_entry.mode)
+                if theirs is None:
+                    theirs = IndexEntry(
+                        path, empty_oid, conflict_entry.mode)
+            merged_file = repo.merge_file_from_index(
+                ancestor, ours, theirs)
+            # merge_file_from_index gratuitously decodes as UTF-8, so
+            # encode it back again.
+            blob_oid = repo.create_blob(merged_file.encode('utf-8'))
+            index.add(IndexEntry(path, blob_oid, conflict_entry.mode))
             del index.conflicts[path]
     return conflicts
 

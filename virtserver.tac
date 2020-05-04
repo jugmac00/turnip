@@ -13,7 +13,7 @@ from twisted.application import (
     )
 from twisted.scripts.twistd import ServerOptions
 
-from turnip.config import TurnipConfig
+from turnip.config import config
 from turnip.log import RotatableFileLogObserver
 from turnip.pack.git import PackVirtFactory
 
@@ -21,7 +21,6 @@ from turnip.pack.git import PackVirtFactory
 def getPackVirtService():
     """Return a PackVirt Service."""
 
-    config = TurnipConfig()
     return internet.TCPServer(
         int(config.get('pack_virt_port')),
         PackVirtFactory(config.get('pack_backend_host'),
