@@ -7,7 +7,10 @@ from __future__ import (
     unicode_literals,
     )
 
-from turnip.tests.logging import setupLogger
+import sys
+import logging
 
 
-setupLogger()
+def setupLogger():
+    """Setup our basic logging for tests."""
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)

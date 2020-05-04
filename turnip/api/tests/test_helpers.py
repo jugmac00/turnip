@@ -4,20 +4,23 @@
 import contextlib
 import fnmatch
 import itertools
+import logging
 import os
+from subprocess import PIPE, Popen, CalledProcessError
 import uuid
-
-from six.moves import urllib
 
 from pygit2 import (
     clone_repository,
-    init_repository,
     GIT_FILEMODE_BLOB,
-    GIT_OBJ_COMMIT,
     IndexEntry,
+    init_repository,
     Repository,
     Signature,
     )
+import six
+from six.moves import urllib
+
+log = logging.getLogger()
 
 
 def get_revlist(repo):
@@ -94,14 +97,34 @@ class RepoFactory(object):
         self.branches.append(branch)
         return branch
 
+    def _get_cmd_line_auth_params(self):
+        return [
+            '-c', 'user.name={}'.format(self.author.name),
+            '-c', 'user.email={}'.format(self.author.email),
+            '-c', 'author.name={}'.format(self.author.name),
+            '-c', 'author.email={}'.format(self.author.email),
+            '-c', 'committer.name={}'.format(self.committer.name),
+            '-c', 'committer.email={}'.format(self.committer.email),
+        ]
+
     def add_tag(self, tag_name, tag_message, oid):
         """Create a tag from tag_name and oid."""
-        repo = self.repo
-        repo.create_tag(tag_name, oid, GIT_OBJ_COMMIT,
-                        self.committer, tag_message)
+        cmd_line = ['git', '-C', self.repo_path]
+        cmd_line += self._get_cmd_line_auth_params()
+        cmd_line += ['tag', '-m', tag_message, tag_name, oid.hex]
+        subproc = Popen(cmd_line, stderr=PIPE, stdout=PIPE)
+        retcode = subproc.wait()
+        if retcode:
+            log.error(
+                "Command %s finished with error code %s. stdout/stderr:\n%s",
+                cmd_line, retcode, subproc.stderr.read())
+            raise CalledProcessError(retcode, cmd_line)
 
     def makeSignature(self, name, email, encoding='utf-8'):
         """Return an author or committer signature."""
+        # email should always be str on python3, but pygit2
+        # doesn't enforce the same for name.
+        email = six.ensure_str(email)
         return Signature(name, email, encoding=encoding)
 
     def stage(self, path, content):

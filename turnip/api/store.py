@@ -2,10 +2,6 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 import base64
-from contextlib2 import (
-    contextmanager,
-    ExitStack,
-    )
 import itertools
 import os
 import re
@@ -13,14 +9,18 @@ import shutil
 import subprocess
 import uuid
 
+from contextlib2 import (
+    contextmanager,
+    ExitStack,
+    )
 from pygit2 import (
-    GitError,
     GIT_OBJ_BLOB,
     GIT_OBJ_COMMIT,
-    GIT_OBJ_TREE,
     GIT_OBJ_TAG,
+    GIT_OBJ_TREE,
     GIT_REF_OID,
     GIT_SORT_TOPOLOGICAL,
+    GitError,
     IndexEntry,
     init_repository,
     Oid,
@@ -335,12 +335,14 @@ def get_refs(repo_store, repo_name, exclude_prefixes=None):
     """Return all refs for a git repository."""
     with open_repo(repo_store, repo_name) as repo:
         refs = {}
-        for ref in repo.listall_references():
-            git_object = repo.references[ref].peel()
+        for ref_obj in repo.listall_reference_objects():
             # Filter non-unicode refs, as refs are treated as unicode
             # given json is unable to represent arbitrary byte strings.
             try:
-                ref = ref.decode('utf-8')
+                ref = ref_obj.name
+                if isinstance(ref, bytes):
+                    ref = ref.decode('utf-8')
+                git_object = repo.references[ref].peel()
             except UnicodeDecodeError:
                 pass
             else:

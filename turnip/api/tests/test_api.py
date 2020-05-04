@@ -10,16 +10,13 @@ import os
 import subprocess
 from textwrap import dedent
 import unittest
-try:
-    from urllib.parse import quote
-except ImportError:
-    from urllib import quote
 import uuid
 
 from fixtures import (
     EnvironmentVariable,
     TempDir,
     )
+from six.moves.urllib.parse import quote
 from testtools import TestCase
 from testtools.matchers import (
     Equals,
@@ -217,7 +214,7 @@ class ApiTestCase(TestCase):
         """Ensure non-unicode refs are dropped from ref collection."""
         factory = RepoFactory(self.repo_store)
         commit_oid = factory.add_commit('foo', 'foobar.txt')
-        tag = '\xe9\xe9\xe9'  # latin-1
+        tag = b'\xe9\xe9\xe9'  # latin-1
         tag_message = 'tag message'
         factory.add_tag(tag, tag_message, commit_oid)
 
@@ -335,7 +332,7 @@ class ApiTestCase(TestCase):
     def test_repo_diff_non_unicode_commits(self):
         """Ensure non utf-8 chars are handled but stripped from diff."""
         factory = RepoFactory(self.repo_store)
-        message = 'not particularly sensible latin-1: \xe9\xe9\xe9.'
+        message = b'not particularly sensible latin-1: \xe9\xe9\xe9.'
         oid = factory.add_commit(message, 'foo.py')
         oid2 = factory.add_commit('a sensible commit message', 'foo.py', [oid])
 
@@ -406,7 +403,7 @@ class ApiTestCase(TestCase):
             self.repo_path, quote('{}^'.format(c2)), c2)
         resp = self.app.get(path)
         self.assertIn(
-            b'diff --git a/foo.txt b/bar.txt\n', resp.json_body['patch'])
+            'diff --git a/foo.txt b/bar.txt\n', resp.json_body['patch'])
 
     def test_repo_diff_rename_and_change_content_conflict(self):
         # Create repo1 with foo.txt.
@@ -576,7 +573,7 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, c1, c2))
         self.assertIn(
-            b'diff --git a/foo.txt b/bar.txt\n', resp.json_body['patch'])
+            'diff --git a/foo.txt b/bar.txt\n', resp.json_body['patch'])
 
     def test_repo_get_commit(self):
         factory = RepoFactory(self.repo_store)
@@ -671,7 +668,7 @@ class ApiTestCase(TestCase):
     def test_repo_get_non_unicode_log(self):
         """Ensure that non-unicode data is discarded."""
         factory = RepoFactory(self.repo_store)
-        message = '\xe9\xe9\xe9'  # latin-1
+        message = b'\xe9\xe9\xe9'  # latin-1
         oid = factory.add_commit(message, 'foo.py')
         resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid))
         self.assertEqual(message.decode('utf-8', 'replace'),
@@ -809,15 +806,15 @@ class ApiTestCase(TestCase):
         factory.add_commit('b\n', 'dir/file', parents=[c1])
         resp = self.app.get('/repo/{}/blob/dir/file'.format(self.repo_path))
         self.assertEqual(2, resp.json['size'])
-        self.assertEqual('b\n', base64.b64decode(resp.json['data']))
+        self.assertEqual(b'b\n', base64.b64decode(resp.json['data']))
         resp = self.app.get('/repo/{}/blob/dir/file?rev=master'.format(
             self.repo_path))
         self.assertEqual(2, resp.json['size'])
-        self.assertEqual('b\n', base64.b64decode(resp.json['data']))
+        self.assertEqual(b'b\n', base64.b64decode(resp.json['data']))
         resp = self.app.get('/repo/{}/blob/dir/file?rev={}'.format(
             self.repo_path, c1.hex))
         self.assertEqual(2, resp.json['size'])
-        self.assertEqual('a\n', base64.b64decode(resp.json['data']))
+        self.assertEqual(b'a\n', base64.b64decode(resp.json['data']))
 
     def test_repo_blob_missing_commit(self):
         """Trying to get a blob from a non-existent commit returns HTTP 404."""
@@ -861,7 +858,7 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}/blob/dir/file?rev=tag-name'.format(
             self.repo_path))
         self.assertEqual(2, resp.json['size'])
-        self.assertEqual('a\n', base64.b64decode(resp.json['data']))
+        self.assertEqual(b'a\n', base64.b64decode(resp.json['data']))
 
     def test_repo_blob_from_non_commit(self):
         """Trying to get a blob from a non-commit returns HTTP 404."""
