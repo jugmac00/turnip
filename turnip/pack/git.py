@@ -36,7 +36,7 @@ from turnip.pack.helpers import (
 ERROR_PREFIX = b'ERR '
 VIRT_ERROR_PREFIX = b'turnip virt error: '
 
-SAFE_PARAMS = frozenset(['host'])
+SAFE_PARAMS = frozenset(['host', 'version'])
 
 
 class RequestIDLogger(Logger):

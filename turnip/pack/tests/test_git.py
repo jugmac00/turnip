@@ -118,6 +118,53 @@ class DummyPackBackendProtocol(git.PackBackendProtocol):
         self.test_process = (cmd, args, env)
 
 
+class TestPackFrontendServerProtocol(TestCase):
+
+    def setUp(self):
+        super(TestPackFrontendServerProtocol, self).setUp()
+        self.factory = git.PackFrontendFactory('example.com', 12345)
+        self.proto = git.PackFrontendServerProtocol()
+        self.proto.factory = self.factory
+        self.transport = testing.StringTransportWithDisconnection()
+        self.transport.protocol = self.proto
+        self.proto.makeConnection(self.transport)
+
+    def assertKilledWith(self, message):
+        self.assertFalse(self.transport.connected)
+        self.assertEqual(
+            (b'ERR ' + message + b'\n', b''),
+            helpers.decode_packet(self.transport.value()))
+
+    def test_git_receive(self):
+        self.proto.pauseProducing()
+        self.proto.got_request = True
+        yield self.proto.requestReceived(
+            b'git-upload-pack', b'/foo.git', {b'host': b'example.com'})
+        self.assertEqual(b'git-upload-pack', self.proto.command)
+        self.transport.loseConnection()
+
+    def test_git_receive_with_version_param(self):
+        self.proto.pauseProducing()
+        self.proto.got_request = True
+        yield self.proto.requestReceived(
+            b'git-upload-pack', b'/test_repo',
+            {b'host': 'example.com', 'version': '2'}),
+        self.assertIn(b'host', self.proto.params)
+        self.assertIn('version', self.proto.params)
+        self.transport.loseConnection()
+
+    def test_git_receive_with_extra_undefined_params(self):
+        self.proto.pauseProducing()
+        self.proto.got_request = True
+        yield self.proto.requestReceived(
+            b'git-upload-pack', b'/test_repo',
+            {b'host': 'example.com', 'version': '2',
+             'undefined_param': 'value'}),
+        self.assertIsNone(self.proto.params)
+        self.assertKilledWith(b'Illegal request parameters')
+        self.transport.loseConnection()
+
+
 class TestPackBackendProtocol(TestCase):
     """Test the Git pack backend protocol."""
 
