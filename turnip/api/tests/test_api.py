@@ -22,6 +22,8 @@ from testtools.matchers import (
     Equals,
     MatchesSetwise,
     )
+from webtest import TestApp
+
 from turnip import api
 from turnip.api.tests.test_helpers import (
     chdir,
@@ -29,7 +31,6 @@ from turnip.api.tests.test_helpers import (
     open_repo,
     RepoFactory,
     )
-from webtest import TestApp
 
 
 class ApiTestCase(TestCase):
