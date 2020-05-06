@@ -341,3 +341,46 @@ class TestHookRPCHandler(TestCase):
             clock.advance(15)
             self.assertTrue(d.called)
             return assert_fails_with(d, defer.TimeoutError)
+
+    @defer.inlineCallbacks
+    def test_getMergeProposalURL(self):
+        clock = task.Clock()
+        self.hookrpc_handler = hookrpc.HookRPCHandler(
+            self.virtinfo_url, 15, reactor=clock)
+
+        with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
+            mp_url = yield self.hookrpc_handler.getMergeProposalURL(
+                None, {'key': key, 'branch': 'master', 'uid': 4})
+        self.assertIsNotNone(mp_url)
+
+    def test_getMergeProposalURL_timeout(self):
+        clock = task.Clock()
+        self.hookrpc_handler = hookrpc.HookRPCHandler(
+            self.virtinfo_url, 15, reactor=clock)
+
+        with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
+            d = self.hookrpc_handler.getMergeProposalURL(
+                None, {'key': key, 'branch': 'master', 'uid': 4})
+            clock.advance(1)
+            self.assertFalse(d.called)
+            clock.advance(15)
+            self.assertTrue(d.called)
+            return assert_fails_with(d, defer.TimeoutError)
+
+    @defer.inlineCallbacks
+    def test_getMergeProposalURL_unauthorized(self):
+        # we return None for the merge proposal URL
+        # when catching and UNAUTHORIZED and NOT_FOUND exception
+        self.virtinfo.merge_proposal_url_fault = xmlrpc.Fault(
+            3, 'Unauthorized')
+        with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
+            mp_url = yield self.hookrpc_handler.getMergeProposalURL(
+                None, {'key': key, 'branch': 'master', 'uid': 4})
+        self.assertIsNone(mp_url)
+
+        self.virtinfo.merge_proposal_url_fault = xmlrpc.Fault(
+            1, 'NOT_FOUND')
+        with self.registeredKey('/translated', auth_params={'uid': 42}) as key:
+            mp_url = yield self.hookrpc_handler.getMergeProposalURL(
+                None, {'key': key, 'branch': 'master', 'uid': 4})
+        self.assertIsNone(mp_url)

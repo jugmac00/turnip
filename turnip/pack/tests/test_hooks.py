@@ -10,6 +10,7 @@ from __future__ import (
 
 import base64
 import os.path
+import subprocess
 import uuid
 
 from fixtures import (
@@ -66,6 +67,9 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
         return {
             base64.b64encode(ref).decode('UTF-8'): permissions
             for ref, permissions in self.ref_permissions[args['key']].items()}
+
+    def getMergeProposalURL(self, proto, args):
+        return 'http://mp-url.test'
 
 
 class MockRef(object):
@@ -141,14 +145,16 @@ class HookTestMixin(object):
         super(HookTestMixin, self).setUp()
         self.hookrpc_handler = MockHookRPCHandler()
         self.hookrpc = hookrpc.HookRPCServerFactory(self.hookrpc_handler)
-        dir = self.useFixture(TempDir()).path
-        self.hookrpc_sock_path = os.path.join(dir, 'hookrpc_sock')
+        self.repo_dir = os.path.join(self.useFixture(TempDir()).path, '.git')
+        os.mkdir(self.repo_dir)
+        subprocess.check_output(['git', 'init', self.repo_dir])
+        self.hookrpc_sock_path = os.path.join(self.repo_dir, 'hookrpc_sock')
         self.hookrpc_port = reactor.listenUNIX(
             self.hookrpc_sock_path, self.hookrpc)
         self.addCleanup(self.hookrpc_port.stopListening)
-        hooks_dir = os.path.join(dir, 'hooks')
+        hooks_dir = os.path.join(self.repo_dir, 'hooks')
         os.mkdir(hooks_dir)
-        ensure_hooks(dir)
+        ensure_hooks(self.repo_dir)
         self.hook_path = os.path.join(hooks_dir, self.hook_name)
 
     def encodeRefs(self, updates):
@@ -184,6 +190,16 @@ class HookTestMixin(object):
         code, out, err = yield self.invokeHook(
             self.encodeRefs(updates), permissions)
         self.assertEqual((1, message, b''), (code, out, err))
+
+    @defer.inlineCallbacks
+    def assertMergeProposalURLReceived(self, updates, permissions):
+        mp_url_message = (
+            b"Create a merge proposal for '%s' on Launchpad by"
+            b" visiting:\n" % updates[0][0].split(b'/', 2)[2])
+        code, out, err = yield self.invokeHook(
+            self.encodeRefs(updates), permissions)
+        self.assertEqual((0, b''), (code, err))
+        self.assertIn(mp_url_message, out)
 
 
 class TestPreReceiveHook(HookTestMixin, TestCase):
@@ -247,7 +263,7 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
     @defer.inlineCallbacks
     def test_notifies(self):
         # The notification callback is invoked with the storage path.
-        yield self.assertAccepted(
+        yield self.assertMergeProposalURLReceived(
             [(b'refs/heads/foo', self.old_sha1, self.new_sha1)], [])
         self.assertEqual(['/translated'], self.hookrpc_handler.notifications)
 
@@ -256,6 +272,39 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         # No notification is sent for an empty push.
         yield self.assertAccepted([], [])
         self.assertEqual([], self.hookrpc_handler.notifications)
+
+    @defer.inlineCallbacks
+    def test_merge_proposal_URL(self):
+        # MP URL received for push of non-default branch
+        curdir = os.getcwd()
+        try:
+            os.chdir(self.repo_dir)
+            default_branch = subprocess.check_output(
+                ['git', 'symbolic-ref', 'HEAD']
+                ).rstrip(b'\n')
+            pushed_branch = str(default_branch + 'notdefault')
+            yield self.assertMergeProposalURLReceived([(
+                b'%s' % pushed_branch,
+                self.old_sha1, self.new_sha1)],
+                {b'%s' % pushed_branch: ['push']})
+        finally:
+            os.chdir(curdir)
+
+    @defer.inlineCallbacks
+    def test_no_merge_proposal_URL(self):
+        # No MP URL received for push of default branch
+        curdir = os.getcwd()
+        try:
+            os.chdir(self.repo_dir)
+            default_branch = subprocess.check_output(
+                ['git', 'symbolic-ref', 'HEAD']
+                ).rstrip(b'\n')
+            yield self.assertAccepted([(
+                b'%s' % default_branch,
+                self.old_sha1, self.new_sha1)],
+                {b'%s' % default_branch: ['push']})
+        finally:
+            os.chdir(curdir)
 
 
 class TestUpdateHook(TestCase):

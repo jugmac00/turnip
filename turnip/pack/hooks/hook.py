@@ -16,7 +16,6 @@ import socket
 import subprocess
 import sys
 
-
 # XXX twom 2018-10-23 This should be a pygit2 import, but
 # that currently causes CFFI warnings to be returned to the client.
 GIT_OID_HEX_ZERO = '0'*40
@@ -30,6 +29,12 @@ def check_ancestor(old, new):
     return_code = subprocess.call(
         ['git', 'merge-base', '--is-ancestor', old, new])
     return return_code == 0
+
+
+def is_default_branch(pushed_branch):
+    default_branch = subprocess.check_output(
+        ['git', 'symbolic-ref', 'HEAD']).rstrip(b'\n')
+    return pushed_branch == default_branch
 
 
 def determine_permissions_outcome(old, ref, rule_lines):
@@ -133,13 +138,32 @@ def check_ref_permissions(sock, rpc_key, ref_paths):
         for path, permissions in rule_lines.items()}
 
 
+def send_mp_url(received_line):
+    ref = received_line.rstrip(b'\n').split(b' ', 2)[2]
+
+    # check for branch ref here (we're interested in
+    # heads and not tags)
+
+    if ref.startswith(b'refs/heads/') and not is_default_branch(ref):
+        pushed_branch = ref[len(b'refs/heads/'):]
+        if not is_default_branch(pushed_branch):
+            mp_url = rpc_invoke(
+                sock, b'get_mp_url',
+                {'key': rpc_key, 'branch': pushed_branch})
+            if mp_url is not None:
+                sys.stdout.write(b'      \n')
+                sys.stdout.write(
+                    b"Create a merge proposal for '%s' on Launchpad by"
+                    b" visiting:\n" % pushed_branch)
+                sys.stdout.write(b'      %s\n' % mp_url)
+                sys.stdout.write(b'      \n')
+
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key
     # from the environment.
     rpc_key = os.environ['TURNIP_HOOK_RPC_KEY']
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(os.environ['TURNIP_HOOK_RPC_SOCK'])
-
     hook = os.path.basename(sys.argv[0])
     if hook == 'pre-receive':
         # Verify the proposed changes against rules from the server.
@@ -153,8 +177,11 @@ if __name__ == '__main__':
     elif hook == 'post-receive':
         # Notify the server about the push if there were any changes.
         # Details of the changes aren't currently included.
-        if sys.stdin.readlines():
+        lines = sys.stdin.readlines()
+        if lines:
             rpc_invoke(sock, b'notify_push', {'key': rpc_key})
+        if len(lines) == 1:
+            send_mp_url(lines[0])
         sys.exit(0)
     elif hook == 'update':
         ref = sys.argv[1]

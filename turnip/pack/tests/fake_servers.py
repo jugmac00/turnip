@@ -62,6 +62,8 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.translations = []
         self.authentications = []
         self.push_notifications = []
+        self.merge_proposal_url = 'http://bogus.test'
+        self.merge_proposal_url_fault = None
         self.ref_permissions_checks = []
         self.ref_permissions = {}
         self.ref_permissions_fault = None
@@ -94,3 +96,9 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         return [
             (xmlrpc_client.Binary(ref), permissions)
             for ref, permissions in self.ref_permissions.items()]
+
+    def xmlrpc_getMergeProposalURL(self, path, branch, auth_params):
+        if self.merge_proposal_url_fault is not None:
+            raise self.merge_proposal_url_fault
+        else:
+            return self.merge_proposal_url
