@@ -173,7 +173,8 @@ class HookTestMixin(object):
                 self.hook_path, [self.hook_path],
                 env={
                     b'TURNIP_HOOK_RPC_SOCK': self.hookrpc_sock_path,
-                    b'TURNIP_HOOK_RPC_KEY': key})
+                    b'TURNIP_HOOK_RPC_KEY': key},
+                path=self.repo_dir)
             code, stdout, stderr = yield d
         finally:
             self.hookrpc_handler.unregisterKey(key)
