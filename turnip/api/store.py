@@ -341,8 +341,11 @@ def get_refs(repo_store, repo_name, exclude_prefixes=None):
             try:
                 ref = ref_obj.name
                 if isinstance(ref, bytes):
+                    ref_bytes = ref
                     ref = ref.decode('utf-8')
-                git_object = repo.references[ref].peel()
+                else:
+                    ref_bytes = ref.encode('utf-8')
+                git_object = repo.references[ref_bytes].peel()
             except UnicodeDecodeError:
                 pass
             else:
