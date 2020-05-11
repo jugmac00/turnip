@@ -12,10 +12,11 @@ from __future__ import (
 import base64
 import json
 import os
-import six
 import socket
 import subprocess
 import sys
+
+import six
 
 from turnip.compat.files import fd_buffer
 
