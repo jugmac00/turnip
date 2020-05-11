@@ -80,6 +80,13 @@ pip-check: $(ENV)
 
 check: pip-check test lint
 
+check-python-compat:
+	for i in 2 3; do \
+		make clean && \
+		VENV_ARGS="-p python$$i" make bootstrap && \
+		ARGS="-v" make check || break;\
+	done
+
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
 
