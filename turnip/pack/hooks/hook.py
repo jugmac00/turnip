@@ -16,6 +16,10 @@ import socket
 import subprocess
 import sys
 
+import six
+
+from turnip.compat.files import fd_buffer
+
 # XXX twom 2018-10-23 This should be a pygit2 import, but
 # that currently causes CFFI warnings to be returned to the client.
 GIT_OID_HEX_ZERO = '0'*40
@@ -44,7 +48,8 @@ def determine_permissions_outcome(old, ref, rule_lines):
         if 'create' in rule:
             return
         else:
-            return b'You do not have permission to create ' + ref + b'.'
+            return (b'You do not have permission to create %s.' %
+                    six.ensure_binary(ref, "UTF-8"))
     # We have force-push permission, implies push, therefore okay
     if 'force_push' in rule:
         return
@@ -53,7 +58,8 @@ def determine_permissions_outcome(old, ref, rule_lines):
     if 'push' in rule:
         return
     # If we're here, there are no matching rules
-    return b"You do not have permission to push to " + ref + b"."
+    return (b"You do not have permission to push to %s." %
+            six.ensure_binary(ref, "UTF-8"))
 
 
 def match_rules(rule_lines, ref_lines):
@@ -95,7 +101,8 @@ def match_update_rules(rule_lines, ref_line):
     rule = rule_lines.get(ref, [])
     if 'force_push' in rule:
         return []
-    return [b'You do not have permission to force-push to ' + ref + b'.']
+    return [b'You do not have permission to force-push to %s.' %
+            six.ensure_binary(ref, "UTF-8")]
 
 
 def netstring_send(sock, s):
@@ -104,7 +111,7 @@ def netstring_send(sock, s):
 
 def netstring_recv(sock):
     c = sock.recv(1)
-    lengthstr = ''
+    lengthstr = b''
     while c != b':':
         assert c.isdigit()
         lengthstr += c
@@ -121,7 +128,7 @@ def rpc_invoke(sock, method, args):
     msg = dict(args)
     assert 'op' not in msg
     msg['op'] = method
-    netstring_send(sock, json.dumps(msg))
+    netstring_send(sock, six.ensure_binary(json.dumps(msg), 'UTF-8'))
     res = json.loads(netstring_recv(sock))
     if 'error' in res:
         raise Exception(res)
@@ -131,7 +138,7 @@ def rpc_invoke(sock, method, args):
 def check_ref_permissions(sock, rpc_key, ref_paths):
     ref_paths = [base64.b64encode(path).decode('UTF-8') for path in ref_paths]
     rule_lines = rpc_invoke(
-        sock, b'check_ref_permissions',
+        sock, 'check_ref_permissions',
         {'key': rpc_key, 'paths': ref_paths})
     return {
         base64.b64decode(path.encode('UTF-8')): permissions
@@ -148,38 +155,42 @@ def send_mp_url(received_line):
         pushed_branch = ref[len(b'refs/heads/'):]
         if not is_default_branch(pushed_branch):
             mp_url = rpc_invoke(
-                sock, b'get_mp_url',
-                {'key': rpc_key, 'branch': pushed_branch})
+                sock, 'get_mp_url',
+                {'key': rpc_key,
+                 'branch': six.ensure_text(pushed_branch, "UTF-8")})
             if mp_url is not None:
-                sys.stdout.write(b'      \n')
-                sys.stdout.write(
+                stdout = fd_buffer(sys.stdout)
+                stdout.write(b'      \n')
+                stdout.write(
                     b"Create a merge proposal for '%s' on Launchpad by"
                     b" visiting:\n" % pushed_branch)
-                sys.stdout.write(b'      %s\n' % mp_url)
-                sys.stdout.write(b'      \n')
+                stdout.write(b'      %s\n' % six.ensure_binary(mp_url, "UTF8"))
+                stdout.write(b'      \n')
 
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key
     # from the environment.
+    stdin = fd_buffer(sys.stdin)
+    stdout = fd_buffer(sys.stdout)
     rpc_key = os.environ['TURNIP_HOOK_RPC_KEY']
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(os.environ['TURNIP_HOOK_RPC_SOCK'])
     hook = os.path.basename(sys.argv[0])
     if hook == 'pre-receive':
         # Verify the proposed changes against rules from the server.
-        raw_paths = sys.stdin.readlines()
+        raw_paths = stdin.readlines()
         ref_paths = [p.rstrip(b'\n').split(b' ', 2)[2] for p in raw_paths]
         rule_lines = check_ref_permissions(sock, rpc_key, ref_paths)
         errors = match_rules(rule_lines, raw_paths)
         for error in errors:
-            sys.stdout.write(error + b'\n')
+            stdout.write(error + b'\n')
         sys.exit(1 if errors else 0)
     elif hook == 'post-receive':
         # Notify the server about the push if there were any changes.
         # Details of the changes aren't currently included.
-        lines = sys.stdin.readlines()
+        lines = stdin.readlines()
         if lines:
-            rpc_invoke(sock, b'notify_push', {'key': rpc_key})
+            rpc_invoke(sock, 'notify_push', {'key': rpc_key})
         if len(lines) == 1:
             send_mp_url(lines[0])
         sys.exit(0)
@@ -188,7 +199,7 @@ if __name__ == '__main__':
         rule_lines = check_ref_permissions(sock, rpc_key, [ref])
         errors = match_update_rules(rule_lines, sys.argv[1:4])
         for error in errors:
-            sys.stdout.write(error + b'\n')
+            stdout.write(error + b'\n')
         sys.exit(1 if errors else 0)
     else:
         sys.stderr.write('Invalid hook name: %s' % hook)
