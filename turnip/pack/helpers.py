@@ -18,6 +18,7 @@ from tempfile import (
     NamedTemporaryFile,
     )
 
+import six
 from pygit2 import Repository
 import yaml
 
@@ -156,7 +157,9 @@ def ensure_hooks(repo_root):
     target_name = 'hook.py'
 
     def hook_path(name):
-        return os.path.join(repo_root, 'hooks', name)
+        root = six.ensure_text(repo_root, "utf8")
+        name = six.ensure_text(name, "utf8")
+        return os.path.join(root, 'hooks', name)
 
     if not os.path.exists(hook_path(target_name)):
         need_target = True
