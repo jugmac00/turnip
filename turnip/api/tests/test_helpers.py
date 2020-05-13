@@ -113,11 +113,12 @@ class RepoFactory(object):
         cmd_line += self._get_cmd_line_auth_params()
         cmd_line += ['tag', '-m', tag_message, tag_name, oid.hex]
         subproc = Popen(cmd_line, stderr=PIPE, stdout=PIPE)
-        retcode = subproc.wait()
+        outs, errs = subproc.communicate()
+        retcode = subproc.returncode
         if retcode:
             log.error(
                 "Command %s finished with error code %s. stdout/stderr:\n%s",
-                cmd_line, retcode, subproc.stderr.read())
+                cmd_line, retcode, outs)
             raise CalledProcessError(retcode, cmd_line)
 
     def makeSignature(self, name, email, encoding='utf-8'):
