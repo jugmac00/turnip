@@ -92,7 +92,7 @@ class TestDecodeRequest(TestCase):
         req = b'git-upload-pack /test_repo\0host=git.launchpad.test\0\0ver=2\0'
         self.assertEqual(
             (b'git-upload-pack', b'/test_repo',
-                {b'host': 'git.launchpad.test', 'ver': '2'}),
+                {b'host': b'git.launchpad.test', b'ver': b'2'}),
             helpers.decode_request(req))
 
     def test_parse_multiple_extra_params_after_2_null_bytes(self):
@@ -103,8 +103,8 @@ class TestDecodeRequest(TestCase):
                )
         self.assertEqual(
             (b'git-upload-pack', b'/test_repo',
-                {b'host': 'git.launchpad.test', 'ver': '2',
-                 'param2': 'value2', 'param3': 'value3'}),
+                {b'host': b'git.launchpad.test', b'ver': b'2',
+                 b'param2': b'value2', b'param3': b'value3'}),
             helpers.decode_request(req))
 
     def test_rejects_extra_param_without_end_null_bytes(self):

@@ -258,7 +258,7 @@ class HookRPCHandler(object):
         try:
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
             mp_url = yield proxy.callRemote(
-                b'getMergeProposalURL', path, branch, auth_params).addTimeout(
+                'getMergeProposalURL', path, branch, auth_params).addTimeout(
                 self.virtinfo_timeout, self.reactor)
         except xmlrpc.Fault as e:
             code = translate_xmlrpc_fault(e.faultCode)
