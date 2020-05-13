@@ -125,7 +125,7 @@ class TestDecodeRequest(TestCase):
         req = b'git-upload-pack /test_repo\0host=git.launchpad.test\0\0'
         self.assertEqual(
             (b'git-upload-pack', b'/test_repo',
-                {b'host': 'git.launchpad.test'}),
+                {b'host': b'git.launchpad.test'}),
             helpers.decode_request(req))
 
     def test_without_parameters(self):

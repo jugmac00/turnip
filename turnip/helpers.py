@@ -9,12 +9,16 @@ from __future__ import (
 
 import os.path
 
+import six
+
 
 def compose_path(root, path):
     # Construct the full path, stripping any leading slashes so we
     # resolve absolute paths within the root.
+    root = six.ensure_binary(root, "utf-8")
     full_path = os.path.abspath(os.path.join(
-        root, path.lstrip(os.path.sep.encode('utf-8'))))
+        root,
+        path.lstrip(six.ensure_binary(os.path.sep, 'utf-8'))))
     if not full_path.startswith(os.path.abspath(root)):
         raise ValueError('Path not contained within root')
     return full_path
