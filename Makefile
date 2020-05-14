@@ -2,6 +2,7 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 ENV := $(CURDIR)/env
+PY3_ENV := $(CURDIR)/py3env
 PIP_CACHE = $(CURDIR)/pip-cache
 
 PYTHON := $(ENV)/bin/python
@@ -11,6 +12,7 @@ PIP := $(ENV)/bin/pip
 VIRTUALENV := virtualenv
 
 DEPENDENCIES_URL := https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
+PIP_SOURCE_DIR := dependencies
 
 PIP_ARGS ?= --quiet
 ifneq ($(PIP_SOURCE_DIR),)
@@ -59,7 +61,7 @@ test: $(ENV)
 
 clean:
 	find turnip -name '*.py[co]' -exec rm '{}' \;
-	rm -rf $(ENV) $(PIP_CACHE)
+	rm -rf $(ENV) $(PY3_ENV) $(PIP_CACHE)
 	rm -f turnip/version_info.py
 
 dist:
@@ -79,6 +81,11 @@ pip-check: $(ENV)
 	$(PIP) check
 
 check: pip-check test lint
+
+check-python3:
+	$(MAKE) check VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
+
+check-python-compat: check check-python3
 
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
