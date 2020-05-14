@@ -10,9 +10,9 @@ from __future__ import (
 import hashlib
 import os.path
 
-import six
 from fixtures import TempDir
 from pygit2 import init_repository
+import six
 from testtools import TestCase
 from testtools.matchers import (
     ContainsDict,

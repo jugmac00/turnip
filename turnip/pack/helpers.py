@@ -18,8 +18,8 @@ from tempfile import (
     NamedTemporaryFile,
     )
 
-import six
 from pygit2 import Repository
+import six
 import yaml
 
 import turnip.pack.hooks
