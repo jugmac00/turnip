@@ -12,6 +12,7 @@ import os.path
 
 from fixtures import TempDir
 from pygit2 import init_repository
+import six
 from testtools import TestCase
 from testtools.matchers import (
     ContainsDict,
@@ -192,9 +193,10 @@ class TestPackBackendProtocol(TestCase):
         # spawnProcess with appropriate arguments.
         self.proto.requestReceived(
             b'git-upload-pack', b'/foo.git', {b'host': b'example.com'})
+        full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
         self.assertEqual(
             (b'git',
-             [b'git', b'upload-pack', os.path.join(self.root, b'foo.git')],
+             [b'git', b'upload-pack', full_path],
              {}),
             self.proto.test_process)
 

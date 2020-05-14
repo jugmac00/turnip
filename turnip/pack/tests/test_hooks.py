@@ -283,11 +283,10 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
             default_branch = subprocess.check_output(
                 ['git', 'symbolic-ref', 'HEAD']
                 ).rstrip(b'\n')
-            pushed_branch = str(default_branch + 'notdefault')
-            yield self.assertMergeProposalURLReceived([(
-                b'%s' % pushed_branch,
-                self.old_sha1, self.new_sha1)],
-                {b'%s' % pushed_branch: ['push']})
+            pushed_branch = default_branch + b'notdefault'
+            yield self.assertMergeProposalURLReceived(
+                [(pushed_branch, self.old_sha1, self.new_sha1)],
+                {pushed_branch: ['push']})
         finally:
             os.chdir(curdir)
 
