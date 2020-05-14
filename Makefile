@@ -1,8 +1,8 @@
 # Copyright 2005-2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-ENV ?= $(CURDIR)/env
-PY3_ENV ?= $(CURDIR)/py3env
+ENV := $(CURDIR)/env
+PY3_ENV := $(CURDIR)/py3env
 PIP_CACHE = $(CURDIR)/pip-cache
 
 PYTHON := $(ENV)/bin/python
@@ -12,7 +12,7 @@ PIP := $(ENV)/bin/pip
 VIRTUALENV := virtualenv
 
 DEPENDENCIES_URL := https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
-PIP_SOURCE_DIR ?= dependencies
+PIP_SOURCE_DIR := dependencies
 
 PIP_ARGS ?= --quiet
 ifneq ($(PIP_SOURCE_DIR),)
@@ -83,7 +83,7 @@ pip-check: $(ENV)
 check: pip-check test lint
 
 check-python3:
-	VENV_ARGS="-p python3" ENV="$(PY3_ENV)" $(MAKE) check
+	$(MAKE) check VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
 
 check-python-compat: check check-python3
 
