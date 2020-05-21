@@ -137,8 +137,7 @@ class HookTestMixin(object):
 
     old_sha1 = b'a' * 40
     new_sha1 = b'b' * 40
-    zero_sha = b'0' * 40
-    
+
     def handlePushNotification(self, path):
         self.notifications.append(path)
 
@@ -313,16 +312,13 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         curdir = os.getcwd()
         try:
             os.chdir(self.repo_dir)
-            default_branch = subprocess.check_output(
-                ['git', 'symbolic-ref', 'HEAD']
-                ).rstrip(b'\n')
-            pushed_branch = str(default_branch + 'notdefault')
             yield self.assertAccepted([(
-                b'%s' % pushed_branch,
-                self.old_sha1, self.zero_sha)],
-                {b'%s' % pushed_branch: ['push']})
+                b'pushed_branch',
+                self.old_sha1, pygit2.GIT_OID_HEX_ZERO)],
+                {b'pushed_branch': ['force_push']})
         finally:
             os.chdir(curdir)
+
 
 class TestUpdateHook(TestCase):
     """Tests for the git update hook"""
