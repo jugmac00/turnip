@@ -306,6 +306,19 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
         finally:
             os.chdir(curdir)
 
+    @defer.inlineCallbacks
+    def test_no_merge_proposal_URL_delete_branch(self):
+        # No MP URL received for delete of non default branch
+        curdir = os.getcwd()
+        try:
+            os.chdir(self.repo_dir)
+            yield self.assertAccepted([(
+                b'pushed_branch',
+                self.old_sha1, pygit2.GIT_OID_HEX_ZERO)],
+                {b'pushed_branch': ['force_push']})
+        finally:
+            os.chdir(curdir)
+
 
 class TestUpdateHook(TestCase):
     """Tests for the git update hook"""

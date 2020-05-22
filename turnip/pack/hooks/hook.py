@@ -146,11 +146,15 @@ def check_ref_permissions(sock, rpc_key, ref_paths):
 
 
 def send_mp_url(received_line):
-    ref = received_line.rstrip(b'\n').split(b' ', 2)[2]
+    _, new_sha, ref = received_line.rstrip(b'\n').split(b' ', 2)
 
-    # check for branch ref here (we're interested in
-    # heads and not tags)
+    # The new sha will be zero when deleting branch
+    # in which case we do not want to send the MP URL.
+    if new_sha == GIT_OID_HEX_ZERO:
+        return
 
+    # Check for branch ref here - we're interested in
+    # heads and not tags.
     if ref.startswith(b'refs/heads/') and not is_default_branch(ref):
         pushed_branch = ref[len(b'refs/heads/'):]
         if not is_default_branch(pushed_branch):
