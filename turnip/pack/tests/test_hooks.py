@@ -88,9 +88,24 @@ class MockRepo(object):
 
 
 class MockSocket(object):
+    # "sends" up to this amount of bytes on "send()"
+    MAX_SEND_DATA = 5
 
     def __init__(self, blocks=None):
         self.blocks = blocks or []
+        self._sent_data = b""
+
+    def send(self, data, flags=None):
+        to_send = data[:self.MAX_SEND_DATA]
+        self._sent_data += to_send
+        return min(self.MAX_SEND_DATA, len(data))
+
+    def sendall(self, data, flags=None):
+        ret = self.send(data, flags)
+        if ret > 0:
+            return self.sendall(data[ret:], flags)
+        else:
+            return None
 
     def recv(self, bufsize, flags=None):
         if not self.blocks:
@@ -130,6 +145,17 @@ class TestNetstringRecv(TestCase):
             b'\x00\x01\x02\x03\x04,\x05\x06\x07\x08\x09',
             hook.netstring_recv(sock))
         self.assertEqual([b'remaining'], sock.blocks)
+
+    def test_send_uses_sendall(self):
+        sock = MockSocket([])
+
+        # Send up to 5 bytes on each "send()" call.
+        # This is important to make sure we are using python's higher level
+        # socket.sendall() rather than socket.send().
+        sock.MAX_SEND_DATA = 5
+
+        hook.netstring_send(sock, b"some-fake-data")
+        self.assertEqual(b"14:some-fake-data,", sock._sent_data)
 
 
 class HookTestMixin(object):

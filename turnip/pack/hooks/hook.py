@@ -106,7 +106,7 @@ def match_update_rules(rule_lines, ref_line):
 
 
 def netstring_send(sock, s):
-    sock.send(b'%d:%s,' % (len(s), s))
+    sock.sendall(b'%d:%s,' % (len(s), s))
 
 
 def netstring_recv(sock):
