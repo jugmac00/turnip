@@ -41,6 +41,8 @@ from turnip.pack.helpers import (
 
 class JSONNetstringProtocol(basic.NetstringReceiver):
     """A protocol that sends and receives JSON as netstrings."""
+    # 200MB should be enough.
+    MAX_LENGTH = 200 * 1024 * 1024
 
     def stringReceived(self, string):
         try:

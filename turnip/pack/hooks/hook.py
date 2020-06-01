@@ -106,21 +106,27 @@ def match_update_rules(rule_lines, ref_line):
 
 
 def netstring_send(sock, s):
-    sock.send(b'%d:%s,' % (len(s), s))
+    sock.sendall(b'%d:%s,' % (len(s), s))
 
 
 def netstring_recv(sock):
     c = sock.recv(1)
     lengthstr = b''
     while c != b':':
-        assert c.isdigit()
+        if not c.isdigit():
+            raise ValueError(
+                "Invalid response: %s" % (six.ensure_text(c + sock.recv(256))))
         lengthstr += c
         c = sock.recv(1)
     length = int(lengthstr)
     s = bytearray()
     while len(s) < length:
         s += sock.recv(length - len(s))
-    assert sock.recv(1) == b','
+    ending = sock.recv(1)
+    if ending != b',':
+        raise ValueError(
+            "Length error for message '%s': ending='%s'" %
+            (six.ensure_text(bytes(s)), six.ensure_text(ending)))
     return bytes(s)
 
 
