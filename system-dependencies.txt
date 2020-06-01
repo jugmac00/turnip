@@ -4,5 +4,7 @@ git
 libffi-dev
 libgit2-27
 libssl-dev
+libxml2-dev
+libxslt1-dev
 python-dev
 virtualenv

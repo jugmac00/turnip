@@ -8,9 +8,9 @@ cffi==1.14.0
 constantly==15.1.0
 contextlib2==0.4.0
 cornice==3.6.1
-cryptography==2.8
+cryptography==2.9.2
 docutils==0.14
-enum34==1.1.9
+enum34==1.1.10
 envdir==0.7
 extras==1.0.0
 fixtures==3.0.0
@@ -23,6 +23,7 @@ incremental==17.5.0
 ipaddress==1.0.23
 lazr.sshserver==0.1.8
 linecache2==1.0.0
+lxml==4.5.1
 m2r==0.1.14
 mccabe==0.3
 mistune==0.8.3
@@ -37,15 +38,12 @@ pyflakes==0.8.1
 pygit2==0.27.4
 pyramid==1.10.4
 python-mimeparse==1.6.0
-# XXX: deryck 2012-08-10
-# See lp:~deryck/python-openid/python-openid-fix1034376 which
-# reapplied a patch from wgrant to get codehosting going again.
-python-openid==2.2.5-fix1034376
+python-openid2==3.1
 PyYAML==5.3
 repoze.lru==0.6
 setuptools-scm==1.17.0
 simplejson==3.6.5
-six==1.14.0
+six==1.15.0
 testtools==2.3.0
 traceback2==1.4.0
 translationstring==1.3
