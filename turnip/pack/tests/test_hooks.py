@@ -123,15 +123,21 @@ class TestNetstringRecv(TestCase):
 
     def test_nondigit(self):
         sock = MockSocket([b'zzz:abc,'])
-        self.assertRaises(AssertionError, hook.netstring_recv, sock)
+        self.assertRaisesRegex(
+            ValueError, "Invalid response: zzz:abc,",
+            hook.netstring_recv, sock)
 
     def test_short(self):
         sock = MockSocket([b'4:abc,'])
-        self.assertRaises(AssertionError, hook.netstring_recv, sock)
+        self.assertRaisesRegex(
+            ValueError, "Length error for message 'abc,': ending=''",
+            hook.netstring_recv, sock)
 
     def test_unterminated(self):
         sock = MockSocket([b'4:abcd'])
-        self.assertRaises(AssertionError, hook.netstring_recv, sock)
+        self.assertRaisesRegex(
+            ValueError, "Length error for message 'abcd': ending=''",
+            hook.netstring_recv, sock)
 
     def test_split_data(self):
         sock = MockSocket([b'12:abcd', b'efgh', b'ijkl,'])
