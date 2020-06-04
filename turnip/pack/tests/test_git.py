@@ -7,7 +7,7 @@ from __future__ import (
     unicode_literals,
     )
 
-from contextlib import nested
+from contextlib2 import ExitStack
 import hashlib
 import os.path
 
@@ -331,10 +331,11 @@ class TestPackVirtServerProtocol(TestCase):
         m_init_repo = mock.Mock()
         m_init_repo.side_effect = Exception("Some random error.")
         m_del_repo = mock.Mock()
-        mocks_context = nested(
-            mock.patch("turnip.pack.git.init_repo", m_init_repo),
-            mock.patch("turnip.pack.git.delete_repo", m_del_repo))
-        with mocks_context:
+        with ExitStack() as stack:
+            mocks = [mock.patch("turnip.pack.git.init_repo", m_init_repo),
+                     mock.patch("turnip.pack.git.delete_repo", m_del_repo)]
+            for i in mocks:
+                stack.enter_context(i)
             yield self.proto.requestReceived(b'git-upload-pack', path, {})
 
         digest = hashlib.sha256(b'example-new/clone-from:foo-repo').hexdigest()
@@ -360,10 +361,11 @@ class TestPackVirtServerProtocol(TestCase):
 
         m_init_repo = mock.Mock()
         m_del_repo = mock.Mock()
-        mocks_context = nested(
-            mock.patch("turnip.pack.git.init_repo", m_init_repo),
-            mock.patch("turnip.pack.git.delete_repo", m_del_repo))
-        with mocks_context:
+        with ExitStack() as stack:
+            mocks = [mock.patch("turnip.pack.git.init_repo", m_init_repo),
+                     mock.patch("turnip.pack.git.delete_repo", m_del_repo)]
+            for i in mocks:
+                stack.enter_context(i)
             yield self.proto.requestReceived(b'git-upload-pack', path, {})
 
         digest = hashlib.sha256(b'example-new/clone-from:foo-repo').hexdigest()
