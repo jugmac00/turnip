@@ -27,7 +27,7 @@ from twisted.internet import (
     task,
     testing,
     )
-from twisted.web import server
+from twisted.web import server, xmlrpc
 
 from turnip.pack import (
     git,
@@ -355,7 +355,9 @@ class TestPackVirtServerProtocol(TestCase):
         path = b'/+rwexample-new/clone-from:foo-repo'
 
         self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock()
-        self.virtinfo.xmlrpc_confirmRepoCreation.side_effect = Exception("?")
+        self.virtinfo.xmlrpc_confirmRepoCreation.side_effect = (
+            xmlrpc.Fault(99, "Some error."))
+
         m_init_repo = mock.Mock()
         m_del_repo = mock.Mock()
         mocks_context = nested(
@@ -373,7 +375,6 @@ class TestPackVirtServerProtocol(TestCase):
 
         self.assertEqual(1, m_del_repo.call_count)
         self.assertEqual(mock.call(digest), m_del_repo.call_args)
-
 
     def test_translatePath_timeout(self):
         root = self.useFixture(TempDir()).path
