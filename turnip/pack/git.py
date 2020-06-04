@@ -20,6 +20,7 @@ from twisted.logger import Logger
 from twisted.web import xmlrpc
 from zope.interface import implementer
 
+from turnip.api.store import init_repo, delete_repo
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
     decode_packet,
@@ -378,6 +379,25 @@ class PackProxyServerProtocol(PackServerProtocol):
             self.factory.backend_host, self.factory.backend_port, client)
         return d
 
+    @defer.inlineCallbacks
+    def _createRepo(self, lp_xmlrpc, pathname, creation_params):
+        """Creates a repository locally, and asks Launchpad to initialize
+        database objects too.
+
+        :param lp_xmlrpc: The XML-RCP proxy to launchpad.
+        :param pathname: Local path for the repository.
+        :param creation_params: Repo creation parameters returned from
+                                translatePath call."""
+        clone_from = creation_params.get("clone_from")
+        allocated_id = creation_params["allocated_id"]
+        try:
+            yield init_repo(pathname, clone_from)
+            yield lp_xmlrpc.callRemote(
+                "confirmRepoCreation", pathname, allocated_id)
+        except Exception:
+            delete_repo(pathname)
+            raise
+
     def resumeProducing(self):
         # Send our translated request and then open the gate to the
         # client.
@@ -571,6 +591,11 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                     VIRT_ERROR_PREFIX +
                     b'NOT_FOUND Repository does not exist.')
             pathname = translated['path']
+
+            # Repository doesn't exist, and should be created.
+            creation_params = translated.get("creation_params", {})
+            if creation_params and creation_params["should_create"]:
+                yield self._createRepo(proxy, pathname, creation_params)
         except xmlrpc.Fault as e:
             fault_type = translate_xmlrpc_fault(
                 e.faultCode).name.encode('UTF-8')
