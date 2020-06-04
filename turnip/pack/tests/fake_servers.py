@@ -53,7 +53,17 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     """A trivial virt information XML-RPC service.
 
     Translates a path to its SHA-256 hash. The repo is writable if the
-    path is prefixed with '/+rw'
+    path is prefixed with '/+rw', and is new if its name contains '-new'.
+
+    For new repositories, to fake a response with "clone_from", include in
+    its name the pattern "/clone-from:REPO_NAME" in the end of pathname.
+
+    Examples of repositories:
+        - /example: Simple read-only repo
+        - /+rwexample: Read & write repo
+        - /example-new: Non-existing repository, read only
+        - /+rwexample-new/clone-from:foo: New repository called "example-new",
+            that can be written and cloned from "foo"
     """
 
     def __init__(self, *args, **kwargs):
@@ -67,6 +77,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.ref_permissions_checks = []
         self.ref_permissions = {}
         self.ref_permissions_fault = None
+        self.confirm_repo_creation_call_args = []
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
@@ -80,7 +91,20 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
 
         if permission != b'read' and not writable:
             raise xmlrpc.Fault(2, "Repository is read-only")
-        return {'path': hashlib.sha256(pathname).hexdigest()}
+        retval = {'path': hashlib.sha256(pathname).hexdigest()}
+
+        if "-new" in pathname:
+            if "/clone-from:" in pathname:
+                clone_path = pathname.split("/clone-from:", 1)[1]
+                clone_from = hashlib.sha256(clone_path).hexdigest()
+            else:
+                clone_from = None
+            retval["creation_params"] = {
+                "allocated_id": 66,
+                "should_create": writable,
+                "clone_from": clone_from
+            }
+        return retval
 
     def xmlrpc_authenticateWithPassword(self, username, password):
         self.authentications.append((username, password))
@@ -102,3 +126,6 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             raise self.merge_proposal_url_fault
         else:
             return self.merge_proposal_url
+
+    def xmlrpc_confirmRepoCreation(self, pathname, allocated_id):
+        self.confirm_repo_creation_call_args.append((pathname, allocated_id))
