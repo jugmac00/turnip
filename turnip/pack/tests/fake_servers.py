@@ -19,6 +19,8 @@ __all__ = [
     "FakeVirtInfoService",
     ]
 
+from twisted.web.xmlrpc import Binary
+
 
 class FakeAuthServerService(xmlrpc.XMLRPC):
     """A fake version of the Launchpad authserver service."""
@@ -83,9 +85,11 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         if self.require_auth and 'user' not in auth_params:
             raise xmlrpc.Fault(3, "Unauthorized")
 
+        if isinstance(pathname, Binary):
+            pathname = pathname.data
         self.translations.append((pathname, permission, auth_params))
         writable = False
-        if pathname.startswith('/+rw'):
+        if pathname.startswith(b'/+rw'):
             writable = True
             pathname = pathname[4:]
 
@@ -93,9 +97,9 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             raise xmlrpc.Fault(2, "Repository is read-only")
         retval = {'path': hashlib.sha256(pathname).hexdigest()}
 
-        if "-new" in pathname:
-            if "/clone-from:" in pathname:
-                clone_path = pathname.split("/clone-from:", 1)[1]
+        if b"-new" in pathname:
+            if b"/clone-from:" in pathname:
+                clone_path = pathname.split(b"/clone-from:", 1)[1]
                 clone_from = hashlib.sha256(clone_path).hexdigest()
             else:
                 clone_from = None

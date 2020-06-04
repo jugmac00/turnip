@@ -608,7 +608,8 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                 VIRT_ERROR_PREFIX +
                 b'GATEWAY_TIMEOUT Path translation timed out.')
         except Exception as e:
-            self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + str(e))
+            msg = str(e).encode("UTF-8")
+            self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + msg)
         else:
             try:
                 yield self.connectToBackend(command, pathname, params)
