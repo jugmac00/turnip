@@ -7,6 +7,7 @@ from __future__ import (
     unicode_literals,
     )
 
+import os
 import uuid
 
 from twisted.internet import (
@@ -21,6 +22,7 @@ from twisted.web import xmlrpc
 from zope.interface import implementer
 
 from turnip.api.store import init_repo, delete_repo
+from turnip.config import config
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
     decode_packet,
@@ -380,7 +382,7 @@ class PackProxyServerProtocol(PackServerProtocol):
         return d
 
     @defer.inlineCallbacks
-    def _createRepo(self, lp_xmlrpc, pathname, creation_params):
+    def _createRepo(self, lp_xmlrpc, pathname, creation_params, auth_params):
         """Creates a repository locally, and asks Launchpad to initialize
         database objects too.
 
@@ -389,12 +391,15 @@ class PackProxyServerProtocol(PackServerProtocol):
         :param creation_params: Repo creation parameters returned from
                                 translatePath call."""
         clone_from = creation_params.get("clone_from")
-        allocated_id = creation_params["allocated_id"]
+        repository_id = creation_params["repository_id"]
         try:
-            yield init_repo(pathname, clone_from)
+            repo_path = os.path.join(config.get('repo_store'), pathname)
+            yield init_repo(repo_path, clone_from)
             yield lp_xmlrpc.callRemote(
-                "confirmRepoCreation", pathname, allocated_id)
+                "confirmRepoCreation", repository_id, auth_params)
         except Exception:
+            yield lp_xmlrpc.callRemote(
+                "abortRepoCreation", repository_id, auth_params)
             delete_repo(pathname)
             raise
 
@@ -593,9 +598,10 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             pathname = translated['path']
 
             # Repository doesn't exist, and should be created.
-            creation_params = translated.get("creation_params", {})
-            if creation_params and creation_params["should_create"]:
-                yield self._createRepo(proxy, pathname, creation_params)
+            creation_params = translated.get("creation_params")
+            if creation_params:
+                yield self._createRepo(
+                    proxy, pathname, creation_params, auth_params)
         except xmlrpc.Fault as e:
             fault_type = translate_xmlrpc_fault(
                 e.faultCode).name.encode('UTF-8')

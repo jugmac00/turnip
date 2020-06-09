@@ -80,6 +80,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.ref_permissions = {}
         self.ref_permissions_fault = None
         self.confirm_repo_creation_call_args = []
+        self.abort_repo_creation_call_args = []
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
@@ -104,10 +105,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             else:
                 clone_from = None
             retval["creation_params"] = {
-                "allocated_id": 66,
-                "should_create": writable,
-                "clone_from": clone_from
-            }
+                "repository_id": 66, "clone_from": clone_from}
         return retval
 
     def xmlrpc_authenticateWithPassword(self, username, password):
@@ -131,5 +129,8 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         else:
             return self.merge_proposal_url
 
-    def xmlrpc_confirmRepoCreation(self, pathname, allocated_id):
-        self.confirm_repo_creation_call_args.append((pathname, allocated_id))
+    def xmlrpc_confirmRepoCreation(self, repository_id):
+        self.confirm_repo_creation_call_args.append((repository_id, ))
+
+    def xmlrpc_abortRepoCreation(self, repository_id):
+        self.abort_repo_creation_call_args.append((repository_id, ))

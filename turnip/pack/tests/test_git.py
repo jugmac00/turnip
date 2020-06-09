@@ -350,6 +350,7 @@ class TestPackVirtServerProtocol(TestCase):
 
         # No call to confirm repo creation should have been made.
         self.assertEqual([], self.virtinfo.confirm_repo_creation_call_args)
+        self.assertEqual([(66, )], self.virtinfo.abort_repo_creation_call_args)
 
     @defer.inlineCallbacks
     def test_git_push_for_new_repository_fails_to_confirm(self):
@@ -377,6 +378,7 @@ class TestPackVirtServerProtocol(TestCase):
 
         self.assertEqual(1, m_del_repo.call_count)
         self.assertEqual(mock.call(digest), m_del_repo.call_args)
+        self.assertEqual([(66,)], self.virtinfo.abort_repo_creation_call_args)
 
     def test_translatePath_timeout(self):
         root = self.useFixture(TempDir()).path
