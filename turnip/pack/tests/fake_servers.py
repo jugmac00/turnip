@@ -129,8 +129,8 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         else:
             return self.merge_proposal_url
 
-    def xmlrpc_confirmRepoCreation(self, repository_id):
+    def xmlrpc_confirmRepoCreation(self, repository_id, auth_params):
         self.confirm_repo_creation_call_args.append((repository_id, ))
 
-    def xmlrpc_abortRepoCreation(self, repository_id):
+    def xmlrpc_abortRepoCreation(self, repository_id, auth_params):
         self.abort_repo_creation_call_args.append((repository_id, ))

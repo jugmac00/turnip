@@ -7,9 +7,10 @@ from __future__ import (
     unicode_literals,
     )
 
-import os
+import json
 import uuid
 
+import six
 from twisted.internet import (
     defer,
     error,
@@ -381,28 +382,6 @@ class PackProxyServerProtocol(PackServerProtocol):
             self.factory.backend_host, self.factory.backend_port, client)
         return d
 
-    @defer.inlineCallbacks
-    def _createRepo(self, lp_xmlrpc, pathname, creation_params, auth_params):
-        """Creates a repository locally, and asks Launchpad to initialize
-        database objects too.
-
-        :param lp_xmlrpc: The XML-RCP proxy to launchpad.
-        :param pathname: Local path for the repository.
-        :param creation_params: Repo creation parameters returned from
-                                translatePath call."""
-        clone_from = creation_params.get("clone_from")
-        repository_id = creation_params["repository_id"]
-        try:
-            repo_path = os.path.join(config.get('repo_store'), pathname)
-            yield init_repo(repo_path, clone_from)
-            yield lp_xmlrpc.callRemote(
-                "confirmRepoCreation", repository_id, auth_params)
-        except Exception:
-            yield lp_xmlrpc.callRemote(
-                "abortRepoCreation", repository_id, auth_params)
-            delete_repo(pathname)
-            raise
-
     def resumeProducing(self):
         # Send our translated request and then open the gate to the
         # client.
@@ -432,11 +411,30 @@ class PackBackendProtocol(PackServerProtocol):
     hookrpc_key = None
     expect_set_symbolic_ref = False
 
+    @defer.inlineCallbacks
     def requestReceived(self, command, raw_pathname, params):
         self.extractRequestMeta(command, raw_pathname, params)
         self.command = command
         self.raw_pathname = raw_pathname
         self.path = compose_path(self.factory.root, self.raw_pathname)
+
+        auth_params = self.createAuthParams(params)
+
+        # If any operation should be executed before running the requested
+        # command, we should run it here.
+        if 'turnip-pre-execution' in params:
+            pre_exec_details = json.loads(params['turnip-pre-execution'])
+            operation = pre_exec_details['operation']
+            pre_exec_params = pre_exec_details['params']
+            method = {
+                'turnip-create-repo': self._createRepo,
+            }
+            try:
+                yield method[operation](
+                    auth_params=auth_params, **pre_exec_params)
+            except Exception as e:
+                self.die(b'Could not create repository: %s' % e)
+                return
 
         if command == b'turnip-set-symbolic-ref':
             self.expect_set_symbolic_ref = True
@@ -459,7 +457,6 @@ class PackBackendProtocol(PackServerProtocol):
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
         args.append(self.path)
-        auth_params = self.createAuthParams(params)
         self.spawnGit(subcmd,
                       args,
                       write_operation=write_operation,
@@ -492,6 +489,44 @@ class PackBackendProtocol(PackServerProtocol):
 
     def spawnProcess(self, cmd, args, env=None):
         default_reactor.spawnProcess(self.peer, cmd, args, env=env)
+
+    @defer.inlineCallbacks
+    def _createRepo(self, xmlrpc_endpoint, pathname, creation_params,
+                    auth_params):
+        """Creates a repository locally, and asks Launchpad to initialize
+        database objects too.
+
+        :param xmlrpc_endpoint: The XML-RCP proxy address to launchpad.
+        :param pathname: Local path for the repository.
+        :param creation_params: Repo creation parameters returned from
+                                translatePath call."""
+        xmlrpc_endpoint = six.ensure_binary(xmlrpc_endpoint, 'utf8')
+        proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
+        clone_from = creation_params.get("clone_from")
+        repository_id = creation_params["repository_id"]
+        xmlrpc_timeout = config.get("virtinfo_timeout")
+        try:
+            repo_path = compose_path(self.factory.root, pathname)
+            if clone_from:
+                clone_path = compose_path(self.factory.root, clone_from)
+            else:
+                clone_path = None
+            self._init_repo(repo_path, clone_path)
+            yield proxy.callRemote(
+                "confirmRepoCreation", repository_id, auth_params).addTimeout(
+                xmlrpc_timeout, default_reactor)
+        except Exception as e:
+            yield proxy.callRemote(
+                "abortRepoCreation", repository_id, auth_params).addTimeout(
+                    xmlrpc_timeout, default_reactor)
+            self._delete_repo(repo_path)
+            raise e
+
+    def _init_repo(self, repo_path, clone_path):
+        init_repo(repo_path, clone_path)
+
+    def _delete_repo(self, pathname):
+        delete_repo(pathname)
 
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
@@ -600,8 +635,14 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             # Repository doesn't exist, and should be created.
             creation_params = translated.get("creation_params")
             if creation_params:
-                yield self._createRepo(
-                    proxy, pathname, creation_params, auth_params)
+                params[b'turnip-pre-execution'] = json.dumps({
+                    'operation': 'turnip-create-repo',
+                    'params': {
+                        'xmlrpc_endpoint': self.factory.virtinfo_endpoint,
+                        'pathname': pathname,
+                        'creation_params': creation_params}})
+                params[b'turnip-pre-execution'] = six.ensure_binary(
+                    params[b'turnip-pre-execution'], 'utf8')
         except xmlrpc.Fault as e:
             fault_type = translate_xmlrpc_fault(
                 e.faultCode).name.encode('UTF-8')
