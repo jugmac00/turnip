@@ -124,4 +124,5 @@ publish-tarball: build-tarball
 		$(SWIFT_CONTAINER_NAME) $(SWIFT_OBJECT_PATH) \
 		$(TARBALL_BUILD_PATH)
 
-.PHONY: build check clean dist lint run-api run-pack test build-tarball
+.PHONY: build check clean dist lint run-api run-pack test
+.PHONY: build-tarball publish-tarball
