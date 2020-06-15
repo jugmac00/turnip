@@ -7,6 +7,10 @@ from __future__ import (
     unicode_literals,
     )
 
+
+__metaclass__ = type
+
+
 import json
 import uuid
 
@@ -346,6 +350,7 @@ class PackClientFactory(protocol.ClientFactory):
     def __init__(self, server, deferred):
         self.server = server
         self.deferred = deferred
+        self.protocol_instance = None
 
     def startedConnecting(self, connector):
         self.server.log.info(
@@ -368,32 +373,54 @@ class PackProxyServerProtocol(PackServerProtocol):
     before forwarding them to the backend.
     """
 
-    command = pathname = params = None
-    request_sent = False
     client_factory = PackClientFactory
+    
+    def __init__(self):
+        self.command = []
+        self.pathname = []
+        self.params = []
+        self.requests_sent = 0
+        self.deferred = None
 
-    def connectToBackend(self, command, pathname, params):
-        self.command = command
-        self.pathname = pathname
-        self.params = params
-        d = defer.Deferred()
-        client = self.client_factory(self, d)
-        default_reactor.connectTCP(
-            self.factory.backend_host, self.factory.backend_port, client)
-        return d
+    def runOnBackend(self, command, pathname, params):
+        """Connects to backend and sends a command to it."""
+        # On the first command sent, connect to the backend.
+        self.command.append(command)
+        self.pathname.append(pathname)
+        self.params.append(params)
 
-    def resumeProducing(self):
-        # Send our translated request and then open the gate to the
-        # client.
-        if not self.request_sent:
+        # On the first command sent, establish the connection.
+        if len(self.command) == 1:
+            self.deferred = defer.Deferred()
+            client = self.client_factory(self, self.deferred)
+            default_reactor.connectTCP(
+                self.factory.backend_host, self.factory.backend_port, client)
+            return self.deferred
+        else:
+            d = defer.Deferred()
+            d.addCallback(lambda result: self.resumeProducing())
+            self.deferred.chainDeferred(d)
+            return d
+
+    def sendNextCommand(self):
+        if self.peer is None:
+            # If we didn't connection established just yet, hold on.
+            return
+        while self.requests_sent < len(self.command):
+            req_id = self.requests_sent
+            self.requests_sent += 1
+            command = self.command[req_id]
+            pathname = self.pathname[req_id]
+            params = self.params[req_id]
             self.log.info(
                 "Forwarding request to backend: '{command} {pathname}', "
-                "params={params}", command=self.command,
-                pathname=self.pathname, params=self.params)
-            self.request_sent = True
-            self.peer.sendPacket(
-                encode_request(
-                    self.command, self.pathname, self.params))
+                "params={params}", command=command,
+                pathname=pathname, params=params)
+            self.peer.sendPacket(encode_request(command, pathname, params))
+
+    def resumeProducing(self):
+        # Send our translated request and then open the gate to the client.
+        self.sendNextCommand()
         PackServerProtocol.resumeProducing(self)
 
     def readConnectionLost(self):
@@ -427,14 +454,18 @@ class PackBackendProtocol(PackServerProtocol):
             operation = pre_exec_details['operation']
             pre_exec_params = pre_exec_details['params']
             method = {
-                'turnip-create-repo': self._createRepo,
+              'turnip-create-repo': self._createRepo,
             }
+            yield method[operation](auth_params=auth_params, **pre_exec_params)
+
+        if command == b'turnip-create-repo':
             try:
-                yield method[operation](
-                    auth_params=auth_params, **pre_exec_params)
+                self.log.info("Creating repository: %s" % raw_pathname)
+                # self._createRepo(auth_params=auth_params, **params)
             except Exception as e:
                 self.die(b'Could not create repository: %s' % e)
-                return
+            self.expectNextCommand()
+            return
 
         if command == b'turnip-set-symbolic-ref':
             self.expect_set_symbolic_ref = True
@@ -489,6 +520,11 @@ class PackBackendProtocol(PackServerProtocol):
 
     def spawnProcess(self, cmd, args, env=None):
         default_reactor.spawnProcess(self.peer, cmd, args, env=env)
+
+    def expectNextCommand(self):
+        """Enables this connection to receive the next command."""
+        self.got_request = False
+        self.resumeProducing()
 
     @defer.inlineCallbacks
     def _createRepo(self, xmlrpc_endpoint, pathname, creation_params,
@@ -659,7 +695,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + msg)
         else:
             try:
-                yield self.connectToBackend(command, pathname, params)
+                yield self.runOnBackend(command, pathname, params)
             except Exception as e:
                 self.server.log.failure('Backend connection failed.')
                 self.server.die(b'Backend connection failed.')
@@ -714,7 +750,7 @@ class PackFrontendServerProtocol(PackProxyServerProtocol):
             self.die(b'Illegal request parameters')
             return
         params[b'turnip-request-id'] = self.request_id
-        self.connectToBackend(command, pathname, params)
+        self.runOnBackend(command, pathname, params)
 
 
 class PackFrontendFactory(protocol.Factory):

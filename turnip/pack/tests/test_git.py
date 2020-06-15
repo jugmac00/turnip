@@ -114,7 +114,7 @@ class TestPackServerProtocol(TestCase):
 
 class DummyPackBackendProtocol(git.PackBackendProtocol, object):
 
-    test_process = None
+    test_process_list = None
 
     def __init__(self):
         super(DummyPackBackendProtocol, self).__init__()
@@ -130,7 +130,15 @@ class DummyPackBackendProtocol(git.PackBackendProtocol, object):
     def spawnProcess(self, cmd, args, env=None):
         if self.test_process is not None:
             raise AssertionError('Process already spawned.')
-        self.test_process = (cmd, args, env)
+        if self.test_process_list is None:
+            self.test_process_list = []
+        self.test_process_list.append((cmd, args, env))
+
+    @property
+    def test_process(self):
+        if self.test_process_list is None:
+            return None
+        return self.test_process_list[-1]
 
 
 class TestPackFrontendServerProtocol(TestCase):
@@ -400,8 +408,22 @@ class TestPackVirtServerProtocol(TestCase):
     def test_translatePath(self):
         yield self.proto.requestReceived(b'git-upload-pack', b'/example', {})
         self.assertEqual(
-            hashlib.sha256(b'/example').hexdigest(), self.proto.pathname)
+            [hashlib.sha256(b'/example').hexdigest()], self.proto.pathname)
         self.backend_factory.test_protocol.transport.loseConnection()
+
+    @defer.inlineCallbacks
+    def test_multiple_calls_to_backend(self):
+        yield self.proto.runOnBackend(
+            b'turnip-create-repo', b'/example_1', {b"param": b'1'})
+        yield self.proto.runOnBackend(
+            b'git-upload-pack', b'/example_2', {b"param": b'2'})
+        self.backend_factory.test_protocol.transport.loseConnection()
+        self.assertEqual(
+            [b'turnip-create-repo', b'git-upload-pack'], self.proto.command)
+        self.assertEqual(
+            [b'/example_1', b'/example_2'], self.proto.pathname)
+        self.assertEqual(
+            [{b"param": b'1'}, {b"param": b'2'}], self.proto.params)
 
     @defer.inlineCallbacks
     def test_git_push_for_new_repository_adds_pre_execution_step(self):
@@ -412,6 +434,7 @@ class TestPackVirtServerProtocol(TestCase):
 
         digest = hashlib.sha256(b'example-new/clone-from:foo-repo').hexdigest()
         clone_digest = hashlib.sha256(b'foo-repo').hexdigest()
+        self.assertEqual(1, len(self.proto.params))
         self.assertEqual({
             'turnip-pre-execution': json.dumps({
                 "operation": "turnip-create-repo",
@@ -422,7 +445,7 @@ class TestPackVirtServerProtocol(TestCase):
                         "repository_id": 66,
                         "clone_from": clone_digest}
                 }})
-        }, self.proto.params)
+        }, self.proto.params[0])
 
     def test_translatePath_timeout(self):
         root = self.useFixture(TempDir()).path
