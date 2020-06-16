@@ -104,8 +104,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
                 clone_from = hashlib.sha256(clone_path).hexdigest()
             else:
                 clone_from = None
-            retval["creation_params"] = {
-                "repository_id": 66, "clone_from": clone_from}
+            retval["creation_params"] = {"clone_from": clone_from}
         return retval
 
     def xmlrpc_authenticateWithPassword(self, username, password):
@@ -129,8 +128,8 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         else:
             return self.merge_proposal_url
 
-    def xmlrpc_confirmRepoCreation(self, repository_id, auth_params):
-        self.confirm_repo_creation_call_args.append((repository_id, ))
+    def xmlrpc_confirmRepoCreation(self, pathname, auth_params):
+        self.confirm_repo_creation_call_args.append((pathname, ))
 
-    def xmlrpc_abortRepoCreation(self, repository_id, auth_params):
-        self.abort_repo_creation_call_args.append((repository_id, ))
+    def xmlrpc_abortRepoCreation(self, pathname, auth_params):
+        self.abort_repo_creation_call_args.append((pathname, ))

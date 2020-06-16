@@ -11,10 +11,8 @@ from __future__ import (
 __metaclass__ = type
 
 
-import json
 import uuid
 
-import six
 from twisted.internet import (
     defer,
     error,
@@ -26,7 +24,7 @@ from twisted.logger import Logger
 from twisted.web import xmlrpc
 from zope.interface import implementer
 
-from turnip.api.store import init_repo, delete_repo
+from turnip.api import store
 from turnip.config import config
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
@@ -347,19 +345,26 @@ class PackClientFactory(protocol.ClientFactory):
 
     protocol = PackClientProtocol
 
-    def __init__(self, server, deferred):
+    def __init__(self, server, protocol_deferred, connection_deferred):
+        """Builds the Pack client.
+
+        :param protocol_deferred: The deferred to be called back when
+                                  protocol gets built.
+        :param connection_deferred: The deferred to be called when the
+                                    connection is established."""
         self.server = server
-        self.deferred = deferred
-        self.protocol_instance = None
+        self.connection_deferred = connection_deferred
+        self.protocol_deferred = protocol_deferred
 
     def startedConnecting(self, connector):
         self.server.log.info(
             "Connecting to backend: {dest}.", dest=connector.getDestination())
+        self.connection_deferred.callback(None)
 
     def buildProtocol(self, *args, **kwargs):
         p = protocol.ClientFactory.buildProtocol(self, *args, **kwargs)
         p.setPeer(self.server)
-        self.deferred.callback(None)
+        self.protocol_deferred.callback(None)
         return p
 
     def clientConnectionFailed(self, connector, reason):
@@ -374,39 +379,44 @@ class PackProxyServerProtocol(PackServerProtocol):
     """
 
     client_factory = PackClientFactory
-    
+
     def __init__(self):
+        self.commands_deferred = []
         self.command = []
         self.pathname = []
         self.params = []
         self.requests_sent = 0
-        self.deferred = None
 
     def runOnBackend(self, command, pathname, params):
         """Connects to backend and sends a command to it."""
-        # On the first command sent, connect to the backend.
+        command_deferred = defer.Deferred()
+        self.commands_deferred.append(command_deferred)
         self.command.append(command)
         self.pathname.append(pathname)
         self.params.append(params)
 
-        # On the first command sent, establish the connection.
         if len(self.command) == 1:
-            self.deferred = defer.Deferred()
-            client = self.client_factory(self, self.deferred)
+            # On the first command sent, establish the connection.
+            conn_deferred = defer.Deferred()
+            proto_deferred = defer.Deferred()
+            client = self.client_factory(self, proto_deferred, conn_deferred)
             default_reactor.connectTCP(
                 self.factory.backend_host, self.factory.backend_port, client)
-            return self.deferred
+
+            # We should wait for both protocol creation and connection
+            # established deferreds, and also the command execution itself.
+            return defer.DeferredList(
+                [conn_deferred, proto_deferred, command_deferred])
         else:
-            d = defer.Deferred()
-            d.addCallback(lambda result: self.resumeProducing())
-            self.deferred.chainDeferred(d)
-            return d
+            # Chain the resumeProducing() execution to be executed after the
+            # previous command.
+            previous_command = self.commands_deferred[-2]
+            previous_command.addCallback(lambda result: self.resumeProducing())
+            return command_deferred
 
     def sendNextCommand(self):
-        if self.peer is None:
-            # If we didn't connection established just yet, hold on.
-            return
         while self.requests_sent < len(self.command):
+            # Consume all commands queued up and not sent yet.
             req_id = self.requests_sent
             self.requests_sent += 1
             command = self.command[req_id]
@@ -417,6 +427,7 @@ class PackProxyServerProtocol(PackServerProtocol):
                 "params={params}", command=command,
                 pathname=pathname, params=params)
             self.peer.sendPacket(encode_request(command, pathname, params))
+            self.commands_deferred[req_id].callback(None)
 
     def resumeProducing(self):
         # Send our translated request and then open the gate to the client.
@@ -444,24 +455,13 @@ class PackBackendProtocol(PackServerProtocol):
         self.command = command
         self.raw_pathname = raw_pathname
         self.path = compose_path(self.factory.root, self.raw_pathname)
-
         auth_params = self.createAuthParams(params)
-
-        # If any operation should be executed before running the requested
-        # command, we should run it here.
-        if 'turnip-pre-execution' in params:
-            pre_exec_details = json.loads(params['turnip-pre-execution'])
-            operation = pre_exec_details['operation']
-            pre_exec_params = pre_exec_details['params']
-            method = {
-              'turnip-create-repo': self._createRepo,
-            }
-            yield method[operation](auth_params=auth_params, **pre_exec_params)
 
         if command == b'turnip-create-repo':
             try:
                 self.log.info("Creating repository: %s" % raw_pathname)
-                # self._createRepo(auth_params=auth_params, **params)
+                clone_from = params['clone_from']
+                yield self._createRepo(raw_pathname, clone_from, auth_params)
             except Exception as e:
                 self.die(b'Could not create repository: %s' % e)
             self.expectNextCommand()
@@ -527,42 +527,39 @@ class PackBackendProtocol(PackServerProtocol):
         self.resumeProducing()
 
     @defer.inlineCallbacks
-    def _createRepo(self, xmlrpc_endpoint, pathname, creation_params,
-                    auth_params):
+    def _createRepo(self, pathname, clone_from, auth_params):
         """Creates a repository locally, and asks Launchpad to initialize
         database objects too.
 
-        :param xmlrpc_endpoint: The XML-RCP proxy address to launchpad.
-        :param pathname: Local path for the repository.
-        :param creation_params: Repo creation parameters returned from
-                                translatePath call."""
-        xmlrpc_endpoint = six.ensure_binary(xmlrpc_endpoint, 'utf8')
-        proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
-        clone_from = creation_params.get("clone_from")
-        repository_id = creation_params["repository_id"]
+        :param pathname: Repository's translated path.
+        :param auth_params: Authorization info.
+        """
+        # Test issue: Twisted seems to lose @mock.patch("store") context
+        # (specially when catching exception with defer.inlineCallbacks).
+        # So, we create this reference here to make sure init_repo and
+        # delete_repo will continue being a mock in case we use @mock.path.
+        init_repo = store.init_repo
+        delete_repo = store.delete_repo
+
+        xmlrpc_endpoint = config.get("virtinfo_endpoint")
         xmlrpc_timeout = config.get("virtinfo_timeout")
+        proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
         try:
             repo_path = compose_path(self.factory.root, pathname)
             if clone_from:
                 clone_path = compose_path(self.factory.root, clone_from)
             else:
                 clone_path = None
-            self._init_repo(repo_path, clone_path)
+            init_repo(repo_path, clone_path)
             yield proxy.callRemote(
-                "confirmRepoCreation", repository_id, auth_params).addTimeout(
+                "confirmRepoCreation", pathname, auth_params).addTimeout(
                 xmlrpc_timeout, default_reactor)
-        except Exception as e:
+        except Exception:
             yield proxy.callRemote(
-                "abortRepoCreation", repository_id, auth_params).addTimeout(
+                "abortRepoCreation", pathname, auth_params).addTimeout(
                     xmlrpc_timeout, default_reactor)
-            self._delete_repo(repo_path)
-            raise e
-
-    def _init_repo(self, repo_path, clone_path):
-        init_repo(repo_path, clone_path)
-
-    def _delete_repo(self, pathname):
-        delete_repo(pathname)
+            delete_repo(repo_path)
+            raise
 
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
@@ -671,14 +668,11 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             # Repository doesn't exist, and should be created.
             creation_params = translated.get("creation_params")
             if creation_params:
-                params[b'turnip-pre-execution'] = json.dumps({
-                    'operation': 'turnip-create-repo',
-                    'params': {
-                        'xmlrpc_endpoint': self.factory.virtinfo_endpoint,
-                        'pathname': pathname,
-                        'creation_params': creation_params}})
-                params[b'turnip-pre-execution'] = six.ensure_binary(
-                    params[b'turnip-pre-execution'], 'utf8')
+                creation_params[b'clone_from'] = (
+                    creation_params.get(b'clone_from') or b'')
+                creation_params.update(params)
+                yield self.runOnBackend(
+                    b'turnip-create-repo', pathname, creation_params)
         except xmlrpc.Fault as e:
             fault_type = translate_xmlrpc_fault(
                 e.faultCode).name.encode('UTF-8')
