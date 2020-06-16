@@ -8,7 +8,6 @@ from __future__ import (
     )
 
 import hashlib
-import json
 import os.path
 
 from fixtures import TempDir
@@ -30,6 +29,7 @@ from twisted.internet import (
 from twisted.web import server
 from twisted.web.xmlrpc import Fault
 
+from turnip.config import config
 from turnip.pack import (
     git,
     helpers,
@@ -112,33 +112,14 @@ class TestPackServerProtocol(TestCase):
         self.assertKilledWith(b'Bad request: flush-pkt instead')
 
 
-class DummyPackBackendProtocol(git.PackBackendProtocol, object):
+class DummyPackBackendProtocol(git.PackBackendProtocol):
 
-    test_process_list = None
-
-    def __init__(self):
-        super(DummyPackBackendProtocol, self).__init__()
-        self.initiated_repos = []
-        self.deleted_repos = []
-
-    def _init_repo(self, repo_path, clone_path):
-        self.initiated_repos.append((repo_path, clone_path))
-
-    def _delete_repo(self, pathname):
-        self.deleted_repos.append((pathname, ))
+    test_process = None
 
     def spawnProcess(self, cmd, args, env=None):
         if self.test_process is not None:
             raise AssertionError('Process already spawned.')
-        if self.test_process_list is None:
-            self.test_process_list = []
-        self.test_process_list.append((cmd, args, env))
-
-    @property
-    def test_process(self):
-        if self.test_process_list is None:
-            return None
-        return self.test_process_list[-1]
+        self.test_process = (cmd, args, env)
 
 
 class TestPackFrontendServerProtocol(TestCase):
@@ -213,6 +194,10 @@ class TestPackBackendProtocol(TestCase):
         self.virtinfo_port = self.virtinfo_listener.getHost().port
         self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
         self.addCleanup(self.virtinfo_listener.stopListening)
+        self.setupConfig()
+
+    def setupConfig(self):
+        config.defaults['virtinfo_endpoint'] = self.virtinfo_url
 
     def assertKilledWith(self, message):
         self.assertFalse(self.transport.connected)
@@ -220,59 +205,50 @@ class TestPackBackendProtocol(TestCase):
             (b'ERR ' + message + b'\n', b''),
             helpers.decode_packet(self.transport.value()))
 
+    @mock.patch("turnip.pack.git.store")
     @defer.inlineCallbacks
-    def test_create_repo_pre_execution_command(self):
-        # If command params has 'turnip-pre-execution', it should run what
-        # is described there before spawning process
-        pre_exec_operation = {
-            "operation": "turnip-create-repo",
-            "params": {
-                'xmlrpc_endpoint': str(self.virtinfo_url),
-                'pathname': 'foo.git',
-                'creation_params': {"clone_from": None, "repository_id": 9}}}
+    def test_create_repo_command_allows_further_requests(self, store):
+        # If command is 'turnip-create-repo', it should allow us to run more
+        # than one command.
         yield self.proto.requestReceived(
-            b'git-upload-pack', b'/foo.git', {
-                b'host': b'example.com',
-                b'turnip-pre-execution': json.dumps(pre_exec_operation)
-            })
+            b'turnip-create-repo', b'foo.git', {b"clone_from": None})
+
+        yield self.proto.requestReceived(
+            b'git-upload-pack', b'/foo.git', {b'host': b'example.com'})
 
         full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
-        self.assertEqual([(full_path, None)], self.proto.initiated_repos)
-        self.assertEqual([], self.proto.deleted_repos)
+        self.assertEqual(
+            [mock.call(full_path, None)], store.init_repo.call_args_list)
+        self.assertEqual([], store.delete_repo.call_args_list)
 
         self.assertEqual(
-            [(9, )], self.virtinfo.confirm_repo_creation_call_args)
+            [('foo.git', )], self.virtinfo.confirm_repo_creation_call_args)
 
         self.assertEqual(
-            (b'git',
-             [b'git', b'upload-pack', full_path],
-             {}),
+            (b'git', [b'git', b'upload-pack', full_path], {}),
             self.proto.test_process)
 
+    @mock.patch("turnip.pack.git.store")
     @defer.inlineCallbacks
-    def test_create_repo_fails_to_confirm(self):
+    def test_create_repo_fails_to_confirm(self, store):
         self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock()
         self.virtinfo.xmlrpc_confirmRepoCreation.side_effect = Fault(1, "?")
 
-        pre_exec_operation = {
-            "operation": "turnip-create-repo",
-            "params": {
-                'xmlrpc_endpoint': str(self.virtinfo_url),
-                'pathname': 'foo.git',
-                'creation_params': {"clone_from": None, "repository_id": 9}}}
-        params = {
-            b'host': b'example.com',
-            b'turnip-pre-execution': json.dumps(pre_exec_operation)}
+        params = {b'host': b'example.com'}
         yield self.proto.requestReceived(
-            b'git-upload-pack', b'/foo.git', params)
+            b'turnip-create-repo', b'foo.git', {"clone_from": None})
 
         full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
-        self.assertEqual([(full_path, None)], self.proto.initiated_repos)
-        self.assertEqual([(full_path, )], self.proto.deleted_repos)
-
-        self.assertEqual([(9, )], self.virtinfo.abort_repo_creation_call_args)
         self.assertEqual(
-            [mock.call(mock.ANY, 9, self.proto.createAuthParams(params))],
+            [mock.call(full_path, None)], store.init_repo.call_args_list)
+        self.assertEqual(
+            [mock.call(full_path, )], store.delete_repo.call_args_list)
+
+        auth_params = self.proto.createAuthParams(params)
+        self.assertEqual([(b'foo.git', )],
+                         self.virtinfo.abort_repo_creation_call_args)
+        self.assertEqual(
+            [mock.call(mock.ANY, b'foo.git', auth_params)],
             self.virtinfo.xmlrpc_confirmRepoCreation.call_args_list)
 
         self.assertIsNone(self.proto.test_process)
@@ -413,8 +389,20 @@ class TestPackVirtServerProtocol(TestCase):
 
     @defer.inlineCallbacks
     def test_multiple_calls_to_backend(self):
+        self.backend_factory.protocol._createRepo = mock.Mock()
+
         yield self.proto.runOnBackend(
-            b'turnip-create-repo', b'/example_1', {b"param": b'1'})
+            b'turnip-create-repo', b'/example_1', {b"clone_from": b'1'})
+        self.assertEqual(
+            [b'turnip-create-repo'], self.proto.command)
+        self.assertEqual(
+            [b'/example_1'], self.proto.pathname)
+        self.assertEqual(
+            [{b"clone_from": b'1'}], self.proto.params)
+        self.assertEqual(1, self.proto.requests_sent)
+        self.assertEqual(1, len(self.proto.commands_deferred))
+        self.assertTrue(self.proto.commands_deferred[0].called)
+
         yield self.proto.runOnBackend(
             b'git-upload-pack', b'/example_2', {b"param": b'2'})
         self.backend_factory.test_protocol.transport.loseConnection()
@@ -423,10 +411,13 @@ class TestPackVirtServerProtocol(TestCase):
         self.assertEqual(
             [b'/example_1', b'/example_2'], self.proto.pathname)
         self.assertEqual(
-            [{b"param": b'1'}, {b"param": b'2'}], self.proto.params)
+            [{b"clone_from": b'1'}, {b"param": b'2'}], self.proto.params)
+        self.assertEqual(2, self.proto.requests_sent)
+        self.assertEqual(2, len(self.proto.commands_deferred))
+        self.assertTrue(self.proto.commands_deferred[1].called)
 
     @defer.inlineCallbacks
-    def test_git_push_for_new_repository_adds_pre_execution_step(self):
+    def test_git_push_for_new_repository_runs_both_commands(self):
         path = b'/+rwexample-new/clone-from:foo-repo'
 
         yield self.proto.requestReceived(b'git-upload-pack', path, {})
@@ -434,18 +425,10 @@ class TestPackVirtServerProtocol(TestCase):
 
         digest = hashlib.sha256(b'example-new/clone-from:foo-repo').hexdigest()
         clone_digest = hashlib.sha256(b'foo-repo').hexdigest()
-        self.assertEqual(1, len(self.proto.params))
-        self.assertEqual({
-            'turnip-pre-execution': json.dumps({
-                "operation": "turnip-create-repo",
-                "params": {
-                    "xmlrpc_endpoint": str(self.virtinfo_url),
-                    "pathname": digest,
-                    "creation_params": {
-                        "repository_id": 66,
-                        "clone_from": clone_digest}
-                }})
-        }, self.proto.params[0])
+        self.assertEqual(
+            ['turnip-create-repo', 'git-upload-pack'], self.proto.command)
+        self.assertEqual([digest, digest], self.proto.pathname)
+        self.assertEqual([{'clone_from': clone_digest}, {}], self.proto.params)
 
     def test_translatePath_timeout(self):
         root = self.useFixture(TempDir()).path
