@@ -85,10 +85,10 @@ changed, or an error message::
    set-symbolic-ref-ack             = PKT-LINE("ACK" SP refname)
 
 
-Internally, Turnip implements an extension to create repositories:
-'turnip-create-repo'. It receives, apart from the pathname, the same
-authentication parameters used by the external interface. This
-authentication is used to confirm/abort the repository creation on Launchpad.
+Internally, Turnip also implements an extension to create repositories:
+'turnip-create-repo'. It receives the new repository's pathname and the same
+authentication parameters used by the external interface. The authentication
+defails are used to confirm/abort the repository creation on Launchpad.
 
 Development
 ===========
