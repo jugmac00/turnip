@@ -6,9 +6,11 @@
 from __future__ import print_function
 
 import base64
+from datetime import timedelta, datetime
 import os
 import subprocess
 from textwrap import dedent
+import time
 import unittest
 import uuid
 
@@ -51,6 +53,23 @@ class ApiTestCase(TestCase):
             repo.references[expected].peel().oid,
             repo.references[observed].peel().oid)
 
+    def assertRepositoryCreatedAsynchronously(self, repo_path, timeout_secs=5):
+        """Waits up to `timeout_secs` for a repository to be available."""
+        timeout = timedelta(seconds=timeout_secs)
+        start = datetime.now()
+        while datetime.now() <= (start + timeout):
+            try:
+                resp = self.app.get('/repo/{}'.format(repo_path),
+                                    expect_errors=True)
+                if resp.status_code == 200 and resp.json['is_available']:
+                    return
+            except:
+                pass
+            time.sleep(0.1)
+        self.fail(
+            "Repository %s was not created after %s secs"
+            % (repo_path, timeout_secs))
+
     def get_ref(self, ref):
         resp = self.app.get('/repo/{}/{}'.format(self.repo_path, ref))
         return resp.json
@@ -81,6 +100,27 @@ class ApiTestCase(TestCase):
         resp = self.app.post_json('/repo', {'repo_path': new_repo_path,
                                             'clone_from': self.repo_path,
                                             'clone_refs': True})
+        repo1_revlist = get_revlist(factory.repo)
+        clone_from = resp.json['repo_url'].split('/')[-1]
+        repo2 = open_repo(os.path.join(self.repo_root, clone_from))
+        repo2_revlist = get_revlist(repo2)
+
+        self.assertEqual(repo1_revlist, repo2_revlist)
+        self.assertEqual(200, resp.status_code)
+        self.assertIn(new_repo_path, resp.json['repo_url'])
+
+    def test_repo_async_init_with_clone(self):
+        """Repo can be initialised with optional clone asynchronously."""
+        factory = RepoFactory(self.repo_store, num_commits=2)
+        factory.build()
+        new_repo_path = uuid.uuid1().hex
+        resp = self.app.post_json('/repo?async=1', {
+            'repo_path': new_repo_path,
+            'clone_from': self.repo_path,
+            'clone_refs': True})
+
+        self.assertRepositoryCreatedAsynchronously(new_repo_path)
+
         repo1_revlist = get_revlist(factory.repo)
         clone_from = resp.json['repo_url'].split('/')[-1]
         repo2 = open_repo(os.path.join(self.repo_root, clone_from))

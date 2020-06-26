@@ -287,6 +287,13 @@ def get_default_branch(repo_path):
     return repo.references['HEAD'].target
 
 
+def is_repository_available(repo_path):
+    """Checks if the repository is available (that is, if it is not in the
+    middle of a clone or init operation)."""
+    repo = Repository(repo_path)
+    return not repo.is_empty
+
+
 def set_default_branch(repo_path, target):
     repo = Repository(repo_path)
     repo.set_head(target)

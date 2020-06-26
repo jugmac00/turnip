@@ -3,6 +3,7 @@
 
 import os
 import re
+from multiprocessing import Pool
 from subprocess import CalledProcessError
 
 from cornice.resource import resource
@@ -12,6 +13,16 @@ import pyramid.httpexceptions as exc
 
 from turnip.config import config
 from turnip.api import store
+
+# Process pool for async execution (like repository creation).
+processing_pool = None
+
+
+def run_in_background(f, *args, **kwargs):
+    global processing_pool
+    if processing_pool is None:
+        processing_pool = Pool(maxtasksperchild=10)
+    return processing_pool.apply_async(f, args=args, kwds=kwargs)
 
 
 def is_valid_path(repo_store, repo_path):
@@ -53,9 +64,11 @@ class RepoAPI(BaseAPI):
 
     def collection_post(self):
         """Initialise a new git repository, or clone from an existing repo."""
-        repo_path = extract_json_data(self.request).get('repo_path')
-        clone_path = extract_json_data(self.request).get('clone_from')
-        clone_refs = extract_json_data(self.request).get('clone_refs', False)
+        json_data = extract_json_data(self.request)
+        repo_path = json_data.get('repo_path')
+        clone_path = json_data.get('clone_from')
+        clone_refs = json_data.get('clone_refs', False)
+        async_run = self.request.params.get('async')
 
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
@@ -72,7 +85,12 @@ class RepoAPI(BaseAPI):
             repo_clone = None
 
         try:
-            store.init_repo(repo, clone_from=repo_clone, clone_refs=clone_refs)
+            kwargs = dict(
+                repo_path=repo, clone_from=repo_clone, clone_refs=clone_refs)
+            if async_run:
+                run_in_background(store.init_repo, **kwargs)
+            else:
+                store.init_repo(**kwargs)
             repo_name = os.path.basename(os.path.normpath(repo))
             return {'repo_url': '/'.join([self.request.url, repo_name])}
         except GitError:
@@ -88,6 +106,7 @@ class RepoAPI(BaseAPI):
             raise exc.HTTPNotFound()
         return {
             'default_branch': store.get_default_branch(repo_path),
+            'is_available': store.is_repository_available(repo_path)
             }
 
     def _patch_default_branch(self, repo_path, value):
