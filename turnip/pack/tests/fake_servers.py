@@ -60,9 +60,9 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
 
     Examples of repositories:
         - /example: Simple read-only repo
-        - /+rwexample: Read & write repo
+        - /+rw/example: Read & write repo
         - /example-new: Non-existing repository, read only
-        - /+rwexample-new/clone-from:foo: New repository called "example-new",
+        - /+rw/example-new/clone-from:foo: New repository called "example-new",
             that can be written and cloned from "foo"
     """
 
@@ -80,24 +80,26 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.confirm_repo_creation_call_args = []
         self.abort_repo_creation_call_args = []
 
+    def getInternalPath(self, pathname):
+        if pathname.startswith(b'/+rw'):
+            pathname = pathname[4:]
+        return hashlib.sha256(pathname).hexdigest()
+
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
             raise xmlrpc.Fault(3, "Unauthorized")
 
         self.translations.append((pathname, permission, auth_params))
-        writable = False
-        if pathname.startswith(b'/+rw'):
-            writable = True
-            pathname = pathname[4:]
+        writable = pathname.startswith(b'/+rw')
 
         if permission != b'read' and not writable:
             raise xmlrpc.Fault(2, "Repository is read-only")
-        retval = {'path': hashlib.sha256(pathname).hexdigest()}
+        retval = {'path': self.getInternalPath(pathname)}
 
         if b"-new" in pathname:
             if b"/clone-from:" in pathname:
                 clone_path = pathname.split(b"/clone-from:", 1)[1]
-                clone_from = hashlib.sha256(clone_path).hexdigest()
+                clone_from = self.getInternalPath(clone_path)
             else:
                 clone_from = None
             retval["creation_params"] = {"clone_from": clone_from}
