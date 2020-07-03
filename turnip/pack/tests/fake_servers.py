@@ -19,8 +19,6 @@ __all__ = [
     "FakeVirtInfoService",
     ]
 
-from twisted.web.xmlrpc import Binary
-
 
 class FakeAuthServerService(xmlrpc.XMLRPC):
     """A fake version of the Launchpad authserver service."""
@@ -86,8 +84,6 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         if self.require_auth and 'user' not in auth_params:
             raise xmlrpc.Fault(3, "Unauthorized")
 
-        if isinstance(pathname, Binary):
-            pathname = pathname.data
         self.translations.append((pathname, permission, auth_params))
         writable = False
         if pathname.startswith(b'/+rw'):
