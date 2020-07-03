@@ -529,7 +529,7 @@ class PackBackendProtocol(PackServerProtocol):
             yield proxy.callRemote(
                 "confirmRepoCreation", pathname, auth_params).addTimeout(
                 xmlrpc_timeout, default_reactor)
-        except Exception:
+        except xmlrpc.Fault:
             yield proxy.callRemote(
                 "abortRepoCreation", pathname, auth_params).addTimeout(
                     xmlrpc_timeout, default_reactor)
@@ -640,14 +640,8 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                     b'NOT_FOUND Repository does not exist.')
             pathname = translated['path']
 
-            # Repository doesn't exist, and should be created.
-            creation_params = translated.get("creation_params")
-            if creation_params:
-                creation_params[b'clone_from'] = (
-                    creation_params.get(b'clone_from') or b'')
-                creation_params.update(params)
-                yield self.runOnBackend(
-                    b'turnip-create-repo', pathname, creation_params)
+            yield self._ensureRepositoryExists(
+                pathname, translated, permission, params)
         except xmlrpc.Fault as e:
             fault_type = translate_xmlrpc_fault(
                 e.faultCode).name.encode('UTF-8')
@@ -668,6 +662,29 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
             except Exception as e:
                 self.server.log.failure('Backend connection failed.')
                 self.server.die(b'Backend connection failed.')
+
+    @defer.inlineCallbacks
+    def _ensureRepositoryExists(
+            self, pathname, translated_path, permission, params):
+        """Checks if the repository doesn't exist and should be created.
+
+        For stateless frontends (like HTTP/S), we should create the
+        repository in the "advertise-refs" stage when it is about to
+        push to the repository.
+        For stateful frontends (like git+ssh), we should always create
+        the repository if it doesn't exist.
+        """
+        creation_params = translated_path.get("creation_params")
+        is_stateless_rpc = params.get('turnip-stateless-rpc') == b'yes'
+        is_advertise_ref = params.get('turnip-advertise-refs')
+        is_write = permission == 'write'
+        should_create = not is_stateless_rpc or (is_advertise_ref and is_write)
+        if creation_params and should_create:
+            creation_params[b'clone_from'] = (
+                creation_params.get(b'clone_from') or b'')
+            creation_params.update(params)
+            yield self.runOnBackend(
+                b'turnip-create-repo', pathname, creation_params)
 
 
 class PackVirtFactory(protocol.Factory):
