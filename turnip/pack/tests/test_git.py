@@ -10,7 +10,7 @@ from __future__ import (
 import hashlib
 import os.path
 
-from fixtures import TempDir
+from fixtures import TempDir, MonkeyPatch
 from pygit2 import init_repository
 import six
 from testtools import TestCase
@@ -228,11 +228,12 @@ class TestPackBackendProtocol(TestCase):
             (b'git', [b'git', b'upload-pack', full_path], {}),
             self.proto.test_process)
 
-    @mock.patch("turnip.pack.git.store")
     @defer.inlineCallbacks
-    def test_create_repo_fails_to_confirm(self, store):
-        self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock()
-        self.virtinfo.xmlrpc_confirmRepoCreation.side_effect = Fault(1, "?")
+    def test_create_repo_fails_to_confirm(self):
+        self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock(
+            side_effect=Fault(1, "?"))
+        store = mock.Mock()
+        self.useFixture(MonkeyPatch("turnip.pack.git.store", store))
 
         params = {b'host': b'example.com'}
         yield self.proto.requestReceived(
@@ -383,38 +384,35 @@ class TestPackVirtServerProtocol(TestCase):
     @defer.inlineCallbacks
     def test_translatePath(self):
         yield self.proto.requestReceived(b'git-upload-pack', b'/example', {})
+        _, pathname, _, _ = self.proto.requests[0]
         self.assertEqual(
-            [hashlib.sha256(b'/example').hexdigest()], self.proto.pathname)
+            hashlib.sha256(b'/example').hexdigest(), pathname)
         self.backend_factory.test_protocol.transport.loseConnection()
 
     @defer.inlineCallbacks
     def test_multiple_calls_to_backend(self):
         self.backend_factory.protocol._createRepo = mock.Mock()
 
+        ANY = mock.ANY
         yield self.proto.runOnBackend(
-            b'turnip-create-repo', b'/example_1', {b"clone_from": b'1'})
+            b'turnip-create-repo', b'/path_1', {b"clone_from": b'1'})
+
         self.assertEqual(
-            [b'turnip-create-repo'], self.proto.command)
-        self.assertEqual(
-            [b'/example_1'], self.proto.pathname)
-        self.assertEqual(
-            [{b"clone_from": b'1'}], self.proto.params)
+            [(b'turnip-create-repo', b'/path_1', {b"clone_from": b'1'}, ANY)],
+            self.proto.requests)
         self.assertEqual(1, self.proto.requests_sent)
-        self.assertEqual(1, len(self.proto.commands_deferred))
-        self.assertTrue(self.proto.commands_deferred[0].called)
+        self.assertTrue(self.proto.requests[0][-1].called)
 
         yield self.proto.runOnBackend(
-            b'git-upload-pack', b'/example_2', {b"param": b'2'})
+            b'git-upload-pack', b'/path_2', {b"param": b'2'})
         self.backend_factory.test_protocol.transport.loseConnection()
+
         self.assertEqual(
-            [b'turnip-create-repo', b'git-upload-pack'], self.proto.command)
-        self.assertEqual(
-            [b'/example_1', b'/example_2'], self.proto.pathname)
-        self.assertEqual(
-            [{b"clone_from": b'1'}, {b"param": b'2'}], self.proto.params)
+            [(b'turnip-create-repo', b'/path_1', {b"clone_from": b'1'}, ANY),
+             (b'git-upload-pack', b'/path_2', {b"param": b'2'}, ANY)],
+            self.proto.requests)
         self.assertEqual(2, self.proto.requests_sent)
-        self.assertEqual(2, len(self.proto.commands_deferred))
-        self.assertTrue(self.proto.commands_deferred[1].called)
+        self.assertTrue(self.proto.requests[1][-1].called)
 
     @defer.inlineCallbacks
     def test_git_push_for_new_repository_runs_both_commands(self):
@@ -425,10 +423,11 @@ class TestPackVirtServerProtocol(TestCase):
 
         digest = hashlib.sha256(b'example-new/clone-from:foo-repo').hexdigest()
         clone_digest = hashlib.sha256(b'foo-repo').hexdigest()
+        ANY = mock.ANY
         self.assertEqual(
-            ['turnip-create-repo', 'git-upload-pack'], self.proto.command)
-        self.assertEqual([digest, digest], self.proto.pathname)
-        self.assertEqual([{'clone_from': clone_digest}, {}], self.proto.params)
+            [('turnip-create-repo', digest, {'clone_from': clone_digest}, ANY),
+             ('git-upload-pack', digest, {}, ANY)],
+            self.proto.requests)
 
     def test_translatePath_timeout(self):
         root = self.useFixture(TempDir()).path

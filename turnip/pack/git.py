@@ -345,26 +345,19 @@ class PackClientFactory(protocol.ClientFactory):
 
     protocol = PackClientProtocol
 
-    def __init__(self, server, protocol_deferred, connection_deferred):
-        """Builds the Pack client.
-
-        :param protocol_deferred: The deferred to be called back when
-                                  protocol gets built.
-        :param connection_deferred: The deferred to be called when the
-                                    connection is established."""
+    def __init__(self, server, deferred):
+        """Builds the Pack client."""
         self.server = server
-        self.connection_deferred = connection_deferred
-        self.protocol_deferred = protocol_deferred
+        self.deferred = deferred
 
     def startedConnecting(self, connector):
         self.server.log.info(
             "Connecting to backend: {dest}.", dest=connector.getDestination())
-        self.connection_deferred.callback(None)
 
     def buildProtocol(self, *args, **kwargs):
         p = protocol.ClientFactory.buildProtocol(self, *args, **kwargs)
         p.setPeer(self.server)
-        self.protocol_deferred.callback(None)
+        self.deferred.callback(None)
         return p
 
     def clientConnectionFailed(self, connector, reason):
@@ -381,53 +374,42 @@ class PackProxyServerProtocol(PackServerProtocol):
     client_factory = PackClientFactory
 
     def __init__(self):
-        self.commands_deferred = []
-        self.command = []
-        self.pathname = []
-        self.params = []
         self.requests_sent = 0
+        # A list of tuples like (command, pathname, params, deferred)
+        self.requests = []
 
     def runOnBackend(self, command, pathname, params):
         """Connects to backend and sends a command to it."""
         command_deferred = defer.Deferred()
-        self.commands_deferred.append(command_deferred)
-        self.command.append(command)
-        self.pathname.append(pathname)
-        self.params.append(params)
+        self.requests.append((command, pathname, params, command_deferred))
 
-        if len(self.command) == 1:
+        if len(self.requests) == 1:
             # On the first command sent, establish the connection.
-            conn_deferred = defer.Deferred()
             proto_deferred = defer.Deferred()
-            client = self.client_factory(self, proto_deferred, conn_deferred)
+            client = self.client_factory(self, proto_deferred)
             default_reactor.connectTCP(
                 self.factory.backend_host, self.factory.backend_port, client)
-
-            # We should wait for both protocol creation and connection
-            # established deferreds, and also the command execution itself.
-            return defer.DeferredList(
-                [conn_deferred, proto_deferred, command_deferred])
+            return command_deferred
         else:
             # Chain the resumeProducing() execution to be executed after the
             # previous command.
-            previous_command = self.commands_deferred[-2]
-            previous_command.addCallback(lambda result: self.resumeProducing())
+            previous_request = self.requests[-2]
+            previous_deferred = previous_request[3]
+            previous_deferred.addCallback(lambda r: self.resumeProducing())
             return command_deferred
 
     def sendNextCommand(self):
-        while self.requests_sent < len(self.command):
+        while self.requests_sent < len(self.requests):
             # Consume all commands queued up and not sent yet.
             req_id = self.requests_sent
             self.requests_sent += 1
-            command = self.command[req_id]
-            pathname = self.pathname[req_id]
-            params = self.params[req_id]
+            command, pathname, params, deferred = self.requests[req_id]
             self.log.info(
                 "Forwarding request to backend: '{command} {pathname}', "
                 "params={params}", command=command,
                 pathname=pathname, params=params)
             self.peer.sendPacket(encode_request(command, pathname, params))
-            self.commands_deferred[req_id].callback(None)
+            deferred.callback(None)
 
     def resumeProducing(self):
         # Send our translated request and then open the gate to the client.
@@ -534,13 +516,6 @@ class PackBackendProtocol(PackServerProtocol):
         :param pathname: Repository's translated path.
         :param auth_params: Authorization info.
         """
-        # Test issue: Twisted seems to lose @mock.patch("store") context
-        # (specially when catching exception with defer.inlineCallbacks).
-        # So, we create this reference here to make sure init_repo and
-        # delete_repo will continue being a mock in case we use @mock.path.
-        init_repo = store.init_repo
-        delete_repo = store.delete_repo
-
         xmlrpc_endpoint = config.get("virtinfo_endpoint")
         xmlrpc_timeout = config.get("virtinfo_timeout")
         proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
@@ -550,7 +525,7 @@ class PackBackendProtocol(PackServerProtocol):
                 clone_path = compose_path(self.factory.root, clone_from)
             else:
                 clone_path = None
-            init_repo(repo_path, clone_path)
+            store.init_repo(repo_path, clone_path)
             yield proxy.callRemote(
                 "confirmRepoCreation", pathname, auth_params).addTimeout(
                 xmlrpc_timeout, default_reactor)
@@ -558,7 +533,7 @@ class PackBackendProtocol(PackServerProtocol):
             yield proxy.callRemote(
                 "abortRepoCreation", pathname, auth_params).addTimeout(
                     xmlrpc_timeout, default_reactor)
-            delete_repo(repo_path)
+            store.delete_repo(repo_path)
             raise
 
     def packetReceived(self, data):
