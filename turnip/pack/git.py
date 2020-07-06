@@ -25,6 +25,7 @@ from twisted.web import xmlrpc
 from zope.interface import implementer
 
 from turnip.api import store
+from turnip.api.store import AlreadyExistsError
 from turnip.config import config
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
@@ -389,14 +390,13 @@ class PackProxyServerProtocol(PackServerProtocol):
             client = self.client_factory(self, proto_deferred)
             default_reactor.connectTCP(
                 self.factory.backend_host, self.factory.backend_port, client)
-            return command_deferred
         else:
             # Chain the resumeProducing() execution to be executed after the
             # previous command.
             previous_request = self.requests[-2]
             previous_deferred = previous_request[3]
             previous_deferred.addCallback(lambda r: self.resumeProducing())
-            return command_deferred
+        return command_deferred
 
     def sendNextCommand(self):
         while self.requests_sent < len(self.requests):
@@ -442,7 +442,7 @@ class PackBackendProtocol(PackServerProtocol):
         if command == b'turnip-create-repo':
             try:
                 self.log.info("Creating repository: %s" % raw_pathname)
-                clone_from = params['clone_from']
+                clone_from = params.get('clone_from')
                 yield self._createRepo(raw_pathname, clone_from, auth_params)
             except Exception as e:
                 self.die(b'Could not create repository: %s' % e)
@@ -529,7 +529,10 @@ class PackBackendProtocol(PackServerProtocol):
             yield proxy.callRemote(
                 "confirmRepoCreation", pathname, auth_params).addTimeout(
                 xmlrpc_timeout, default_reactor)
-        except xmlrpc.Fault:
+        except AlreadyExistsError:
+            # Do not abort nor try to delete existing repositories.
+            raise
+        except Exception:
             yield proxy.callRemote(
                 "abortRepoCreation", pathname, auth_params).addTimeout(
                     xmlrpc_timeout, default_reactor)
@@ -675,13 +678,11 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
         the repository if it doesn't exist.
         """
         creation_params = translated_path.get("creation_params")
-        is_stateless_rpc = params.get('turnip-stateless-rpc') == b'yes'
+        is_stateless_rpc = params.get('turnip-stateless-rpc')
         is_advertise_ref = params.get('turnip-advertise-refs')
         is_write = permission == 'write'
         should_create = not is_stateless_rpc or (is_advertise_ref and is_write)
         if creation_params and should_create:
-            creation_params[b'clone_from'] = (
-                creation_params.get(b'clone_from') or b'')
             creation_params.update(params)
             yield self.runOnBackend(
                 b'turnip-create-repo', pathname, creation_params)

@@ -88,7 +88,7 @@ changed, or an error message::
 Internally, Turnip also implements an extension to create repositories:
 'turnip-create-repo'. It receives the new repository's pathname and the same
 authentication parameters used by the external interface. The authentication
-defails are used to confirm/abort the repository creation on Launchpad.
+details are used to confirm/abort the repository creation on Launchpad.
 
 Development
 ===========
