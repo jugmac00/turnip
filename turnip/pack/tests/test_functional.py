@@ -210,7 +210,7 @@ class FunctionalTestMixin(object):
             (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
             path=clone)
 
-        # Add a new remote to the backend, indicating to XLM-RPC fake server
+        # Add a new remote to the backend, indicating to XML-RPC fake server
         # that it should request a new repository creation, cloning from the
         # existing repository.
         url = list(urlsplit(self.url))
@@ -243,7 +243,7 @@ class FunctionalTestMixin(object):
             (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
             path=clone)
 
-        # Add a new remote to the backend, indicating to XLM-RPC fake server
+        # Add a new remote to the backend, indicating to XML-RPC fake server
         # that it should request a new repository creation.
         url = list(urlsplit(self.url))
         url[2] = b'/+rw/example-new'
