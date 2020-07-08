@@ -16,6 +16,9 @@ import random
 import shutil
 import stat
 import tempfile
+
+from turnip.config import config
+
 try:
     from urllib.parse import (
         urlsplit,
@@ -89,6 +92,7 @@ class FunctionalTestMixin(object):
         self.addCleanup(self.virtinfo_listener.stopListening)
         self.virtinfo.ref_permissions = {
             b'refs/heads/master': ['create', 'push']}
+        config.defaults['virtinfo_endpoint'] = self.virtinfo_url
 
     def startHookRPC(self):
         self.hookrpc_handler = HookRPCHandler(self.virtinfo_url, 15)
@@ -188,6 +192,66 @@ class FunctionalTestMixin(object):
         out = yield self.assertCommandSuccess(
             (b'git', b'log', b'--oneline', b'-n', b'1'), path=clone1)
         self.assertIn(b'Another test', out)
+
+    @defer.inlineCallbacks
+    def test_push_forked_repository(self):
+        # Test that repository creation in the backend is working.
+        test_root = self.useFixture(TempDir()).path
+        clone = os.path.join(test_root, 'clone1')
+
+        # Clone the empty repo from the backend.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone)
+
+        # Add a new remote to the backend, indicating to XML-RPC fake server
+        # that it should request a new repository creation, cloning from the
+        # existing repository.
+        url = list(urlsplit(self.url))
+        new_path = b'/+rw/example-new/clone-from:%s' % url[2]
+        url[2] = new_path
+        url = urlunsplit(url)
+        yield self.assertCommandSuccess(
+            (b'git', b'remote', b'add', b'myorigin', url), path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'-u', b'myorigin', b'master'), path=clone)
+
+        self.assertEqual(
+            [(self.virtinfo.getInternalPath(new_path), )],
+            self.virtinfo.confirm_repo_creation_call_args)
+
+    @defer.inlineCallbacks
+    def test_push_new_repository(self):
+        # Test that repository creation in the backend is working.
+        test_root = self.useFixture(TempDir()).path
+        clone = os.path.join(test_root, 'clone1')
+
+        # Clone the empty repo from the backend.
+        yield self.assertCommandSuccess((b'git', b'init', clone))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone)
+
+        # Add a new remote to the backend, indicating to XML-RPC fake server
+        # that it should request a new repository creation.
+        url = list(urlsplit(self.url))
+        url[2] = b'/+rw/example-new'
+        url = urlunsplit(url)
+        yield self.assertCommandSuccess(
+            (b'git', b'remote', b'add', b'myorigin', url), path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'-u', b'myorigin', b'master'), path=clone)
 
     @defer.inlineCallbacks
     def test_clone_shallow(self):
@@ -482,6 +546,16 @@ class TestBackendFunctional(FunctionalTestMixin, TestCase):
         yield self.assertCommandSuccess(
             (b'git', b'init', b'--bare', b'test'), path=self.root)
         self.url = b'git://localhost:%d/test' % self.port
+
+    def test_push_new_repository(self):
+        """It doesn't make sense to test this when connecting directly to
+        a backend, since it depends on some reaction from XML-RPC's
+        translatePath, called only by PackVirtServer."""
+        self.skipTest(
+            "Skipping test that depends on XML-RPC when connecting "
+            "directly to the backend.")
+
+    test_push_forked_repository = test_push_new_repository
 
 
 class FrontendFunctionalTestMixin(FunctionalTestMixin):

@@ -53,7 +53,17 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
     """A trivial virt information XML-RPC service.
 
     Translates a path to its SHA-256 hash. The repo is writable if the
-    path is prefixed with '/+rw'
+    path is prefixed with '/+rw', and is new if its name contains '-new'.
+
+    For new repositories, to fake a response with "clone_from", include in
+    its name the pattern "/clone-from:REPO_NAME" in the end of pathname.
+
+    Examples of repositories:
+        - /example: Simple read-only repo
+        - /+rw/example: Read & write repo
+        - /example-new: Non-existing repository, read only
+        - /+rw/example-new/clone-from:foo: New repository called "example-new",
+            that can be written and cloned from "foo"
     """
 
     def __init__(self, *args, **kwargs):
@@ -67,20 +77,33 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.ref_permissions_checks = []
         self.ref_permissions = {}
         self.ref_permissions_fault = None
+        self.confirm_repo_creation_call_args = []
+        self.abort_repo_creation_call_args = []
+
+    def getInternalPath(self, pathname):
+        if pathname.startswith(b'/+rw'):
+            pathname = pathname[4:]
+        return hashlib.sha256(pathname).hexdigest()
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
             raise xmlrpc.Fault(3, "Unauthorized")
 
         self.translations.append((pathname, permission, auth_params))
-        writable = False
-        if pathname.startswith('/+rw'):
-            writable = True
-            pathname = pathname[4:]
+        writable = pathname.startswith(b'/+rw')
 
         if permission != b'read' and not writable:
             raise xmlrpc.Fault(2, "Repository is read-only")
-        return {'path': hashlib.sha256(pathname).hexdigest()}
+        retval = {'path': self.getInternalPath(pathname)}
+
+        if b"-new" in pathname:
+            if b"/clone-from:" in pathname:
+                clone_path = pathname.split(b"/clone-from:", 1)[1]
+                clone_from = self.getInternalPath(clone_path)
+            else:
+                clone_from = None
+            retval["creation_params"] = {"clone_from": clone_from}
+        return retval
 
     def xmlrpc_authenticateWithPassword(self, username, password):
         self.authentications.append((username, password))
@@ -102,3 +125,9 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             raise self.merge_proposal_url_fault
         else:
             return self.merge_proposal_url
+
+    def xmlrpc_confirmRepoCreation(self, pathname, auth_params):
+        self.confirm_repo_creation_call_args.append((pathname, ))
+
+    def xmlrpc_abortRepoCreation(self, pathname, auth_params):
+        self.abort_repo_creation_call_args.append((pathname, ))
