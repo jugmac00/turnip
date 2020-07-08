@@ -22,6 +22,7 @@ from testtools import TestCase
 import yaml
 
 from turnip.api import store
+from turnip.api.store import RepositoryStatusEnum
 from turnip.api.tests.test_helpers import (
     open_repo,
     RepoFactory,
@@ -125,6 +126,16 @@ class InitTestCase(TestCase):
         self.assertEqual(str(yaml_config['pack.depth']),
                          repo_config['pack.depth'])
 
+    def test_is_repository_available(self):
+        repo_path = os.path.join(self.repo_store, 'repo/')
+
+        store.init_repository(repo_path, True)
+        store.set_repository_status(repo_path, RepositoryStatusEnum.CREATING)
+        self.assertFalse(store.is_repository_available(repo_path))
+
+        store.set_repository_status(repo_path, RepositoryStatusEnum.AVAILABLE)
+        self.assertTrue(store.is_repository_available(repo_path))
+
     def test_open_ephemeral_repo(self):
         """Opening a repo where a repo name contains ':' should return
         a new ephemeral repo.
@@ -224,7 +235,10 @@ class InitTestCase(TestCase):
         # repo with the same set of refs. And the objects are copied
         # too.
         to_path = os.path.join(self.repo_store, 'to/')
+        self.assertFalse(store.is_repository_available(to_path))
         store.init_repo(to_path, clone_from=self.orig_path, clone_refs=True)
+        self.assertTrue(store.is_repository_available(to_path))
+
         to = pygit2.Repository(to_path)
         self.assertIsNot(None, to[self.master_oid])
         self.assertEqual(
@@ -260,7 +274,10 @@ class InitTestCase(TestCase):
         # init_repo with clone_from=orig and clone_refs=False creates a
         # repo without any refs, but the objects are copied.
         to_path = os.path.join(self.repo_store, 'to/')
+        self.assertFalse(store.is_repository_available(to_path))
         store.init_repo(to_path, clone_from=self.orig_path, clone_refs=False)
+        self.assertTrue(store.is_repository_available(to_path))
+
         to = pygit2.Repository(to_path)
         self.assertIsNot(None, to[self.master_oid])
         self.assertEqual([], to.listall_references())
@@ -286,7 +303,10 @@ class InitTestCase(TestCase):
 
         self.assertAllLinkCounts(1, self.orig_objs)
         to_path = os.path.join(self.repo_store, 'to/')
+        self.assertFalse(store.is_repository_available(to_path))
         store.init_repo(to_path, clone_from=self.orig_path)
+        self.assertTrue(store.is_repository_available(to_path))
+
         self.assertAllLinkCounts(2, self.orig_objs)
         to = pygit2.Repository(to_path)
         to_blob = to.create_blob(b'to')

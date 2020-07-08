@@ -27,6 +27,7 @@ from pygit2 import (
     Repository,
     )
 
+from turnip.enums import BaseEnum
 from turnip.pack.helpers import ensure_config
 
 
@@ -36,6 +37,16 @@ REF_TYPE_NAME = {
     GIT_OBJ_BLOB: 'blob',
     GIT_OBJ_TAG: 'tag'
     }
+
+
+class RepositoryStatusEnum(BaseEnum):
+    """Possible status of a local git repository."""
+    CREATING = 'creating'
+    AVAILABLE = 'available'
+
+
+# Where to store repository status information inside a repository directory.
+REPOSITORY_STATUS_FILE_NAME = '.turnip-status'
 
 
 def format_ref(ref, git_object):
@@ -209,6 +220,7 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
     if os.path.exists(repo_path):
         raise AlreadyExistsError(repo_path)
     init_repository(repo_path, is_bare)
+    set_repository_status(repo_path, RepositoryStatusEnum.CREATING)
 
     if clone_from:
         # The clone_from's objects and refs are in fact cloned into a
@@ -240,6 +252,7 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         write_packed_refs(repo_path, packable_refs)
 
     ensure_config(repo_path)  # set repository configuration defaults
+    set_repository_status(repo_path, RepositoryStatusEnum.AVAILABLE)
 
 
 @contextmanager
@@ -287,11 +300,30 @@ def get_default_branch(repo_path):
     return repo.references['HEAD'].target
 
 
+def set_repository_status(repo_path, status):
+    if status not in RepositoryStatusEnum:
+        raise ValueError("%s is not a valid repository status" % status)
+    with open(os.path.join(repo_path, REPOSITORY_STATUS_FILE_NAME), 'w') as fd:
+        fd.write(status)
+        fd.close()
+
+
 def is_repository_available(repo_path):
     """Checks if the repository is available (that is, if it is not in the
     middle of a clone or init operation)."""
-    repo = Repository(repo_path)
-    return not repo.is_empty
+    if not os.path.exists(repo_path):
+        return False
+
+    status_file_path = os.path.join(repo_path, REPOSITORY_STATUS_FILE_NAME)
+
+    # Backward compatibility: if the status file is not created,
+    # the repository was created before this convention existed. So,
+    # it should be already available by now.
+    if not os.path.exists(status_file_path):
+        return True
+
+    with open(status_file_path) as fd:
+        return fd.read() == RepositoryStatusEnum.AVAILABLE
 
 
 def set_default_branch(repo_path, target):
