@@ -27,6 +27,7 @@ from pygit2 import (
     Repository,
     )
 
+from turnip.tasks import app
 from turnip.enums import BaseEnum
 from turnip.pack.helpers import ensure_config
 
@@ -214,6 +215,7 @@ class AlreadyExistsError(GitError):
         self.path = path
 
 
+@app.task
 def init_repo(repo_path, clone_from=None, clone_refs=False,
               alternate_repo_paths=None, is_bare=True):
     """Initialise a new git repository or clone from existing."""
