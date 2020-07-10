@@ -27,8 +27,8 @@ from pygit2 import (
     Repository,
     )
 
-from turnip.tasks import app
 from turnip.pack.helpers import ensure_config
+from turnip.tasks import app
 
 
 REF_TYPE_NAME = {
