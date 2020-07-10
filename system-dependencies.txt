@@ -6,3 +6,4 @@ libgit2-27
 libssl-dev
 python-dev
 virtualenv
+rabbitmq-server

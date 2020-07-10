@@ -8,6 +8,7 @@ PIP_CACHE = $(CURDIR)/pip-cache
 PYTHON := $(ENV)/bin/python
 PSERVE := $(ENV)/bin/pserve
 FLAKE8 := $(ENV)/bin/flake8
+CELERY := $(ENV)/bin/celery
 PIP := $(ENV)/bin/pip
 VIRTUALENV := virtualenv
 
@@ -97,6 +98,26 @@ run-api: $(ENV)
 
 run-pack: $(ENV)
 	$(PYTHON) turnipserver.py
+
+run-worker: $(ENV)
+	PYTHONPATH="turnip" $(CELERY) -A tasks worker \
+		--loglevel=info \
+		--concurrency=20 \
+		--pool=gevent
+
+run:
+	make run-api &\
+	make run-pack &\
+	make run-worker&\
+	wait;
+
+stop:
+	-pkill -f 'make run-api'
+	-pkill -f 'make run-pack'
+	-pkill -f 'make run-worker'
+	-pkill -f '$(CELERY) -A tasks worker'
+
+
 
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
