@@ -34,6 +34,7 @@ test_requires = [
     'docutils',
     'fixtures',
     'flake8',
+    'mock; python_version < "3"',
     'testtools',
     'webtest',
     ]

@@ -27,6 +27,11 @@ TARBALL_BUILDS_DIR ?= build
 TARBALL_BUILD_DIR = $(TARBALL_BUILDS_DIR)/$(TARBALL_BUILD_LABEL)
 TARBALL_BUILD_PATH = $(TARBALL_BUILD_DIR)/$(TARBALL_FILE_NAME)
 
+SWIFT_CONTAINER_NAME ?= turnip-builds
+# This must match the object path used by install_payload in the turnip-base
+# charm layer.
+SWIFT_OBJECT_PATH = turnip-builds/$(TARBALL_BUILD_LABEL)/$(TARBALL_FILE_NAME)
+
 build: $(ENV)
 
 bootstrap:
@@ -113,4 +118,11 @@ build-tarball:
 		--exclude env \
 		./
 
-.PHONY: build check clean dist lint run-api run-pack test build-tarball
+publish-tarball: build-tarball
+	[ ! -e ~/.config/swift/turnip ] || . ~/.config/swift/turnip; \
+	./publish-to-swift --debug \
+		$(SWIFT_CONTAINER_NAME) $(SWIFT_OBJECT_PATH) \
+		$(TARBALL_BUILD_PATH)
+
+.PHONY: build check clean dist lint run-api run-pack test
+.PHONY: build-tarball publish-tarball

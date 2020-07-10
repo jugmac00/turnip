@@ -7,6 +7,10 @@ from __future__ import (
     unicode_literals,
     )
 
+
+__metaclass__ = type
+
+
 import uuid
 
 from twisted.internet import (
@@ -20,6 +24,9 @@ from twisted.logger import Logger
 from twisted.web import xmlrpc
 from zope.interface import implementer
 
+from turnip.api import store
+from turnip.api.store import AlreadyExistsError
+from turnip.config import config
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
     decode_packet,
@@ -340,6 +347,7 @@ class PackClientFactory(protocol.ClientFactory):
     protocol = PackClientProtocol
 
     def __init__(self, server, deferred):
+        """Builds the Pack client."""
         self.server = server
         self.deferred = deferred
 
@@ -364,32 +372,48 @@ class PackProxyServerProtocol(PackServerProtocol):
     before forwarding them to the backend.
     """
 
-    command = pathname = params = None
-    request_sent = False
     client_factory = PackClientFactory
 
-    def connectToBackend(self, command, pathname, params):
-        self.command = command
-        self.pathname = pathname
-        self.params = params
-        d = defer.Deferred()
-        client = self.client_factory(self, d)
-        default_reactor.connectTCP(
-            self.factory.backend_host, self.factory.backend_port, client)
-        return d
+    def __init__(self):
+        self.requests_sent = 0
+        # A list of tuples like (command, pathname, params, deferred)
+        self.requests = []
 
-    def resumeProducing(self):
-        # Send our translated request and then open the gate to the
-        # client.
-        if not self.request_sent:
+    def runOnBackend(self, command, pathname, params):
+        """Connects to backend and sends a command to it."""
+        command_deferred = defer.Deferred()
+        self.requests.append((command, pathname, params, command_deferred))
+
+        if len(self.requests) == 1:
+            # On the first command sent, establish the connection.
+            proto_deferred = defer.Deferred()
+            client = self.client_factory(self, proto_deferred)
+            default_reactor.connectTCP(
+                self.factory.backend_host, self.factory.backend_port, client)
+        else:
+            # Chain the resumeProducing() execution to be executed after the
+            # previous command.
+            previous_request = self.requests[-2]
+            previous_deferred = previous_request[3]
+            previous_deferred.addCallback(lambda r: self.resumeProducing())
+        return command_deferred
+
+    def sendNextCommand(self):
+        while self.requests_sent < len(self.requests):
+            # Consume all commands queued up and not sent yet.
+            req_id = self.requests_sent
+            self.requests_sent += 1
+            command, pathname, params, deferred = self.requests[req_id]
             self.log.info(
                 "Forwarding request to backend: '{command} {pathname}', "
-                "params={params}", command=self.command,
-                pathname=self.pathname, params=self.params)
-            self.request_sent = True
-            self.peer.sendPacket(
-                encode_request(
-                    self.command, self.pathname, self.params))
+                "params={params}", command=command,
+                pathname=pathname, params=params)
+            self.peer.sendPacket(encode_request(command, pathname, params))
+            deferred.callback(None)
+
+    def resumeProducing(self):
+        # Send our translated request and then open the gate to the client.
+        self.sendNextCommand()
         PackServerProtocol.resumeProducing(self)
 
     def readConnectionLost(self):
@@ -407,11 +431,23 @@ class PackBackendProtocol(PackServerProtocol):
     hookrpc_key = None
     expect_set_symbolic_ref = False
 
+    @defer.inlineCallbacks
     def requestReceived(self, command, raw_pathname, params):
         self.extractRequestMeta(command, raw_pathname, params)
         self.command = command
         self.raw_pathname = raw_pathname
         self.path = compose_path(self.factory.root, self.raw_pathname)
+        auth_params = self.createAuthParams(params)
+
+        if command == b'turnip-create-repo':
+            try:
+                self.log.info("Creating repository: %s" % raw_pathname)
+                clone_from = params.get('clone_from')
+                yield self._createRepo(raw_pathname, clone_from, auth_params)
+            except Exception as e:
+                self.die(b'Could not create repository: %s' % e)
+            self.expectNextCommand()
+            return
 
         if command == b'turnip-set-symbolic-ref':
             self.expect_set_symbolic_ref = True
@@ -434,7 +470,6 @@ class PackBackendProtocol(PackServerProtocol):
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
         args.append(self.path)
-        auth_params = self.createAuthParams(params)
         self.spawnGit(subcmd,
                       args,
                       write_operation=write_operation,
@@ -467,6 +502,42 @@ class PackBackendProtocol(PackServerProtocol):
 
     def spawnProcess(self, cmd, args, env=None):
         default_reactor.spawnProcess(self.peer, cmd, args, env=env)
+
+    def expectNextCommand(self):
+        """Enables this connection to receive the next command."""
+        self.got_request = False
+        self.resumeProducing()
+
+    @defer.inlineCallbacks
+    def _createRepo(self, pathname, clone_from, auth_params):
+        """Creates a repository locally, and asks Launchpad to initialize
+        database objects too.
+
+        :param pathname: Repository's translated path.
+        :param auth_params: Authorization info.
+        """
+        xmlrpc_endpoint = config.get("virtinfo_endpoint")
+        xmlrpc_timeout = config.get("virtinfo_timeout")
+        proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
+        try:
+            repo_path = compose_path(self.factory.root, pathname)
+            if clone_from:
+                clone_path = compose_path(self.factory.root, clone_from)
+            else:
+                clone_path = None
+            store.init_repo(repo_path, clone_path)
+            yield proxy.callRemote(
+                "confirmRepoCreation", pathname, auth_params).addTimeout(
+                xmlrpc_timeout, default_reactor)
+        except AlreadyExistsError:
+            # Do not abort nor try to delete existing repositories.
+            raise
+        except Exception:
+            yield proxy.callRemote(
+                "abortRepoCreation", pathname, auth_params).addTimeout(
+                    xmlrpc_timeout, default_reactor)
+            store.delete_repo(repo_path)
+            raise
 
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
@@ -571,6 +642,9 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                     VIRT_ERROR_PREFIX +
                     b'NOT_FOUND Repository does not exist.')
             pathname = translated['path']
+
+            yield self._ensureRepositoryExists(
+                pathname, translated, permission, params)
         except xmlrpc.Fault as e:
             fault_type = translate_xmlrpc_fault(
                 e.faultCode).name.encode('UTF-8')
@@ -583,13 +657,35 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
                 VIRT_ERROR_PREFIX +
                 b'GATEWAY_TIMEOUT Path translation timed out.')
         except Exception as e:
-            self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + str(e))
+            msg = str(e).encode("UTF-8")
+            self.die(VIRT_ERROR_PREFIX + b'INTERNAL_SERVER_ERROR ' + msg)
         else:
             try:
-                yield self.connectToBackend(command, pathname, params)
+                yield self.runOnBackend(command, pathname, params)
             except Exception as e:
                 self.server.log.failure('Backend connection failed.')
                 self.server.die(b'Backend connection failed.')
+
+    @defer.inlineCallbacks
+    def _ensureRepositoryExists(
+            self, pathname, translated_path, permission, params):
+        """Checks if the repository doesn't exist and should be created.
+
+        For stateless frontends (like HTTP/S), we should create the
+        repository in the "advertise-refs" stage when it is about to
+        push to the repository.
+        For stateful frontends (like git+ssh), we should always create
+        the repository if it doesn't exist.
+        """
+        creation_params = translated_path.get("creation_params")
+        is_stateless_rpc = params.get('turnip-stateless-rpc')
+        is_advertise_ref = params.get('turnip-advertise-refs')
+        is_write = permission == 'write'
+        should_create = not is_stateless_rpc or (is_advertise_ref and is_write)
+        if creation_params and should_create:
+            creation_params.update(params)
+            yield self.runOnBackend(
+                b'turnip-create-repo', pathname, creation_params)
 
 
 class PackVirtFactory(protocol.Factory):
@@ -641,7 +737,7 @@ class PackFrontendServerProtocol(PackProxyServerProtocol):
             self.die(b'Illegal request parameters')
             return
         params[b'turnip-request-id'] = self.request_id
-        self.connectToBackend(command, pathname, params)
+        self.runOnBackend(command, pathname, params)
 
 
 class PackFrontendFactory(protocol.Factory):

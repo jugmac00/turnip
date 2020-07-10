@@ -26,6 +26,7 @@ linecache2==1.0.0
 m2r==0.1.14
 mccabe==0.3
 mistune==0.8.3
+mock==3.0.5; python_version < "3"
 Paste==2.0.2
 PasteDeploy==2.1.0
 pbr==5.4.4
