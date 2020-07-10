@@ -33,6 +33,7 @@ from turnip.api.tests.test_helpers import (
     open_repo,
     RepoFactory,
     )
+from turnip.tests.tasks import startCeleryWorker
 
 
 class ApiTestCase(TestCase):
@@ -55,6 +56,7 @@ class ApiTestCase(TestCase):
 
     def assertRepositoryCreatedAsynchronously(self, repo_path, timeout_secs=5):
         """Waits up to `timeout_secs` for a repository to be available."""
+        startCeleryWorker(loglevel="error")
         timeout = timedelta(seconds=timeout_secs)
         start = datetime.now()
         while datetime.now() <= (start + timeout):

@@ -20,7 +20,7 @@ def setupCelery():
 def startCeleryWorker(loglevel="info"):
     """Start a celery worker for test.
 
-    :param quiet: If True, do not output celery worker on stdout.
+    :param loglevel: Which log level to use for the worker.
     """
     global worker_proc
     if worker_proc is not None:

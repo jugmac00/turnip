@@ -12,7 +12,6 @@ import pyramid.httpexceptions as exc
 
 from turnip.config import config
 from turnip.api import store
-from turnip.tests.tasks import startCeleryWorker
 
 
 def is_valid_path(repo_store, repo_path):
@@ -54,7 +53,6 @@ class RepoAPI(BaseAPI):
 
     def collection_post(self):
         """Initialise a new git repository, or clone from an existing repo."""
-        startCeleryWorker(loglevel="error")
         json_data = extract_json_data(self.request)
         repo_path = json_data.get('repo_path')
         clone_path = json_data.get('clone_from')
