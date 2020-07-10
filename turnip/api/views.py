@@ -3,7 +3,6 @@
 
 import os
 import re
-from multiprocessing import Pool
 from subprocess import CalledProcessError
 
 from cornice.resource import resource
@@ -13,16 +12,7 @@ import pyramid.httpexceptions as exc
 
 from turnip.config import config
 from turnip.api import store
-
-# Process pool for async execution (like repository creation).
-processing_pool = None
-
-
-def run_in_background(f, *args, **kwargs):
-    global processing_pool
-    if processing_pool is None:
-        processing_pool = Pool(maxtasksperchild=10)
-    return processing_pool.apply_async(f, args=args, kwds=kwargs)
+from turnip.tests.tasks import startCeleryWorker
 
 
 def is_valid_path(repo_store, repo_path):
@@ -64,6 +54,7 @@ class RepoAPI(BaseAPI):
 
     def collection_post(self):
         """Initialise a new git repository, or clone from an existing repo."""
+        startCeleryWorker(loglevel="error")
         json_data = extract_json_data(self.request)
         repo_path = json_data.get('repo_path')
         clone_path = json_data.get('clone_from')
@@ -88,7 +79,7 @@ class RepoAPI(BaseAPI):
             kwargs = dict(
                 repo_path=repo, clone_from=repo_clone, clone_refs=clone_refs)
             if async_run:
-                run_in_background(store.init_repo, **kwargs)
+                store.init_repo.apply_async(kwargs=kwargs)
             else:
                 store.init_repo(**kwargs)
             repo_name = os.path.basename(os.path.normpath(repo))

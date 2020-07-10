@@ -57,7 +57,12 @@ endif
 	$(PIP) install $(PIP_ARGS) -c requirements.txt \
 		-e '.[test,deploy]'
 
-test: $(ENV)
+test-bootstrap:
+	-sudo rabbitmqctl delete_vhost test-vhost
+	-sudo rabbitmqctl add_vhost test-vhost
+	-sudo rabbitmqctl set_permissions -p "test-vhost" "guest" ".*" ".*" ".*"
+
+test: $(ENV) test-bootstrap
 	$(PYTHON) -m unittest discover $(ARGS) turnip
 
 clean:

@@ -9,15 +9,15 @@ import atexit
 
 from turnip.tasks import app
 
+BROKER_URL = 'pyamqp://guest@localhost/test-vhost'
 worker_proc = None
 
 
 def setupCelery():
-    app.conf.update(broker='pyamqp://guest@localhost/test-vhost/')
-    startCeleryWorker()
+    app.conf.update(broker_url=BROKER_URL)
 
 
-def startCeleryWorker(quiet=True):
+def startCeleryWorker(loglevel="info"):
     """Start a celery worker for test.
 
     :param quiet: If True, do not output celery worker on stdout.
@@ -27,15 +27,14 @@ def startCeleryWorker(quiet=True):
         return
     bin_path = os.path.dirname(sys.executable)
     celery = os.path.join(bin_path, 'celery')
-    cwd = os.path.join(os.path.dirname(__file__), '..')
-    if quiet:
-        log_arg = '--quiet'
-    else:
-        log_arg = '--loglevel=info'
+    turnip_path = os.path.join(os.path.dirname(__file__), '..')
     cmd = [
-        celery, 'worker', '-A', 'tasks', log_arg, '--pool=gevent',
-        '--concurrency=2']
-    worker_proc = subprocess.Popen(cmd, cwd=cwd)
+        celery, 'worker', '-A', 'tasks', '--quiet',
+        '--pool=gevent',
+        '--concurrency=2',
+        '--broker=%s' % BROKER_URL,
+        '--loglevel=%s' % loglevel]
+    worker_proc = subprocess.Popen(cmd, env={'PYTHONPATH': turnip_path})
     atexit.register(stopCeleryWorker)
 
 
