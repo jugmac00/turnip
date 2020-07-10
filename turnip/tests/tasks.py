@@ -9,7 +9,7 @@ import atexit
 
 from turnip.tasks import app
 
-BROKER_URL = 'pyamqp://guest@localhost/test-vhost'
+BROKER_URL = 'pyamqp://guest@localhost/turnip-test-vhost'
 worker_proc = None
 
 

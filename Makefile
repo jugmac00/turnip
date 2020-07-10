@@ -63,9 +63,9 @@ endif
 		-e '.[test,deploy]'
 
 test-bootstrap:
-	-sudo rabbitmqctl delete_vhost test-vhost
-	-sudo rabbitmqctl add_vhost test-vhost
-	-sudo rabbitmqctl set_permissions -p "test-vhost" "guest" ".*" ".*" ".*"
+	-sudo rabbitmqctl delete_vhost turnip-test-vhost
+	-sudo rabbitmqctl add_vhost turnip-test-vhost
+	-sudo rabbitmqctl set_permissions -p "turnip-test-vhost" "guest" ".*" ".*" ".*"
 
 test: $(ENV) test-bootstrap
 	$(PYTHON) -m unittest discover $(ARGS) turnip
@@ -121,8 +121,6 @@ stop:
 	-pkill -f 'make run-pack'
 	-pkill -f 'make run-worker'
 	-pkill -f '$(CELERY) -A tasks worker'
-
-
 
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
