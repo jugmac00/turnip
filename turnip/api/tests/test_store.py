@@ -22,7 +22,6 @@ from testtools import TestCase
 import yaml
 
 from turnip.api import store
-from turnip.api.store import RepositoryStatusEnum
 from turnip.api.tests.test_helpers import (
     open_repo,
     RepoFactory,
@@ -130,10 +129,10 @@ class InitTestCase(TestCase):
         repo_path = os.path.join(self.repo_store, 'repo/')
 
         store.init_repository(repo_path, True)
-        store.set_repository_status(repo_path, RepositoryStatusEnum.CREATING)
+        store.set_repository_creating(repo_path, True)
         self.assertFalse(store.is_repository_available(repo_path))
 
-        store.set_repository_status(repo_path, RepositoryStatusEnum.AVAILABLE)
+        store.set_repository_creating(repo_path, False)
         self.assertTrue(store.is_repository_available(repo_path))
 
     def test_open_ephemeral_repo(self):
