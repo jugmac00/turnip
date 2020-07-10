@@ -13,3 +13,4 @@ from turnip.config import config
 
 
 app = Celery('tasks', broker=config.get('celery_broker'))
+app.conf.update(imports=('turnip.api.store', ))
