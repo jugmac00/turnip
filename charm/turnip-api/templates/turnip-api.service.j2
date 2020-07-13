@@ -13,6 +13,7 @@ WorkingDirectory={{ code_dir }}
 Environment=PATH={{ venv_dir }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=REPO_STORE={{ data_dir }}/repos
 Environment=TURNIP_LOG_DIR={{ logs_dir }}
+Environment=CELERY_BROKER={{ celery_broker }}
 ExecStart={{ venv_dir }}/bin/gunicorn --config {{ config_file }} --paste api.ini
 ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID

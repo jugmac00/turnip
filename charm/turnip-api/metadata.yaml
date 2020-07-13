@@ -19,3 +19,7 @@ provides:
   nrpe-external-master:
     interface: nrpe-external-master
     scope: container
+requires:
+  amqp:
+    interface: rabbitmq
+    optional: true
