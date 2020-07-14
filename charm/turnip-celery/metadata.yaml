@@ -1,0 +1,23 @@
+name: turnip-celery
+display-name: turnip-celery
+summary: Turnip celery worker
+maintainer: Colin Watson <cjwatson@canonical.com>
+description: >
+  Turnip is a flexible and scalable Git server suite written in Python
+  using Twisted.  This component provides asynchronous processing workers.
+tags:
+  # https://docs.jujucharms.com/devel/en/authors-charm-metadata#charm-store-fields
+  - network
+  - web_server
+series:
+  - bionic
+  - xenial
+subordinate: false
+provides:
+  nrpe-external-master:
+    interface: nrpe-external-master
+    scope: container
+requires:
+  amqp:
+    interface: rabbitmq
+    optional: true

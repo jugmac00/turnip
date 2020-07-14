@@ -1,0 +1,29 @@
+[Unit]
+Description=Turnip celery server
+After=network.target
+{%- if nfs %}
+BindsTo={{ data_mount_unit }}
+After={{ data_mount_unit }}
+{%- endif %}
+
+[Service]
+User={{ user }}
+Group={{ group }}
+WorkingDirectory={{ code_dir }}
+Environment=PATH={{ venv_dir }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=REPO_STORE={{ data_dir }}/repos
+Environment=TURNIP_LOG_DIR={{ logs_dir }}
+Environment=CELERY_BROKER={{ celery_broker }}
+Environment=PYTHONPATH=turnip
+ExecStart={{ venv_dir }}/bin/celery -A tasks worker --logfile={{ logs_dir }}/turnip-celery.log
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+LimitNOFILE=1048576
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+{%- if nfs %}
+WantedBy={{ data_mount_unit }}
+{%- endif %}
+

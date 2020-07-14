@@ -13,37 +13,35 @@ from charms.reactive import (
     when_not,
     )
 
-from charms.turnip.api import configure_wsgi
+from charms.turnip.celery import configure_celery
 from charms.turnip.base import (
     configure_service,
     deconfigure_service,
-    publish_website,
     )
 
 
 @when('turnip.installed', 'turnip.storage.available')
 @when_not('turnip.configured')
 def configure_turnip():
-    configure_wsgi()
     configure_service()
     set_flag('turnip.configured')
     clear_flag('turnip.storage.nrpe-external-master.published')
     clear_flag('turnip.nrpe-external-master.published')
-    clear_flag('turnip.turnip-api.published')
+    clear_flag('turnip.turnip-celery.published')
     status.active('Ready')
 
 
 @when('turnip.configured')
 @when_not('turnip.storage.available')
 def deconfigure_turnip():
-    deconfigure_service('turnip-api')
+    deconfigure_service('turnip-celery')
     clear_flag('turnip.configured')
     status.blocked('Waiting for storage to be available')
 
 
 @when('amqp.connected')
 def rabbitmq_available():
-    configure_wsgi()
+    configure_celery()
     status.active('Ready')
 
 
@@ -65,17 +63,3 @@ def nrpe_available():
 @when_not('nrpe-external-master.available')
 def nrpe_unavailable():
     clear_flag('turnip.nrpe-external-master.published')
-
-
-@when('turnip-api.available', 'turnip.configured')
-@when_not('turnip.turnip-api.published')
-def turnip_api_available():
-    turnip_api = endpoint_from_flag('turnip-api.available')
-    publish_website(turnip_api, 'turnip-api', hookenv.config()['port'])
-    set_flag('turnip.turnip-api.published')
-
-
-@when('turnip.turnip-api.published')
-@when_not('turnip-api.available')
-def turnip_api_unavailable():
-    clear_flag('turnip.turnip-api.published')
