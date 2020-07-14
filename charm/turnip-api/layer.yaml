@@ -2,4 +2,5 @@ includes:
     - layer:status
     - layer:turnip-base
     - layer:turnip-storage
+    - interface:rabbitmq
 repo: https://git.launchpad.net/turnip

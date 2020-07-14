@@ -11,7 +11,6 @@ from charms.reactive import (
     endpoint_from_name,
     set_flag,
     when,
-    when_any,
     when_not,
     )
 
@@ -19,7 +18,6 @@ from charms.turnip.api import configure_wsgi
 from charms.turnip.base import (
     configure_service,
     deconfigure_service,
-    find_git_service,
     publish_website,
     )
 
@@ -44,18 +42,20 @@ def deconfigure_turnip():
     status.blocked('Waiting for storage to be available')
 
 
-@when_any('amqp-relation-joined',
-          'amqp-relation-changed')
+@when('amqp.connected')
 def rabbitmq_available():
     config = hookenv.config()
-    with open("/tmp/banana.txt", "w") as fd:
-        fd.write(str(config))
-    config['celery_broker'] = "??"
-    rabbitmq = endpoint_from_name('rabbitmq-server')
-    address, port = find_git_service(rabbitmq, 'rabbitmq-server')
-    if address is not None and port is not None:
-        url = "pyamqp://guest@%s:%s//" % (address, port)
-        config['celery_broker'] = url
+
+    rabbitmq = endpoint_from_name('amqp')
+    if rabbitmq.username():
+        if rabbitmq.password():
+            user = "%s:%s" % (rabbitmq.username(), rabbitmq.password())
+        else:
+            user = rabbitmq.username()
+    else:
+        user = "guest"
+    url = "pyamqp://%s@%s//" % (user, rabbitmq.private_address())
+    config['celery_broker'] = url
     configure_wsgi()
 
 
