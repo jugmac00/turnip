@@ -57,7 +57,7 @@ class RepoAPI(BaseAPI):
         repo_path = json_data.get('repo_path')
         clone_path = json_data.get('clone_from')
         clone_refs = json_data.get('clone_refs', False)
-        async_run = self.request.params.get('async')
+        async_run = json_data.get('async', False)
 
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
@@ -77,7 +77,8 @@ class RepoAPI(BaseAPI):
             kwargs = dict(
                 repo_path=repo, clone_from=repo_clone, clone_refs=clone_refs)
             if async_run:
-                store.init_repo.apply_async(kwargs=kwargs)
+                kwargs["untranslated_path"] = repo_path
+                store.init_and_confirm_repo.apply_async(kwargs=kwargs)
             else:
                 store.init_repo(**kwargs)
             repo_name = os.path.basename(os.path.normpath(repo))

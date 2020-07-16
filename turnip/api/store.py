@@ -27,6 +27,8 @@ from pygit2 import (
     Repository,
     )
 
+from turnip.config import config
+from turnip.helpers import TimeoutServerProxy
 from turnip.pack.helpers import ensure_config
 from turnip.tasks import app
 
@@ -208,7 +210,6 @@ class AlreadyExistsError(GitError):
         self.path = path
 
 
-@app.task
 def init_repo(repo_path, clone_from=None, clone_refs=False,
               alternate_repo_paths=None, is_bare=True):
     """Initialise a new git repository or clone from existing."""
@@ -248,6 +249,27 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
 
     ensure_config(repo_path)  # set repository configuration defaults
     set_repository_creating(repo_path, False)
+
+
+@app.task
+def init_and_confirm_repo(untranslated_path, repo_path, clone_from=None,
+                          clone_refs=False, alternate_repo_paths=None,
+                          is_bare=True):
+    xmlrpc_endpoint = config.get("virtinfo_endpoint")
+    xmlrpc_timeout = float(config.get("virtinfo_timeout"))
+    xmlrpc_auth_params = {"user": "+launchpad-services"}
+    xmlrpc_proxy = TimeoutServerProxy(
+        xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True)
+    try:
+        init_repo(
+            repo_path, clone_from, clone_refs, alternate_repo_paths, is_bare)
+        xmlrpc_proxy.confirmRepoCreation(untranslated_path, xmlrpc_auth_params)
+    except Exception:
+        try:
+            delete_repo(repo_path)
+        except IOError:
+            pass
+        xmlrpc_proxy.abortRepoCreation(untranslated_path, xmlrpc_auth_params)
 
 
 @contextmanager
