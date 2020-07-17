@@ -17,7 +17,7 @@ PIP_SOURCE_DIR := dependencies
 
 PIP_ARGS ?= --quiet
 ifneq ($(PIP_SOURCE_DIR),)
-override PIP_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
+override PIP_ARGS += --no-index --find-links=file://$(shell readlink -f $(PIP_SOURCE_DIR))/
 endif
 
 # Create archives in labelled directories (e.g.
@@ -34,6 +34,9 @@ SWIFT_CONTAINER_NAME ?= turnip-builds
 SWIFT_OBJECT_PATH = turnip-builds/$(TARBALL_BUILD_LABEL)/$(TARBALL_FILE_NAME)
 
 build: $(ENV)
+
+$(PIP_SOURCE_DIR):
+	git clone $(DEPENDENCIES_URL) $(PIP_SOURCE_DIR)
 
 bootstrap:
 	if [ -d dependencies ]; then \
@@ -129,7 +132,7 @@ $(PIP_CACHE): $(ENV)
 		-r requirements.txt
 
 # XXX cjwatson 2015-10-16: limit to only interesting files
-build-tarball:
+build-tarball: $(PIP_SOURCE_DIR)
 	@echo "Creating deployment tarball at $(TARBALL_BUILD_PATH)"
 	rm -rf $(PIP_CACHE)
 	$(MAKE) $(PIP_CACHE)
