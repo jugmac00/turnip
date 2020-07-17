@@ -198,6 +198,10 @@ class TestPackBackendProtocol(TestCase):
 
     def setupConfig(self):
         config.defaults['virtinfo_endpoint'] = self.virtinfo_url
+        # Force timeout to be a string to make sure we are casting it
+        # to a proper type (setting it using env vars could make this use
+        # the wrong typing).
+        config.defaults['virtinfo_endpoint'] = '15'
 
     def assertKilledWith(self, message):
         self.assertFalse(self.transport.connected)

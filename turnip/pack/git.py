@@ -517,7 +517,7 @@ class PackBackendProtocol(PackServerProtocol):
         :param auth_params: Authorization info.
         """
         xmlrpc_endpoint = config.get("virtinfo_endpoint")
-        xmlrpc_timeout = config.get("virtinfo_timeout")
+        xmlrpc_timeout = int(config.get("virtinfo_timeout"))
         proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
         try:
             repo_path = compose_path(self.factory.root, pathname)
