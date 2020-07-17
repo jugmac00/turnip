@@ -3,7 +3,6 @@
 
 import os
 import re
-from multiprocessing import Pool
 from subprocess import CalledProcessError
 
 from cornice.resource import resource
@@ -13,16 +12,6 @@ import pyramid.httpexceptions as exc
 
 from turnip.config import config
 from turnip.api import store
-
-# Process pool for async execution (like repository creation).
-processing_pool = None
-
-
-def run_in_background(f, *args, **kwargs):
-    global processing_pool
-    if processing_pool is None:
-        processing_pool = Pool(maxtasksperchild=10)
-    return processing_pool.apply_async(f, args=args, kwds=kwargs)
 
 
 def is_valid_path(repo_store, repo_path):
@@ -68,7 +57,6 @@ class RepoAPI(BaseAPI):
         repo_path = json_data.get('repo_path')
         clone_path = json_data.get('clone_from')
         clone_refs = json_data.get('clone_refs', False)
-        async_run = self.request.params.get('async')
 
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
@@ -85,12 +73,7 @@ class RepoAPI(BaseAPI):
             repo_clone = None
 
         try:
-            kwargs = dict(
-                repo_path=repo, clone_from=repo_clone, clone_refs=clone_refs)
-            if async_run:
-                run_in_background(store.init_repo, **kwargs)
-            else:
-                store.init_repo(**kwargs)
+            store.init_repo(repo, clone_from=repo_clone, clone_refs=clone_refs)
             repo_name = os.path.basename(os.path.normpath(repo))
             return {'repo_url': '/'.join([self.request.url, repo_name])}
         except GitError:
