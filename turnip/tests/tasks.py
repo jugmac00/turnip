@@ -19,7 +19,7 @@ def setupCelery():
 
 
 class CeleryWorkerFixture(fixtures.Fixture):
-    """Celery worker fixture for tests
+    """Celery worker fixture for tests.
 
     This fixture starts a celery worker with the configuration set when the
     fixture is setUp. Keep in mind that this will run in a separated
@@ -54,7 +54,7 @@ class CeleryWorkerFixture(fixtures.Fixture):
         cmd = [
             celery, 'worker', '-A', 'tasks', '--quiet',
             '--pool=gevent',
-            '--concurrency=2',
+            '--concurrency=20',
             '--broker=%s' % BROKER_URL,
             '--loglevel=%s' % self.loglevel]
 

@@ -913,7 +913,7 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
         """
         reactor_iterations = (
             len(default_reactor._reads) + len(default_reactor._writes))
-        for i in range(reactor_iterations * 100):
+        for i in range(reactor_iterations):
             default_reactor.iterate()
 
     def assertRepositoryCreatedAsynchronously(self, repo_path, timeout_secs=5):
