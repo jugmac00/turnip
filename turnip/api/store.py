@@ -294,11 +294,16 @@ def get_default_branch(repo_path):
 
 
 def set_repository_creating(repo_path, is_creating):
+    if not os.path.exists(repo_path):
+        raise ValueError("Repository %s does not exist." % repo_path)
     file_path = os.path.join(repo_path, REPOSITORY_CREATING_FILE_NAME)
     if is_creating:
         open(file_path, 'a').close()
     else:
-        os.unlink(file_path)
+        try:
+            os.unlink(file_path)
+        except OSError:
+            pass
 
 
 def is_repository_available(repo_path):
