@@ -20,3 +20,4 @@ cgit_secret_path: null
 openid_provider_root: https://testopenid.test/
 site_name: git.launchpad.test
 main_site_root: https://launchpad.test/
+celery_broker: pyamqp://guest@localhost//

@@ -5,4 +5,5 @@ libffi-dev
 libgit2-27
 libssl-dev
 python-dev
+rabbitmq-server
 virtualenv
