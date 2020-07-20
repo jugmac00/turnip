@@ -98,7 +98,9 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}'.format(self.repo_path))
         self.assertEqual(200, resp.status_code)
-        self.assertEqual({'default_branch': 'refs/heads/branch-0'}, resp.json)
+        self.assertEqual({
+            'default_branch': 'refs/heads/branch-0',
+            'is_available': True}, resp.json)
 
     def test_repo_get_default_branch_missing(self):
         """default_branch is returned even if that branch has been deleted."""
@@ -109,7 +111,9 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}'.format(self.repo_path))
         self.assertEqual(200, resp.status_code)
-        self.assertEqual({'default_branch': 'refs/heads/branch-0'}, resp.json)
+        self.assertEqual({
+            'default_branch': 'refs/heads/branch-0',
+            'is_available': True}, resp.json)
 
     def test_repo_patch_default_branch(self):
         """A repository's default branch ("HEAD") can be changed."""
