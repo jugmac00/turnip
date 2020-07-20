@@ -128,10 +128,19 @@ class InitTestCase(TestCase):
     def test_is_repository_available(self):
         repo_path = os.path.join(self.repo_store, 'repo/')
 
+        # Fail to set status if repository directory doesn't exist.
+        self.assertRaises(
+            ValueError, store.set_repository_creating, repo_path, False)
+
         store.init_repository(repo_path, True)
         store.set_repository_creating(repo_path, True)
         self.assertFalse(store.is_repository_available(repo_path))
 
+        store.set_repository_creating(repo_path, False)
+        self.assertTrue(store.is_repository_available(repo_path))
+
+        # Duplicate call to set_repository_creating(False) should ignore
+        # eventually missing ".turnip-creating" file.
         store.set_repository_creating(repo_path, False)
         self.assertTrue(store.is_repository_available(repo_path))
 
