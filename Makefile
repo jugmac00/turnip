@@ -57,7 +57,6 @@ ifeq ($(PIP_SOURCE_DIR),)
 endif
 	mkdir -p $(ENV)
 	(echo '[easy_install]'; \
-	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
 	$(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
