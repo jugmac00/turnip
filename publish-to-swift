@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 
 def ensure_container_privs(container_name):
@@ -75,6 +76,7 @@ def main():
     parser.add_argument("container_name")
     parser.add_argument("swift_object_path")
     parser.add_argument("local_path")
+    parser.add_argument("build_label")
     args = parser.parse_args()
 
     if args.debug:
@@ -117,6 +119,14 @@ def main():
     publish_file_to_swift(
         args.container_name, args.swift_object_path, args.local_path,
         overwrite=overwrite)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filename = "last-successful-build-label.txt"
+        with open(os.path.join(tmpdir, filename), "w") as f:
+            f.write(args.build_label)
+        publish_file_to_swift(
+            args.container_name, filename, os.path.join(tmpdir, filename),
+            overwrite=True)
 
 
 if __name__ == "__main__":
