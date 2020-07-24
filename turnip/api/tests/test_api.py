@@ -16,6 +16,7 @@ from fixtures import (
     EnvironmentVariable,
     TempDir,
     )
+import six
 from six.moves.urllib.parse import quote
 from testtools import TestCase
 from testtools.matchers import (
@@ -52,7 +53,10 @@ class ApiTestCase(TestCase):
             repo.references[observed].peel().oid)
 
     def get_ref(self, ref):
-        resp = self.app.get('/repo/{}/{}'.format(self.repo_path, ref))
+        repo_path = six.ensure_str(self.repo_path)
+        ref = six.ensure_str(ref)
+        url = six.ensure_str('/repo/{}/{}'.format(repo_path, ref))
+        resp = self.app.get(quote(url))
         return resp.json
 
     def test_repo_init(self):
@@ -282,13 +286,15 @@ class ApiTestCase(TestCase):
     def test_repo_get_unicode_ref(self):
         factory = RepoFactory(self.repo_store)
         commit_oid = factory.add_commit('foo', 'foobar.txt')
-        tag_name = u'☃'.encode('utf-8')
-        tag_message = u'☃'.encode('utf-8')
-        factory.add_tag(tag_name, tag_message, commit_oid)
+        tag_name = u'☃'
+        tag_message = u'☃'
+        factory.add_tag(
+            six.ensure_binary(tag_name), six.ensure_binary(tag_message),
+            commit_oid)
 
-        tag = 'refs/tags/{}'.format(tag_name)
+        tag = u'refs/tags/{}'.format(tag_name)
         resp = self.get_ref(tag)
-        self.assertTrue(tag.decode('utf-8') in resp)
+        self.assertIn(tag, resp)
 
     def test_repo_get_tag(self):
         RepoFactory(self.repo_store, num_commits=1, num_tags=1).build()
