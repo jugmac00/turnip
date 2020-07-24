@@ -13,6 +13,7 @@ __metaclass__ = type
 
 import uuid
 
+import six
 from twisted.internet import (
     defer,
     error,
@@ -221,9 +222,9 @@ class PackServerProtocol(PackProxyProtocol):
     def createAuthParams(self, params):
         auth_params = {}
         for key, value in params.items():
+            key = six.ensure_binary(key)
             if key.startswith(b'turnip-authenticated-'):
-                decoded_key = key[len(b'turnip-authenticated-'):].decode(
-                    'utf-8')
+                decoded_key = key[len(b'turnip-authenticated-'):]
                 auth_params[decoded_key] = value
         if 'uid' in auth_params:
             auth_params['uid'] = int(auth_params['uid'])
@@ -445,7 +446,8 @@ class PackBackendProtocol(PackServerProtocol):
                 clone_from = params.get('clone_from')
                 yield self._createRepo(raw_pathname, clone_from, auth_params)
             except Exception as e:
-                self.die(b'Could not create repository: %s' % e)
+                self.die(b'Could not create repository: %s'
+                         % six.ensure_binary(str(e)))
             self.expectNextCommand()
             return
 

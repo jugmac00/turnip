@@ -11,6 +11,7 @@ from collections import defaultdict
 import hashlib
 
 from lazr.sshserver.auth import NoSuchPersonWithName
+import six
 from six.moves import xmlrpc_client
 from twisted.web import xmlrpc
 
@@ -47,6 +48,17 @@ class FakeAuthServerService(xmlrpc.XMLRPC):
             "name": username,
             "keys": self.keys[username],
             }
+
+
+def xmlrpc_binary_content(data):
+    """Compatibility method to get binary data content for fake XML-RPC server.
+
+    On Python3, binary data is represented as xmlrpc.client.Binary object
+    instead of a simple byte string.
+    """
+    if six.PY3:
+        return data.data
+    return data
 
 
 class FakeVirtInfoService(xmlrpc.XMLRPC):
@@ -89,6 +101,8 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         if self.require_auth and 'user' not in auth_params:
             raise xmlrpc.Fault(3, "Unauthorized")
 
+        pathname = xmlrpc_binary_content(pathname)
+
         self.translations.append((pathname, permission, auth_params))
         writable = pathname.startswith(b'/+rw')
 
@@ -127,7 +141,9 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             return self.merge_proposal_url
 
     def xmlrpc_confirmRepoCreation(self, pathname, auth_params):
+        pathname = xmlrpc_binary_content(pathname)
         self.confirm_repo_creation_call_args.append((pathname, ))
 
     def xmlrpc_abortRepoCreation(self, pathname, auth_params):
+        pathname = xmlrpc_binary_content(pathname)
         self.abort_repo_creation_call_args.append((pathname, ))
