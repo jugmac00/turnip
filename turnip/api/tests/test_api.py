@@ -3,7 +3,7 @@
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import base64
 import os
@@ -53,8 +53,8 @@ class ApiTestCase(TestCase):
             repo.references[observed].peel().oid)
 
     def get_ref(self, ref):
-        repo_path = six.ensure_str(self.repo_path)
-        ref = six.ensure_str(ref)
+        repo_path = six.ensure_text(self.repo_path)
+        ref = six.ensure_text(ref)
         url = six.ensure_str('/repo/{}/{}'.format(repo_path, ref))
         resp = self.app.get(quote(url))
         return resp.json
@@ -234,8 +234,8 @@ class ApiTestCase(TestCase):
         """Ensure unicode refs are included in ref collection."""
         factory = RepoFactory(self.repo_store)
         commit_oid = factory.add_commit('foo', 'foobar.txt')
-        tag = u'おいしいイカ'.encode('utf-8')
-        tag_message = u'かわいい タコ'.encode('utf-8')
+        tag = 'おいしいイカ'.encode('utf-8')
+        tag_message = 'かわいい タコ'.encode('utf-8')
         factory.add_tag(tag, tag_message, commit_oid)
 
         resp = self.app.get('/repo/{}/refs'.format(self.repo_path))
@@ -286,13 +286,13 @@ class ApiTestCase(TestCase):
     def test_repo_get_unicode_ref(self):
         factory = RepoFactory(self.repo_store)
         commit_oid = factory.add_commit('foo', 'foobar.txt')
-        tag_name = u'☃'
-        tag_message = u'☃'
+        tag_name = '☃'
+        tag_message = '☃'
         factory.add_tag(
             six.ensure_binary(tag_name), six.ensure_binary(tag_message),
             commit_oid)
 
-        tag = u'refs/tags/{}'.format(tag_name)
+        tag = 'refs/tags/{}'.format(tag_name)
         resp = self.get_ref(tag)
         self.assertIn(tag, resp)
 
@@ -327,8 +327,8 @@ class ApiTestCase(TestCase):
     def test_repo_diff_unicode_commits(self):
         """Ensure expected utf-8 commits objects are returned in diff."""
         factory = RepoFactory(self.repo_store)
-        message = u'屋漏偏逢连夜雨'.encode('utf-8')
-        message2 = u'说曹操，曹操到'.encode('utf-8')
+        message = '屋漏偏逢连夜雨'.encode('utf-8')
+        message2 = '说曹操，曹操到'.encode('utf-8')
         oid = factory.add_commit(message, 'foo.py')
         oid2 = factory.add_commit(message2, 'bar.py', [oid])
 
@@ -437,7 +437,7 @@ class ApiTestCase(TestCase):
         resp = self.app.get('/repo/{}:{}/compare-merge/{}:{}'.format(
             self.repo_path, repo2_name, c2, c3))
 
-        self.assertEqual([u'bar.txt', u'foo.txt'], resp.json['conflicts'])
+        self.assertEqual(['bar.txt', 'foo.txt'], resp.json['conflicts'])
         self.assertEqual(dedent("""\
             diff --git a/bar.txt b/bar.txt
             index 257cc56..0290da8 100644
@@ -476,13 +476,13 @@ class ApiTestCase(TestCase):
         repo = RepoFactory(self.repo_store)
         c1 = repo.add_commit('foo\n', 'blah.txt')
         c2_left = repo.add_commit(
-            u'foo\nbar\u2603\n'.encode('utf-8'), 'blah.txt', parents=[c1])
+            'foo\nbar\u2603\n'.encode('utf-8'), 'blah.txt', parents=[c1])
         c2_right = repo.add_commit(
-            u'foo\nbaz\u263c\n'.encode('utf-8'), 'blah.txt', parents=[c1])
+            'foo\nbaz\u263c\n'.encode('utf-8'), 'blah.txt', parents=[c1])
 
         resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, c2_left, c2_right))
-        self.assertIn(dedent(u"""\
+        self.assertIn(dedent("""\
             +<<<<<<< blah.txt
              bar\u2603
             +=======
@@ -501,7 +501,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, c2_left, c2_right))
-        self.assertIn(dedent(u"""\
+        self.assertIn(dedent("""\
             --- a/foo.txt
             +++ b/foo.txt
             @@ -1,2 +1,5 @@
@@ -524,7 +524,7 @@ class ApiTestCase(TestCase):
 
         resp = self.app.get('/repo/{}/compare-merge/{}:{}'.format(
             self.repo_path, c2_left, c2_right))
-        self.assertIn(dedent(u"""\
+        self.assertIn(dedent("""\
             --- /dev/null
             +++ b/foo.txt
             @@ -0,0 +1,5 @@
@@ -643,12 +643,12 @@ class ApiTestCase(TestCase):
     def test_repo_get_log_signatures(self):
         """Ensure signatures are correct."""
         factory = RepoFactory(self.repo_store)
-        committer = factory.makeSignature(u'村上 春樹'.encode('utf-8'),
-                                          u'tsukuru@猫の町.co.jp'.encode('utf-8'),
+        committer = factory.makeSignature('村上 春樹'.encode('utf-8'),
+                                          'tsukuru@猫の町.co.jp'.encode('utf-8'),
                                           encoding='utf-8')
         author = factory.makeSignature(
-            u'Владимир Владимирович Набоков'.encode('utf-8'),
-            u'Набоко@zembla.ru'.encode('utf-8'), encoding='utf-8')
+            'Владимир Владимирович Набоков'.encode('utf-8'),
+            'Набоко@zembla.ru'.encode('utf-8'), encoding='utf-8')
         oid = factory.add_commit('Obfuscate colophon.', 'path.foo',
                                  author=author, committer=committer)
         resp = self.app.get('/repo/{}/log/{}'.format(self.repo_path, oid))
@@ -664,8 +664,8 @@ class ApiTestCase(TestCase):
 
     def test_repo_get_unicode_log(self):
         factory = RepoFactory(self.repo_store)
-        message = u'나는 김치 사랑'.encode('utf-8')
-        message2 = u'(╯°□°)╯︵ ┻━┻'.encode('utf-8')
+        message = '나는 김치 사랑'.encode('utf-8')
+        message2 = '(╯°□°)╯︵ ┻━┻'.encode('utf-8')
         oid = factory.add_commit(message, '자장면/짜장면.py')
         oid2 = factory.add_commit(message2, '엄마야!.js', [oid])
 
