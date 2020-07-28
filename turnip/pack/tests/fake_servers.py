@@ -50,17 +50,6 @@ class FakeAuthServerService(xmlrpc.XMLRPC):
             }
 
 
-def xmlrpc_binary_content(data):
-    """Compatibility method to get binary data content for fake XML-RPC server.
-
-    On Python3, binary data is represented as xmlrpc.client.Binary object
-    instead of a simple byte string.
-    """
-    if six.PY3:
-        return data.data
-    return data
-
-
 class FakeVirtInfoService(xmlrpc.XMLRPC):
     """A trivial virt information XML-RPC service.
 
@@ -93,26 +82,24 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.abort_repo_creation_call_args = []
 
     def getInternalPath(self, pathname):
-        if pathname.startswith(b'/+rw'):
+        if pathname.startswith('/+rw'):
             pathname = pathname[4:]
-        return hashlib.sha256(pathname).hexdigest()
+        return hashlib.sha256(six.ensure_binary(pathname)).hexdigest()
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
             raise xmlrpc.Fault(3, "Unauthorized")
 
-        pathname = xmlrpc_binary_content(pathname)
-
         self.translations.append((pathname, permission, auth_params))
-        writable = pathname.startswith(b'/+rw')
+        writable = pathname.startswith('/+rw')
 
-        if permission != b'read' and not writable:
+        if permission != 'read' and not writable:
             raise xmlrpc.Fault(2, "Repository is read-only")
         retval = {'path': self.getInternalPath(pathname)}
 
-        if b"-new" in pathname:
-            if b"/clone-from:" in pathname:
-                clone_path = pathname.split(b"/clone-from:", 1)[1]
+        if "-new" in pathname:
+            if "/clone-from:" in pathname:
+                clone_path = pathname.split("/clone-from:", 1)[1]
                 clone_from = self.getInternalPath(clone_path)
             else:
                 clone_from = None
@@ -141,9 +128,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             return self.merge_proposal_url
 
     def xmlrpc_confirmRepoCreation(self, pathname, auth_params):
-        pathname = xmlrpc_binary_content(pathname)
         self.confirm_repo_creation_call_args.append((pathname, ))
 
     def xmlrpc_abortRepoCreation(self, pathname, auth_params):
-        pathname = xmlrpc_binary_content(pathname)
         self.abort_repo_creation_call_args.append((pathname, ))

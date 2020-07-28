@@ -628,13 +628,13 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, params):
         self.extractRequestMeta(command, pathname, params)
-        permission = b'read' if command == b'git-upload-pack' else b'write'
+        permission = 'read' if command == b'git-upload-pack' else 'write'
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint, allowNone=True)
         try:
             auth_params = self.createAuthParams(params)
             self.log.info("Translating request.")
             translated = yield proxy.callRemote(
-                'translatePath', pathname, permission,
+                'translatePath', six.ensure_text(pathname), permission,
                 auth_params).addTimeout(
                     self.factory.virtinfo_timeout, self.factory.reactor)
             self.log.info(
