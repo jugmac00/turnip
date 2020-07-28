@@ -529,15 +529,15 @@ class PackBackendProtocol(PackServerProtocol):
                 clone_path = None
             store.init_repo(repo_path, clone_path)
             yield proxy.callRemote(
-                "confirmRepoCreation", pathname, auth_params).addTimeout(
-                xmlrpc_timeout, default_reactor)
+                "confirmRepoCreation", six.ensure_text(pathname),
+                auth_params).addTimeout(xmlrpc_timeout, default_reactor)
         except AlreadyExistsError:
             # Do not abort nor try to delete existing repositories.
             raise
         except Exception:
             yield proxy.callRemote(
-                "abortRepoCreation", pathname, auth_params).addTimeout(
-                    xmlrpc_timeout, default_reactor)
+                "abortRepoCreation", six.ensure_text(pathname),
+                auth_params).addTimeout(xmlrpc_timeout, default_reactor)
             store.delete_repo(repo_path)
             raise
 

@@ -226,7 +226,7 @@ class TestPackBackendProtocol(TestCase):
         self.assertEqual([], store.delete_repo.call_args_list)
 
         self.assertEqual(
-            [(b'foo.git', )], self.virtinfo.confirm_repo_creation_call_args)
+            [('foo.git', )], self.virtinfo.confirm_repo_creation_call_args)
 
         self.assertEqual(
             (b'git', [b'git', b'upload-pack', full_path], {}),
@@ -250,10 +250,10 @@ class TestPackBackendProtocol(TestCase):
             [mock.call(full_path, )], store.delete_repo.call_args_list)
 
         auth_params = self.proto.createAuthParams(params)
-        self.assertEqual([(b'foo.git', )],
+        self.assertEqual([('foo.git', )],
                          self.virtinfo.abort_repo_creation_call_args)
         self.assertEqual(
-            [mock.call(mock.ANY, b'foo.git', auth_params)],
+            [mock.call(mock.ANY, 'foo.git', auth_params)],
             self.virtinfo.xmlrpc_confirmRepoCreation.call_args_list)
 
         self.assertIsNone(self.proto.test_process)
