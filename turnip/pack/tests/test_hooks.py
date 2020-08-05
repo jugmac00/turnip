@@ -18,6 +18,7 @@ from fixtures import (
     TempDir,
     )
 import pygit2
+import six
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (
@@ -260,7 +261,7 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
         # An invalid ref is rejected.
         yield self.assertRejected(
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1)],
-            {'refs/heads/verboten': []},
+            {b'refs/heads/verboten': []},
             b"You do not have permission to push to refs/heads/verboten.\n")
 
     @defer.inlineCallbacks
@@ -270,9 +271,9 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
             [(b'refs/heads/verboten', self.old_sha1, self.new_sha1),
              (b'refs/heads/master', self.old_sha1, self.new_sha1),
              (b'refs/heads/super-verboten', self.old_sha1, self.new_sha1)],
-            {'refs/heads/verboten': [],
-             'refs/heads/super-verboten': [],
-             'refs/heads/master': ['push']},
+            {b'refs/heads/verboten': [],
+             b'refs/heads/super-verboten': [],
+             b'refs/heads/master': ['push']},
             b"You do not have permission to push to refs/heads/verboten.\n"
             b"You do not have permission to push "
             b"to refs/heads/super-verboten.\n")
@@ -346,7 +347,7 @@ class TestPostReceiveHook(HookTestMixin, TestCase):
             os.chdir(self.repo_dir)
             yield self.assertAccepted([(
                 b'pushed_branch',
-                self.old_sha1, pygit2.GIT_OID_HEX_ZERO)],
+                self.old_sha1, six.ensure_binary(pygit2.GIT_OID_HEX_ZERO))],
                 {b'pushed_branch': ['force_push']})
         finally:
             os.chdir(curdir)

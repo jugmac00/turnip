@@ -148,7 +148,7 @@ publish-tarball: build-tarball
 	[ ! -e ~/.config/swift/turnip ] || . ~/.config/swift/turnip; \
 	./publish-to-swift --debug \
 		$(SWIFT_CONTAINER_NAME) $(SWIFT_OBJECT_PATH) \
-		$(TARBALL_BUILD_PATH)
+		$(TARBALL_BUILD_PATH) turnip=$(TARBALL_BUILD_LABEL)
 
 .PHONY: build check clean dist lint run-api run-pack test
 .PHONY: build-tarball publish-tarball
