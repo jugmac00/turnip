@@ -8,6 +8,7 @@ PIP_CACHE = $(CURDIR)/pip-cache
 PYTHON := $(ENV)/bin/python
 PSERVE := $(ENV)/bin/pserve
 FLAKE8 := $(ENV)/bin/flake8
+CELERY := $(ENV)/bin/celery
 PIP := $(ENV)/bin/pip
 VIRTUALENV := virtualenv
 
@@ -56,7 +57,6 @@ ifeq ($(PIP_SOURCE_DIR),)
 endif
 	mkdir -p $(ENV)
 	(echo '[easy_install]'; \
-	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
 	$(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
@@ -64,7 +64,12 @@ endif
 	$(PIP) install $(PIP_ARGS) -c requirements.txt \
 		-e '.[test,deploy]'
 
-test: $(ENV)
+bootstrap-test:
+	-sudo rabbitmqctl delete_vhost turnip-test-vhost
+	-sudo rabbitmqctl add_vhost turnip-test-vhost
+	-sudo rabbitmqctl set_permissions -p "turnip-test-vhost" "guest" ".*" ".*" ".*"
+
+test: $(ENV) bootstrap-test
 	$(PYTHON) -m unittest discover $(ARGS) turnip
 
 clean:
@@ -100,6 +105,24 @@ run-api: $(ENV)
 
 run-pack: $(ENV)
 	$(PYTHON) turnipserver.py
+
+run-worker: $(ENV)
+	$(CELERY) -A turnip.tasks worker \
+		--loglevel=info \
+		--concurrency=20 \
+		--pool=gevent
+
+run:
+	make run-api &\
+	make run-pack &\
+	make run-worker&\
+	wait;
+
+stop:
+	-pkill -f 'make run-api'
+	-pkill -f 'make run-pack'
+	-pkill -f 'make run-worker'
+	-pkill -f '$(CELERY) -A tasks worker'
 
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
