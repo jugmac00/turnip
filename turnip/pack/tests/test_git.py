@@ -250,10 +250,10 @@ class TestPackBackendProtocol(TestCase):
             [mock.call(full_path, )], store.delete_repo.call_args_list)
 
         auth_params = self.proto.createAuthParams(params)
-        self.assertEqual([(b'foo.git', )],
+        self.assertEqual([('foo.git', )],
                          self.virtinfo.abort_repo_creation_call_args)
         self.assertEqual(
-            [mock.call(mock.ANY, b'foo.git', auth_params)],
+            [mock.call(mock.ANY, 'foo.git', auth_params)],
             self.virtinfo.xmlrpc_confirmRepoCreation.call_args_list)
 
         self.assertIsNone(self.proto.test_process)
@@ -429,8 +429,9 @@ class TestPackVirtServerProtocol(TestCase):
         clone_digest = hashlib.sha256(b'foo-repo').hexdigest()
         ANY = mock.ANY
         self.assertEqual(
-            [('turnip-create-repo', digest, {'clone_from': clone_digest}, ANY),
-             ('git-upload-pack', digest, {}, ANY)],
+            [(b'turnip-create-repo', digest,
+              {'clone_from': clone_digest}, ANY),
+             (b'git-upload-pack', digest, {}, ANY)],
             self.proto.requests)
 
     def test_translatePath_timeout(self):
