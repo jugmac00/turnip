@@ -38,6 +38,10 @@ REF_TYPE_NAME = {
     }
 
 
+# Where to store repository status information inside a repository directory.
+REPOSITORY_CREATING_FILE_NAME = '.turnip-creating'
+
+
 def format_ref(ref, git_object):
     """Return a formatted object dict from a ref."""
     return {
@@ -209,6 +213,7 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
     if os.path.exists(repo_path):
         raise AlreadyExistsError(repo_path)
     init_repository(repo_path, is_bare)
+    set_repository_creating(repo_path, True)
 
     if clone_from:
         # The clone_from's objects and refs are in fact cloned into a
@@ -240,6 +245,7 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         write_packed_refs(repo_path, packable_refs)
 
     ensure_config(repo_path)  # set repository configuration defaults
+    set_repository_creating(repo_path, False)
 
 
 @contextmanager
@@ -285,6 +291,29 @@ def open_repo(repo_store, repo_name, force_ephemeral=False):
 def get_default_branch(repo_path):
     repo = Repository(repo_path)
     return repo.references['HEAD'].target
+
+
+def set_repository_creating(repo_path, is_creating):
+    if not os.path.exists(repo_path):
+        raise ValueError("Repository %s does not exist." % repo_path)
+    file_path = os.path.join(repo_path, REPOSITORY_CREATING_FILE_NAME)
+    if is_creating:
+        open(file_path, 'a').close()
+    else:
+        try:
+            os.unlink(file_path)
+        except OSError:
+            pass
+
+
+def is_repository_available(repo_path):
+    """Checks if the repository is available (that is, if it is not in the
+    middle of a clone or init operation)."""
+    if not os.path.exists(repo_path):
+        return False
+
+    status_file_path = os.path.join(repo_path, REPOSITORY_CREATING_FILE_NAME)
+    return not os.path.exists(status_file_path)
 
 
 def set_default_branch(repo_path, target):

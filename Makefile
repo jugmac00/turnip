@@ -8,6 +8,7 @@ PIP_CACHE = $(CURDIR)/pip-cache
 PYTHON := $(ENV)/bin/python
 PSERVE := $(ENV)/bin/pserve
 FLAKE8 := $(ENV)/bin/flake8
+CELERY := $(ENV)/bin/celery
 PIP := $(ENV)/bin/pip
 VIRTUALENV := virtualenv
 
@@ -16,7 +17,7 @@ PIP_SOURCE_DIR := dependencies
 
 PIP_ARGS ?= --quiet
 ifneq ($(PIP_SOURCE_DIR),)
-override PIP_ARGS += --no-index --find-links=file://$(realpath $(PIP_SOURCE_DIR))/
+override PIP_ARGS += --no-index --find-links=file://$(shell readlink -f $(PIP_SOURCE_DIR))/
 endif
 
 # Create archives in labelled directories (e.g.
@@ -27,7 +28,15 @@ TARBALL_BUILDS_DIR ?= build
 TARBALL_BUILD_DIR = $(TARBALL_BUILDS_DIR)/$(TARBALL_BUILD_LABEL)
 TARBALL_BUILD_PATH = $(TARBALL_BUILD_DIR)/$(TARBALL_FILE_NAME)
 
+SWIFT_CONTAINER_NAME ?= turnip-builds
+# This must match the object path used by install_payload in the turnip-base
+# charm layer.
+SWIFT_OBJECT_PATH = turnip-builds/$(TARBALL_BUILD_LABEL)/$(TARBALL_FILE_NAME)
+
 build: $(ENV)
+
+$(PIP_SOURCE_DIR):
+	git clone $(DEPENDENCIES_URL) $(PIP_SOURCE_DIR)
 
 bootstrap:
 	if [ -d dependencies ]; then \
@@ -48,7 +57,6 @@ ifeq ($(PIP_SOURCE_DIR),)
 endif
 	mkdir -p $(ENV)
 	(echo '[easy_install]'; \
-	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
 	$(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
@@ -56,7 +64,12 @@ endif
 	$(PIP) install $(PIP_ARGS) -c requirements.txt \
 		-e '.[test,deploy]'
 
-test: $(ENV)
+bootstrap-test:
+	-sudo rabbitmqctl delete_vhost turnip-test-vhost
+	-sudo rabbitmqctl add_vhost turnip-test-vhost
+	-sudo rabbitmqctl set_permissions -p "turnip-test-vhost" "guest" ".*" ".*" ".*"
+
+test: $(ENV) bootstrap-test
 	$(PYTHON) -m unittest discover $(ARGS) turnip
 
 clean:
@@ -93,6 +106,24 @@ run-api: $(ENV)
 run-pack: $(ENV)
 	$(PYTHON) turnipserver.py
 
+run-worker: $(ENV)
+	$(CELERY) -A turnip.tasks worker \
+		--loglevel=info \
+		--concurrency=20 \
+		--pool=gevent
+
+run:
+	make run-api &\
+	make run-pack &\
+	make run-worker&\
+	wait;
+
+stop:
+	-pkill -f 'make run-api'
+	-pkill -f 'make run-pack'
+	-pkill -f 'make run-worker'
+	-pkill -f '$(CELERY) -A tasks worker'
+
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
 	$(PIP) install $(PIP_ARGS) -d $(PIP_CACHE) \
@@ -100,7 +131,7 @@ $(PIP_CACHE): $(ENV)
 		-r requirements.txt
 
 # XXX cjwatson 2015-10-16: limit to only interesting files
-build-tarball:
+build-tarball: $(PIP_SOURCE_DIR)
 	@echo "Creating deployment tarball at $(TARBALL_BUILD_PATH)"
 	rm -rf $(PIP_CACHE)
 	$(MAKE) $(PIP_CACHE)
@@ -113,4 +144,11 @@ build-tarball:
 		--exclude env \
 		./
 
-.PHONY: build check clean dist lint run-api run-pack test build-tarball
+publish-tarball: build-tarball
+	[ ! -e ~/.config/swift/turnip ] || . ~/.config/swift/turnip; \
+	./publish-to-swift --debug \
+		$(SWIFT_CONTAINER_NAME) $(SWIFT_OBJECT_PATH) \
+		$(TARBALL_BUILD_PATH) turnip=$(TARBALL_BUILD_LABEL)
+
+.PHONY: build check clean dist lint run-api run-pack test
+.PHONY: build-tarball publish-tarball

@@ -53,9 +53,10 @@ class RepoAPI(BaseAPI):
 
     def collection_post(self):
         """Initialise a new git repository, or clone from an existing repo."""
-        repo_path = extract_json_data(self.request).get('repo_path')
-        clone_path = extract_json_data(self.request).get('clone_from')
-        clone_refs = extract_json_data(self.request).get('clone_refs', False)
+        json_data = extract_json_data(self.request)
+        repo_path = json_data.get('repo_path')
+        clone_path = json_data.get('clone_from')
+        clone_refs = json_data.get('clone_refs', False)
 
         if not repo_path:
             self.request.errors.add('body', 'repo_path',
@@ -88,6 +89,7 @@ class RepoAPI(BaseAPI):
             raise exc.HTTPNotFound()
         return {
             'default_branch': store.get_default_branch(repo_path),
+            'is_available': store.is_repository_available(repo_path)
             }
 
     def _patch_default_branch(self, repo_path, value):

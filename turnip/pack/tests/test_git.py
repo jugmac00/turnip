@@ -10,7 +10,7 @@ from __future__ import (
 import hashlib
 import os.path
 
-from fixtures import TempDir
+from fixtures import TempDir, MonkeyPatch
 from pygit2 import init_repository
 import six
 from testtools import TestCase
@@ -27,13 +27,16 @@ from twisted.internet import (
     testing,
     )
 from twisted.web import server
+from twisted.web.xmlrpc import Fault
 
+from turnip.config import config
 from turnip.pack import (
     git,
     helpers,
     )
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
 from turnip.pack.tests.test_hooks import MockHookRPCHandler
+from turnip.tests.compat import mock
 
 
 class DummyPackServerProtocol(git.PackServerProtocol):
@@ -169,6 +172,8 @@ class TestPackFrontendServerProtocol(TestCase):
 class TestPackBackendProtocol(TestCase):
     """Test the Git pack backend protocol."""
 
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+
     def setUp(self):
         super(TestPackBackendProtocol, self).setUp()
         self.root = self.useFixture(TempDir()).path
@@ -182,11 +187,76 @@ class TestPackBackendProtocol(TestCase):
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
 
+        # XML-RPC server
+        self.virtinfo = FakeVirtInfoService(allowNone=True)
+        self.virtinfo_listener = default_reactor.listenTCP(0, server.Site(
+            self.virtinfo))
+        self.virtinfo_port = self.virtinfo_listener.getHost().port
+        self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
+        self.addCleanup(self.virtinfo_listener.stopListening)
+        self.setupConfig()
+
+    def setupConfig(self):
+        config.defaults['virtinfo_endpoint'] = self.virtinfo_url
+        # Force timeout to be a string to make sure we are casting it
+        # to a proper type (setting it using env vars could make this use
+        # the wrong typing).
+        config.defaults['virtinfo_timeout'] = '15'
+
     def assertKilledWith(self, message):
         self.assertFalse(self.transport.connected)
         self.assertEqual(
             (b'ERR ' + message + b'\n', b''),
             helpers.decode_packet(self.transport.value()))
+
+    @mock.patch("turnip.pack.git.store")
+    @defer.inlineCallbacks
+    def test_create_repo_command_allows_further_requests(self, store):
+        # If command is 'turnip-create-repo', it should allow us to run more
+        # than one command.
+        yield self.proto.requestReceived(
+            b'turnip-create-repo', b'foo.git', {b"clone_from": None})
+
+        yield self.proto.requestReceived(
+            b'git-upload-pack', b'/foo.git', {b'host': b'example.com'})
+
+        full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
+        self.assertEqual(
+            [mock.call(full_path, None)], store.init_repo.call_args_list)
+        self.assertEqual([], store.delete_repo.call_args_list)
+
+        self.assertEqual(
+            [('foo.git', )], self.virtinfo.confirm_repo_creation_call_args)
+
+        self.assertEqual(
+            (b'git', [b'git', b'upload-pack', full_path], {}),
+            self.proto.test_process)
+
+    @defer.inlineCallbacks
+    def test_create_repo_fails_to_confirm(self):
+        self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock(
+            side_effect=Fault(1, "?"))
+        store = mock.Mock()
+        self.useFixture(MonkeyPatch("turnip.pack.git.store", store))
+
+        params = {b'host': b'example.com'}
+        yield self.proto.requestReceived(
+            b'turnip-create-repo', b'foo.git', {"clone_from": None})
+
+        full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
+        self.assertEqual(
+            [mock.call(full_path, None)], store.init_repo.call_args_list)
+        self.assertEqual(
+            [mock.call(full_path, )], store.delete_repo.call_args_list)
+
+        auth_params = self.proto.createAuthParams(params)
+        self.assertEqual([('foo.git', )],
+                         self.virtinfo.abort_repo_creation_call_args)
+        self.assertEqual(
+            [mock.call(mock.ANY, 'foo.git', auth_params)],
+            self.virtinfo.xmlrpc_confirmRepoCreation.call_args_list)
+
+        self.assertIsNone(self.proto.test_process)
 
     def test_git_upload_pack_calls_spawnProcess(self):
         # If the command is git-upload-pack, requestReceived calls
@@ -286,35 +356,83 @@ class TestPackVirtServerProtocol(TestCase):
             (b'ERR turnip virt error: ' + message + b'\n', b''),
             helpers.decode_packet(self.transport.value()))
 
+    def setUp(self):
+        super(TestPackVirtServerProtocol, self).setUp()
+        self.root = self.useFixture(TempDir()).path
+        self.hookrpc_handler = MockHookRPCHandler()
+        self.hookrpc_sock = os.path.join(self.root, 'hookrpc_sock')
+        self.backend_factory = DummyPackBackendFactory(
+            self.root, self.hookrpc_handler, self.hookrpc_sock)
+        self.backend_factory.protocol = DummyPackBackendProtocol
+        self.backend_listener = default_reactor.listenTCP(
+            0, self.backend_factory)
+        self.backend_port = self.backend_listener.getHost().port
+        self.addCleanup(self.backend_listener.stopListening)
+
+        self.virtinfo = FakeVirtInfoService(allowNone=True)
+        self.virtinfo_listener = default_reactor.listenTCP(0, server.Site(
+            self.virtinfo))
+        self.virtinfo_port = self.virtinfo_listener.getHost().port
+        self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
+        self.addCleanup(self.virtinfo_listener.stopListening)
+        factory = git.PackVirtFactory(
+            b'localhost', self.backend_port, self.virtinfo_url, 5)
+        self.proto = git.PackVirtServerProtocol()
+        self.proto.factory = factory
+        self.transport = testing.StringTransportWithDisconnection()
+        self.transport.protocol = self.proto
+        self.proto.makeConnection(self.transport)
+        self.proto.pauseProducing()
+        self.proto.got_request = True
+
     @defer.inlineCallbacks
     def test_translatePath(self):
-        root = self.useFixture(TempDir()).path
-        hookrpc_handler = MockHookRPCHandler()
-        hookrpc_sock = os.path.join(root, 'hookrpc_sock')
-        backend_factory = DummyPackBackendFactory(
-            root, hookrpc_handler, hookrpc_sock)
-        backend_factory.protocol = DummyPackBackendProtocol
-        backend_listener = default_reactor.listenTCP(0, backend_factory)
-        backend_port = backend_listener.getHost().port
-        self.addCleanup(backend_listener.stopListening)
-        virtinfo = FakeVirtInfoService(allowNone=True)
-        virtinfo_listener = default_reactor.listenTCP(0, server.Site(virtinfo))
-        virtinfo_port = virtinfo_listener.getHost().port
-        virtinfo_url = b'http://localhost:%d/' % virtinfo_port
-        self.addCleanup(virtinfo_listener.stopListening)
-        factory = git.PackVirtFactory(
-            b'localhost', backend_port, virtinfo_url, 5)
-        proto = git.PackVirtServerProtocol()
-        proto.factory = factory
-        self.transport = testing.StringTransportWithDisconnection()
-        self.transport.protocol = proto
-        proto.makeConnection(self.transport)
-        proto.pauseProducing()
-        proto.got_request = True
-        yield proto.requestReceived(b'git-upload-pack', b'/example', {})
+        yield self.proto.requestReceived(b'git-upload-pack', b'/example', {})
+        _, pathname, _, _ = self.proto.requests[0]
         self.assertEqual(
-            hashlib.sha256(b'/example').hexdigest(), proto.pathname)
-        backend_factory.test_protocol.transport.loseConnection()
+            hashlib.sha256(b'/example').hexdigest(), pathname)
+        self.backend_factory.test_protocol.transport.loseConnection()
+
+    @defer.inlineCallbacks
+    def test_multiple_calls_to_backend(self):
+        self.backend_factory.protocol._createRepo = mock.Mock()
+
+        ANY = mock.ANY
+        yield self.proto.runOnBackend(
+            b'turnip-create-repo', b'/path_1', {b"clone_from": b'1'})
+
+        self.assertEqual(
+            [(b'turnip-create-repo', b'/path_1', {b"clone_from": b'1'}, ANY)],
+            self.proto.requests)
+        self.assertEqual(1, self.proto.requests_sent)
+        self.assertTrue(self.proto.requests[0][-1].called)
+
+        yield self.proto.runOnBackend(
+            b'git-upload-pack', b'/path_2', {b"param": b'2'})
+        self.backend_factory.test_protocol.transport.loseConnection()
+
+        self.assertEqual(
+            [(b'turnip-create-repo', b'/path_1', {b"clone_from": b'1'}, ANY),
+             (b'git-upload-pack', b'/path_2', {b"param": b'2'}, ANY)],
+            self.proto.requests)
+        self.assertEqual(2, self.proto.requests_sent)
+        self.assertTrue(self.proto.requests[1][-1].called)
+
+    @defer.inlineCallbacks
+    def test_git_push_for_new_repository_runs_both_commands(self):
+        path = b'/+rwexample-new/clone-from:foo-repo'
+
+        yield self.proto.requestReceived(b'git-upload-pack', path, {})
+        self.backend_factory.test_protocol.transport.loseConnection()
+
+        digest = hashlib.sha256(b'example-new/clone-from:foo-repo').hexdigest()
+        clone_digest = hashlib.sha256(b'foo-repo').hexdigest()
+        ANY = mock.ANY
+        self.assertEqual(
+            [(b'turnip-create-repo', digest,
+              {'clone_from': clone_digest}, ANY),
+             (b'git-upload-pack', digest, {}, ANY)],
+            self.proto.requests)
 
     def test_translatePath_timeout(self):
         root = self.useFixture(TempDir()).path

@@ -7,4 +7,5 @@ libssl-dev
 libxml2-dev
 libxslt1-dev
 python-dev
+rabbitmq-server
 virtualenv

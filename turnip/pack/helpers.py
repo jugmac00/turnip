@@ -100,11 +100,15 @@ def decode_request(data):
 def encode_request(command, pathname, params):
     """Encode a command, pathname and parameters into a turnip-proto-request.
     """
+    command = six.ensure_binary(command)
+    pathname = six.ensure_binary(pathname)
     if b' ' in command or b'\0' in pathname:
         raise ValueError('Metacharacter in arguments')
     bits = [pathname]
     for name in sorted(params):
         value = params[name]
+        value = six.ensure_binary(value) if value is not None else b''
+        name = six.ensure_binary(name)
         if b'=' in name or b'\0' in name + value:
             raise ValueError('Metacharacter in arguments')
         bits.append(name + b'=' + value)

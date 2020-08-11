@@ -18,9 +18,11 @@ with open(os.path.join(here, 'NEWS')) as f:
     README += "\n\n" + f.read()
 
 requires = [
+    'celery',
     'contextlib2',
     'cornice',
     'enum34; python_version < "3.4"',
+    'gevent[monitor]',
     'lazr.sshserver>=0.1.7',
     'Paste',
     'pygit2>=0.27.4,<0.28.0',
@@ -34,6 +36,7 @@ test_requires = [
     'docutils',
     'fixtures',
     'flake8',
+    'mock; python_version < "3"',
     'testtools',
     'webtest',
     ]
