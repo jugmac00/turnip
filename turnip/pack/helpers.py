@@ -107,41 +107,6 @@ def decode_protocol_v2_params(data):
     return params
 
 
-def decode_packet_list(data):
-    remaining = data
-    retval = []
-    while remaining:
-        pkt, remaining = decode_packet(remaining)
-        retval.append(pkt)
-    return retval
-
-
-def decode_protocol_v2_params(data):
-    """Parse the protocol v2 extra parameters hidden behind the end of v1
-    protocol.
-
-    :return: An ordered dict with parsed v2 parameters.
-    """
-    params = OrderedDict()
-    cmd, remaining = decode_packet(data)
-    cmd = cmd.split(b'=', 1)[-1].strip()
-    capabilities, args = remaining.split(DELIM_PKT)
-    params[b"command"] = cmd
-    params[b"capabilities"] = decode_packet_list(capabilities)
-    for arg in decode_packet_list(args):
-        if arg is None:
-            continue
-        arg = arg.strip('\n')
-        if b' ' in arg:
-            k, v = arg.split(b' ', 1)
-            if k not in params:
-                params[k] = []
-            params[k].append(v)
-        else:
-            params[arg] = b""
-    return params
-
-
 def decode_request(data):
     """Decode a turnip-proto-request.
 
