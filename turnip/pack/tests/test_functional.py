@@ -815,16 +815,19 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
         test_root = self.useFixture(TempDir()).path
         clone = os.path.join(test_root, 'clone')
         yield self.assertCommandSuccess((b'git', b'clone', self.ro_url, clone))
+        expected_requests = 1 if self.protocol_version == '1' else 2
         self.assertEqual(
-            [(b'test-user', b'test-password')], self.virtinfo.authentications)
-        self.assertThat(self.virtinfo.translations, MatchesListwise([
-            MatchesListwise([
+            [(b'test-user', b'test-password')] * expected_requests,
+            self.virtinfo.authentications)
+        self.assertEqual(expected_requests, len(self.virtinfo.translations))
+        for translation in self.virtinfo.translations:
+            self.assertThat(translation, MatchesListwise([
                 Equals(b'/test'), Equals(b'read'),
                 MatchesDict({
                     b'can-authenticate': Is(True),
                     b'request-id': Not(Is(None)),
-                    b'user': Equals(b'test-user'),
-                    })])]))
+                    b'user': Equals(b'test-user')})
+                ]))
 
     @defer.inlineCallbacks
     def test_authenticated_push(self):

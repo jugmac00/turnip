@@ -436,18 +436,20 @@ class PackBackendProtocol(PackServerProtocol):
 
     Invokes the reference C Git implementation.
     """
+    V2_COMPATIBLE_FRONTENDS = (b'http', )
 
     hookrpc_key = None
     expect_set_symbolic_ref = False
 
-    def getV2CommandInput(self, params):
+    def getV2CommandInput(self):
         """Reconstruct what should be sent to git's stdin from the
         parameters received."""
+        params = self.params
         cmd_input = encode_packet(b"command=%s\n" % params.get(b'command'))
-        for capability in params["capabilities"].split(b"\n"):
+        for capability in params[b"capabilities"].split(b"\n"):
             cmd_input += encode_packet(b"%s\n" % capability)
         cmd_input += DELIM_PKT
-        ignore_keys = (b'capabilities', b'version')
+        ignore_keys = (b'capabilities', b'version', b'command')
         for k, v in params.items():
             k = six.ensure_binary(k)
             if k.startswith(b"turnip-") or k in ignore_keys:
@@ -458,11 +460,18 @@ class PackBackendProtocol(PackServerProtocol):
         cmd_input += FLUSH_PKT
         return cmd_input
 
+    def isV2CompatibleRequest(self):
+        frontend = self.params.get(b'turnip-frontend')
+        return (
+            frontend in self.V2_COMPATIBLE_FRONTENDS and
+            get_capabilities_advertisement(self.params.get(b'version', 1)))
+
     @defer.inlineCallbacks
     def requestReceived(self, command, raw_pathname, params):
         self.extractRequestMeta(command, raw_pathname, params)
         self.command = command
         self.raw_pathname = raw_pathname
+        self.params = params
         self.path = compose_path(self.factory.root, self.raw_pathname)
         auth_params = self.createAuthParams(params)
 
@@ -486,7 +495,7 @@ class PackBackendProtocol(PackServerProtocol):
         cmd_input = None
         cmd_env = {}
         write_operation = False
-        if not get_capabilities_advertisement(params.get(b'version', 1)):
+        if not self.isV2CompatibleRequest():
             if command == b'git-upload-pack':
                 subcmd = b'upload-pack'
             elif command == b'git-receive-pack':
@@ -506,7 +515,7 @@ class PackBackendProtocol(PackServerProtocol):
             send_path_as_option = True
             # Do not include "advertise-refs" parameter.
             params.pop(b'turnip-advertise-refs', None)
-            cmd_input = self.getV2CommandInput(params)
+            cmd_input = self.getV2CommandInput()
 
         args = []
         if params.pop(b'turnip-stateless-rpc', None):
@@ -674,7 +683,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, params):
         self.extractRequestMeta(command, pathname, params)
-        permission = 'read' if command == b'git-upload-pack' else 'write'
+        permission = 'read' if command != b'git-receive-pack' else 'write'
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint, allowNone=True)
         try:
             auth_params = self.createAuthParams(params)

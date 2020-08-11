@@ -24,7 +24,7 @@ import six
 import yaml
 
 import turnip.pack.hooks
-
+from turnip.version_info import version_info
 
 FLUSH_PKT = b'0000'
 DELIM_PKT = b'0001'
@@ -402,5 +402,14 @@ def get_capabilities_advertisement(version='1'):
 
     If no binary data is sent, no advertisement is done and we declare to
     not be compatible with that specific version."""
-    # XXX pappacena 2020-08-11: Return the correct data for protocol v2.
-    return b""
+    if version != '2':
+        return b""
+    turnip_version = six.ensure_binary(version_info.get("revision_id", '-1'))
+    return (
+        encode_packet(b"version 2\n") +
+        encode_packet(b"agent=turnip/%s\n" % turnip_version) +
+        encode_packet(b"ls-refs\n") +
+        encode_packet(b"fetch=shallow\n") +
+        encode_packet(b"server-option\n") +
+        FLUSH_PKT
+    )

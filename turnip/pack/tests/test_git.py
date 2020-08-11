@@ -296,6 +296,7 @@ class TestPackBackendProtocol(TestCase):
         self.proto.requestReceived(
             b'git-upload-pack', b'/foo.git', OrderedDict([
                 (b'turnip-x', b'yes'),
+                (b'turnip-frontend', b'http'),
                 (b'turnip-request-id', b'123'),
                 (b'version', b'2'),
                 (b'command', b'ls-refs'),
@@ -313,7 +314,7 @@ class TestPackBackendProtocol(TestCase):
         stdin_content = (
             b'0014command=ls-refs\n'
             b'0015agent=git/2.25.1\n'
-            b'00010014command ls-refs\n'
+            b'0001'
             b'0009peel\n'
             b'000csymrefs\n'
             b'0014ref-prefix HEAD\n'
