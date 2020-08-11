@@ -359,3 +359,13 @@ def translate_xmlrpc_fault(code):
     else:
         result = TurnipFaultCode.INTERNAL_SERVER_ERROR
     return result
+
+
+def get_capabilities_advertisement(version='1'):
+    """Returns the capability advertisement binary string to be sent to
+    clients for a given protocol version requested.
+
+    If no binary data is sent, no advertisement is done and we declare to
+    not be compatible with that specific version."""
+    # XXX pappacena 2020-08-11: Return the correct data for protocol v2.
+    return b""

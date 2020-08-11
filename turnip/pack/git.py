@@ -31,11 +31,14 @@ from turnip.config import config
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
     decode_packet,
+    DELIM_PKT,
     decode_request,
     encode_packet,
     encode_request,
     ensure_config,
     ensure_hooks,
+    FLUSH_PKT,
+    get_capabilities_advertisement,
     INCOMPLETE_PKT,
     translate_xmlrpc_fault,
     )
@@ -77,7 +80,7 @@ class UnstoppableProducerWrapper(object):
         pass
 
 
-class PackProtocol(protocol.Protocol):
+class PackProtocol(protocol.Protocol, object):
 
     paused = False
     raw = False
@@ -420,7 +423,7 @@ class PackProxyServerProtocol(PackServerProtocol):
     def resumeProducing(self):
         # Send our translated request and then open the gate to the client.
         self.sendNextCommand()
-        PackServerProtocol.resumeProducing(self)
+        super(PackProxyServerProtocol, self).resumeProducing()
 
     def readConnectionLost(self):
         # Forward the closed stdin down the stack.
@@ -436,6 +439,24 @@ class PackBackendProtocol(PackServerProtocol):
 
     hookrpc_key = None
     expect_set_symbolic_ref = False
+
+    def getV2CommandInput(self, params):
+        """Reconstruct what should be sent to git's stdin from the
+        parameters received."""
+        cmd_input = encode_packet(b"command=%s\n" % params.get(b'command'))
+        for capability in params["capabilities"].split(b"\n"):
+            cmd_input += encode_packet(b"%s\n" % capability)
+        cmd_input += DELIM_PKT
+        ignore_keys = (b'capabilities', b'version')
+        for k, v in params.items():
+            k = six.ensure_binary(k)
+            if k.startswith(b"turnip-") or k in ignore_keys:
+                continue
+            for param_value in v.split(b'\n'):
+                value = (b"" if not param_value else b" %s" % param_value)
+                cmd_input += encode_packet(b"%s%s\n" % (k, value))
+        cmd_input += FLUSH_PKT
+        return cmd_input
 
     @defer.inlineCallbacks
     def requestReceived(self, command, raw_pathname, params):
@@ -465,14 +486,27 @@ class PackBackendProtocol(PackServerProtocol):
         cmd_input = None
         cmd_env = {}
         write_operation = False
-        if command == b'git-upload-pack':
-            subcmd = b'upload-pack'
-        elif command == b'git-receive-pack':
-            subcmd = b'receive-pack'
-            write_operation = True
+        if not get_capabilities_advertisement(params.get(b'version', 1)):
+            if command == b'git-upload-pack':
+                subcmd = b'upload-pack'
+            elif command == b'git-receive-pack':
+                subcmd = b'receive-pack'
+                write_operation = True
+            else:
+                self.die(b'Unsupported command in request')
+                return
         else:
-            self.die(b'Unsupported command in request')
-            return
+            v2_command = params.get(b'command')
+            if command == b'git-upload-pack' and not v2_command:
+                self.expectNextCommand()
+                self.transport.loseConnection()
+                return
+            subcmd = b'upload-pack'
+            cmd_env["GIT_PROTOCOL"] = 'version=2'
+            send_path_as_option = True
+            # Do not include "advertise-refs" parameter.
+            params.pop(b'turnip-advertise-refs', None)
+            cmd_input = self.getV2CommandInput(params)
 
         args = []
         if params.pop(b'turnip-stateless-rpc', None):

@@ -9,6 +9,7 @@ from __future__ import (
 
 import hashlib
 import os.path
+from collections import OrderedDict
 
 from fixtures import TempDir, MonkeyPatch
 from pygit2 import init_repository
@@ -282,6 +283,45 @@ class TestPackBackendProtocol(TestCase):
              [b'git', b'upload-pack', full_path],
              {}),
             self.proto.test_process)
+
+    def test_git_upload_pack_v2_calls_spawnProcess(self):
+        # If the command is git-upload-pack using v2 protocol, requestReceived
+        # calls spawnProcess with appropriate arguments.
+        advertise_capabilities = mock.Mock()
+        self.useFixture(
+            MonkeyPatch("turnip.pack.git.get_capabilities_advertisement",
+                        advertise_capabilities))
+        advertise_capabilities.return_value = b'fake capability'
+
+        self.proto.requestReceived(
+            b'git-upload-pack', b'/foo.git', OrderedDict([
+                (b'turnip-x', b'yes'),
+                (b'turnip-request-id', b'123'),
+                (b'version', b'2'),
+                (b'command', b'ls-refs'),
+                (b'capabilities', b'agent=git/2.25.1'),
+                (b'peel', b''),
+                (b'symrefs', b''),
+                (b'ref-prefix', b'HEAD\nrefs/heads/\nrefs/tags/')
+                ]))
+        full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
+        self.assertEqual(
+            (b'git',
+             [b'git', b'-C', full_path, b'upload-pack', full_path],
+             {'GIT_PROTOCOL': 'version=2'}),
+            self.proto.test_process)
+        stdin_content = (
+            b'0014command=ls-refs\n'
+            b'0015agent=git/2.25.1\n'
+            b'00010014command ls-refs\n'
+            b'0009peel\n'
+            b'000csymrefs\n'
+            b'0014ref-prefix HEAD\n'
+            b'001bref-prefix refs/heads/\n'
+            b'001aref-prefix refs/tags/\n'
+            b'0000'
+        )
+        self.assertEqual(stdin_content, self.proto.peer.cmd_input)
 
     def test_git_receive_pack_calls_spawnProcess(self):
         # If the command is git-receive-pack, requestReceived calls
