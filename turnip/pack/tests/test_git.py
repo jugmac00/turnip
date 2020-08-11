@@ -34,6 +34,7 @@ from turnip.pack import (
     git,
     helpers,
     )
+from turnip.pack.git import GitProcessProtocol
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
 from turnip.pack.tests.test_hooks import MockHookRPCHandler
 from turnip.tests.compat import mock
@@ -47,6 +48,18 @@ class DummyPackServerProtocol(git.PackServerProtocol):
         if self.test_request is not None:
             raise AssertionError('Request already received')
         self.test_request = (command, pathname, host)
+
+
+class TestGitProcessProtocol(TestCase):
+    def test_can_write_to_stdin_directly(self):
+        peer = mock.Mock()
+        transport = mock.Mock()
+        protocol = GitProcessProtocol(peer, b"this is the stdin")
+        protocol.transport = transport
+        protocol.connectionMade()
+        self.assertEqual(
+            [mock.call(b'this is the stdin', )],
+            transport.write.call_args_list)
 
 
 class TestPackServerProtocol(TestCase):

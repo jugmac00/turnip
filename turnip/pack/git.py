@@ -239,15 +239,20 @@ class GitProcessProtocol(protocol.ProcessProtocol):
 
     _err_buffer = b''
 
-    def __init__(self, peer):
+    def __init__(self, peer, cmd_input=None):
         self.peer = peer
+        self.cmd_input = cmd_input
         self.out_started = False
 
     def connectionMade(self):
         self.peer.setPeer(self)
         self.peer.transport.registerProducer(self, True)
-        self.transport.registerProducer(
-            UnstoppableProducerWrapper(self.peer.transport), True)
+        if not self.cmd_input:
+            self.transport.registerProducer(
+                UnstoppableProducerWrapper(self.peer.transport), True)
+        else:
+            self.transport.write(self.cmd_input)
+            self.loseWriteConnection()
         self.peer.resumeProducing()
 
     def outReceived(self, data):
@@ -456,6 +461,9 @@ class PackBackendProtocol(PackServerProtocol):
             self.resumeProducing()
             return
 
+        send_path_as_option = False
+        cmd_input = None
+        cmd_env = {}
         write_operation = False
         if command == b'git-upload-pack':
             subcmd = b'upload-pack'
@@ -472,13 +480,16 @@ class PackBackendProtocol(PackServerProtocol):
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
         args.append(self.path)
-        self.spawnGit(subcmd,
-                      args,
-                      write_operation=write_operation,
-                      auth_params=auth_params)
+        self.spawnGit(
+            subcmd, args,
+            write_operation=write_operation,
+            auth_params=auth_params,
+            send_path_as_option=send_path_as_option,
+            cmd_env=cmd_env, cmd_input=cmd_input)
 
     def spawnGit(self, subcmd, extra_args, write_operation=False,
-                 send_path_as_option=False, auth_params=None):
+                 send_path_as_option=False, auth_params=None,
+                 cmd_env=None, cmd_input=None):
         cmd = b'git'
         args = [b'git']
         if send_path_as_option:
@@ -487,6 +498,7 @@ class PackBackendProtocol(PackServerProtocol):
         args.extend(extra_args)
 
         env = {}
+        env.update((cmd_env or {}))
         if write_operation and self.factory.hookrpc_handler:
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.
@@ -499,7 +511,7 @@ class PackBackendProtocol(PackServerProtocol):
             env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
 
         self.log.info('Spawning {args}', args=args)
-        self.peer = GitProcessProtocol(self)
+        self.peer = GitProcessProtocol(self, cmd_input)
         self.spawnProcess(cmd, args, env=env)
 
     def spawnProcess(self, cmd, args, env=None):
