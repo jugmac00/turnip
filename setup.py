@@ -37,6 +37,7 @@ test_requires = [
     'fixtures',
     'flake8',
     'mock; python_version < "3"',
+    'testscenarios',
     'testtools',
     'webtest',
     ]
