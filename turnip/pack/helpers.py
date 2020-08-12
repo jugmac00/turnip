@@ -107,7 +107,8 @@ def encode_request(command, pathname, params):
     bits = [pathname]
     for name in sorted(params):
         value = params[name]
-        value = value if value is not None else b''
+        value = six.ensure_binary(value) if value is not None else b''
+        name = six.ensure_binary(name)
         if b'=' in name or b'\0' in name + value:
             raise ValueError('Metacharacter in arguments')
         bits.append(name + b'=' + value)

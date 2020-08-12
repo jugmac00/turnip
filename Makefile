@@ -57,7 +57,6 @@ ifeq ($(PIP_SOURCE_DIR),)
 endif
 	mkdir -p $(ENV)
 	(echo '[easy_install]'; \
-	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
 	$(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
@@ -108,7 +107,7 @@ run-pack: $(ENV)
 	$(PYTHON) turnipserver.py
 
 run-worker: $(ENV)
-	PYTHONPATH="turnip" $(CELERY) -A tasks worker \
+	$(CELERY) -A turnip.tasks worker \
 		--loglevel=info \
 		--concurrency=20 \
 		--pool=gevent
@@ -149,7 +148,7 @@ publish-tarball: build-tarball
 	[ ! -e ~/.config/swift/turnip ] || . ~/.config/swift/turnip; \
 	./publish-to-swift --debug \
 		$(SWIFT_CONTAINER_NAME) $(SWIFT_OBJECT_PATH) \
-		$(TARBALL_BUILD_PATH)
+		$(TARBALL_BUILD_PATH) turnip=$(TARBALL_BUILD_LABEL)
 
 .PHONY: build check clean dist lint run-api run-pack test
 .PHONY: build-tarball publish-tarball

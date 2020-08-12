@@ -13,6 +13,7 @@ __metaclass__ = type
 
 import uuid
 
+import six
 from twisted.internet import (
     defer,
     error,
@@ -221,9 +222,9 @@ class PackServerProtocol(PackProxyProtocol):
     def createAuthParams(self, params):
         auth_params = {}
         for key, value in params.items():
+            key = six.ensure_binary(key)
             if key.startswith(b'turnip-authenticated-'):
-                decoded_key = key[len(b'turnip-authenticated-'):].decode(
-                    'utf-8')
+                decoded_key = key[len(b'turnip-authenticated-'):]
                 auth_params[decoded_key] = value
         if 'uid' in auth_params:
             auth_params['uid'] = int(auth_params['uid'])
@@ -445,7 +446,8 @@ class PackBackendProtocol(PackServerProtocol):
                 clone_from = params.get('clone_from')
                 yield self._createRepo(raw_pathname, clone_from, auth_params)
             except Exception as e:
-                self.die(b'Could not create repository: %s' % e)
+                self.die(b'Could not create repository: %s'
+                         % six.ensure_binary(str(e)))
             self.expectNextCommand()
             return
 
@@ -527,15 +529,15 @@ class PackBackendProtocol(PackServerProtocol):
                 clone_path = None
             store.init_repo(repo_path, clone_path)
             yield proxy.callRemote(
-                "confirmRepoCreation", pathname, auth_params).addTimeout(
-                xmlrpc_timeout, default_reactor)
+                "confirmRepoCreation", six.ensure_text(pathname),
+                auth_params).addTimeout(xmlrpc_timeout, default_reactor)
         except AlreadyExistsError:
             # Do not abort nor try to delete existing repositories.
             raise
         except Exception:
             yield proxy.callRemote(
-                "abortRepoCreation", pathname, auth_params).addTimeout(
-                    xmlrpc_timeout, default_reactor)
+                "abortRepoCreation", six.ensure_text(pathname),
+                auth_params).addTimeout(xmlrpc_timeout, default_reactor)
             store.delete_repo(repo_path)
             raise
 
@@ -626,13 +628,13 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, params):
         self.extractRequestMeta(command, pathname, params)
-        permission = b'read' if command == b'git-upload-pack' else b'write'
+        permission = 'read' if command == b'git-upload-pack' else 'write'
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint, allowNone=True)
         try:
             auth_params = self.createAuthParams(params)
             self.log.info("Translating request.")
             translated = yield proxy.callRemote(
-                'translatePath', pathname, permission,
+                'translatePath', six.ensure_text(pathname), permission,
                 auth_params).addTimeout(
                     self.factory.virtinfo_timeout, self.factory.reactor)
             self.log.info(
