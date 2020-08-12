@@ -26,7 +26,7 @@ requires = [
     'lazr.sshserver>=0.1.7',
     'Paste',
     'pygit2>=0.27.4,<0.28.0',
-    'python-openid',
+    'python-openid2',
     'PyYAML',
     'Twisted[conch]',
     'waitress',
