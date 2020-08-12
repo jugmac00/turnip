@@ -10,7 +10,6 @@ from charmhelpers.core import (
     templating,
     )
 
-from charms.layer import status
 from charms.turnip.base import (
     code_dir,
     data_dir,
@@ -23,11 +22,12 @@ from charms.turnip.base import (
 
 
 def configure_celery():
+    """Configure celery service, connecting it to rabbitmq.
+
+    :return: True if service is running, False otherwise."""
     celery_broker = get_rabbitmq_url()
     if celery_broker is None:
-        if not host.service_running('turnip-celery'):
-            status.blocked('Waiting for rabbitmq username / password')
-        return
+        return host.service_running('turnip-celery')
     config = hookenv.config()
     context = dict(config)
     context.update({
@@ -42,8 +42,9 @@ def configure_celery():
         'turnip-celery.service.j2',
         '/lib/systemd/system/turnip-celery.service',
         context, perms=0o644)
-    reload_systemd()
     if host.service_running('turnip-celery'):
         host.service_stop('turnip-celery')
+    reload_systemd()
     if not host.service_resume('turnip-celery'):
         raise RuntimeError('Failed to start turnip-celery')
+    return True
