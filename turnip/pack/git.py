@@ -31,14 +31,11 @@ from turnip.config import config
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
     decode_packet,
-    DELIM_PKT,
     decode_request,
     encode_packet,
     encode_request,
     ensure_config,
     ensure_hooks,
-    FLUSH_PKT,
-    get_capabilities_advertisement,
     INCOMPLETE_PKT,
     translate_xmlrpc_fault,
     )
@@ -440,7 +437,6 @@ class PackBackendProtocol(PackServerProtocol):
         self.extractRequestMeta(command, raw_pathname, params)
         self.command = command
         self.raw_pathname = raw_pathname
-        self.params = params
         self.path = compose_path(self.factory.root, self.raw_pathname)
         auth_params = self.createAuthParams(params)
 
@@ -462,7 +458,7 @@ class PackBackendProtocol(PackServerProtocol):
 
         cmd_env = {}
         write_operation = False
-        version = self.params.get(b'version', 0)
+        version = params.get(b'version', 0)
         cmd_env["GIT_PROTOCOL"] = 'version=%s' % version
         if version == b'2':
             params.pop(b'turnip-advertise-refs', None)
@@ -639,7 +635,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
     @defer.inlineCallbacks
     def requestReceived(self, command, pathname, params):
         self.extractRequestMeta(command, pathname, params)
-        permission = 'read' if command != b'git-receive-pack' else 'write'
+        permission = 'read' if command == b'git-upload-pack' else 'write'
         proxy = xmlrpc.Proxy(self.factory.virtinfo_endpoint, allowNone=True)
         try:
             auth_params = self.createAuthParams(params)

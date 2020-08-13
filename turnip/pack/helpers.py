@@ -84,8 +84,7 @@ def decode_request(data):
     bits = rest.split(b'\0')
     # Following the command is a pathname, then any number of named
     # parameters. Each of these is NUL-terminated.
-    # After that, v1 should end (v2 might have extra commands).
-    if len(bits) < 2 or (b'version=2' not in bits and bits[-1] != b''):
+    if len(bits) < 2 or bits[-1] != b'':
         raise ValueError('Invalid git-proto-request')
     pathname = bits[0]
     params = OrderedDict()
@@ -102,21 +101,7 @@ def decode_request(data):
         if name in params:
             raise ValueError('Parameters must not be repeated')
         params[name] = value
-
     return command, pathname, params
-
-
-def get_encoded_value(value):
-    """Encode a value for serialization on encode_request"""
-    if value is None:
-        return b''
-    if isinstance(value, list):
-        if any(b'\n' in i for i in value):
-            raise ValueError('Metacharacter in list argument')
-        return b"\n".join(get_encoded_value(i) for i in value)
-    if isinstance(value, bool):
-        return b'1' if value else b''
-    return six.ensure_binary(value)
 
 
 def encode_request(command, pathname, params):
@@ -128,7 +113,8 @@ def encode_request(command, pathname, params):
         raise ValueError('Metacharacter in arguments')
     bits = [pathname]
     for name in params:
-        value = get_encoded_value(params[name])
+        value = params[name]
+        value = six.ensure_binary(value) if value is not None else b''
         name = six.ensure_binary(name)
         if b'=' in name or b'\0' in name + value:
             raise ValueError('Metacharacter in arguments')

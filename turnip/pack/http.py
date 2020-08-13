@@ -58,8 +58,9 @@ from turnip.pack.git import (
 from turnip.pack.helpers import (
     encode_packet,
     encode_request,
+    get_capabilities_advertisement,
     translate_xmlrpc_fault,
-    TurnipFaultCode, get_capabilities_advertisement,
+    TurnipFaultCode,
 )
 try:
     from turnip.version_info import version_info

@@ -7,7 +7,6 @@ from __future__ import (
     unicode_literals,
     )
 
-from collections import OrderedDict
 import os.path
 import re
 import shutil
@@ -29,7 +28,6 @@ import time
 from turnip.pack import helpers
 import turnip.pack.hooks
 from turnip.pack.helpers import (
-    FLUSH_PKT,
     get_capabilities_advertisement,
     encode_packet,
     )
@@ -183,27 +181,6 @@ class TestDecodeRequest(TestCase):
             b'git-do-stuff /foo\0host=foo\0host=bar\0',
             b'Parameters must not be repeated')
 
-    def test_v2_extra_commands(self):
-        data = (
-            b"git-upload-pack b306d" +
-            b"\x00turnip-x=yes\x00turnip-request-id=123\x00" +
-            b"version=2\x000014command=ls-refs\n0014agent=git/2.25.1" +
-            b'00010009peel\n000csymrefs\n0014ref-prefix HEAD\n' +
-            b'001bref-prefix refs/heads/\n'
-            b'001aref-prefix refs/tags/\n0000' +
-            FLUSH_PKT)
-        decoded = helpers.decode_request(data)
-        self.assertEqual((b'git-upload-pack', b'b306d', OrderedDict([
-            (b'turnip-x', b'yes'),
-            (b'turnip-request-id', b'123'),
-            (b'version', b'2'),
-            (b'command', b'ls-refs'),
-            (b'capabilities', [b'agent=git/2.25.1']),
-            (b'peel', b''),
-            (b'symrefs', b''),
-            (b'ref-prefix', [b'HEAD', b'refs/heads/', b'refs/tags/'])
-            ])), decoded)
-
 
 class TestEncodeRequest(TestCase):
     """Test git-proto-request encoding."""
@@ -224,24 +201,6 @@ class TestEncodeRequest(TestCase):
             helpers.encode_request(
                 b'git-do-stuff', b'/some/path',
                 {b'host': b'example.com', b'user': b'foo=bar'}))
-
-    def test_with_parameters_respects_order(self):
-        params = OrderedDict([
-            (b'a', b'1'), (b'z', b'2'), (b'b', b'3')])
-        self.assertEqual(
-            b'git-do-stuff /some/path\0a=1\0z=2\0b=3\0',
-            helpers.encode_request(b'git-do-stuff', b'/some/path', params))
-
-    def test_with_special_type_values(self):
-        params = OrderedDict([
-            (b'a', None),
-            (b'b', True),
-            (b'c', False),
-            (b'd', [b'x', b'y', b'z'])])
-        encoded = helpers.encode_request(
-            b'git-do-stuff', b'/some/path', params)
-        self.assertEqual(
-            b'git-do-stuff /some/path\0a=\0b=1\0c=\0d=x\ny\nz\0', encoded)
 
     def test_rejects_meta_in_args(self):
         self.assertInvalid(
