@@ -242,20 +242,15 @@ class GitProcessProtocol(protocol.ProcessProtocol):
 
     _err_buffer = b''
 
-    def __init__(self, peer, cmd_input=None):
+    def __init__(self, peer):
         self.peer = peer
-        self.cmd_input = cmd_input
         self.out_started = False
 
     def connectionMade(self):
         self.peer.setPeer(self)
         self.peer.transport.registerProducer(self, True)
-        if not self.cmd_input:
-            self.transport.registerProducer(
-                UnstoppableProducerWrapper(self.peer.transport), True)
-        else:
-            self.transport.write(self.cmd_input)
-            self.loseWriteConnection()
+        self.transport.registerProducer(
+            UnstoppableProducerWrapper(self.peer.transport), True)
         self.peer.resumeProducing()
 
     def outReceived(self, data):
@@ -436,35 +431,9 @@ class PackBackendProtocol(PackServerProtocol):
 
     Invokes the reference C Git implementation.
     """
-    V2_COMPATIBLE_FRONTENDS = (b'http', )
 
     hookrpc_key = None
     expect_set_symbolic_ref = False
-
-    def getV2CommandInput(self):
-        """Reconstruct what should be sent to git's stdin from the
-        parameters received."""
-        params = self.params
-        cmd_input = encode_packet(b"command=%s\n" % params.get(b'command'))
-        for capability in params[b"capabilities"].split(b"\n"):
-            cmd_input += encode_packet(b"%s\n" % capability)
-        cmd_input += DELIM_PKT
-        ignore_keys = (b'capabilities', b'version', b'command')
-        for k, v in params.items():
-            k = six.ensure_binary(k)
-            if k.startswith(b"turnip-") or k in ignore_keys:
-                continue
-            for param_value in v.split(b'\n'):
-                value = (b"" if not param_value else b" %s" % param_value)
-                cmd_input += encode_packet(b"%s%s\n" % (k, value))
-        cmd_input += FLUSH_PKT
-        return cmd_input
-
-    def isV2CompatibleRequest(self):
-        frontend = self.params.get(b'turnip-frontend')
-        return (
-            frontend in self.V2_COMPATIBLE_FRONTENDS and
-            get_capabilities_advertisement(self.params.get(b'version', 1)))
 
     @defer.inlineCallbacks
     def requestReceived(self, command, raw_pathname, params):
@@ -491,8 +460,6 @@ class PackBackendProtocol(PackServerProtocol):
             self.resumeProducing()
             return
 
-        send_path_as_option = False
-        cmd_input = None
         cmd_env = {}
         write_operation = False
         version = self.params.get(b'version', 0)
@@ -516,14 +483,12 @@ class PackBackendProtocol(PackServerProtocol):
         args.append(self.path)
         self.spawnGit(
             subcmd, args,
-            write_operation=write_operation,
-            auth_params=auth_params,
-            send_path_as_option=send_path_as_option,
-            cmd_env=cmd_env, cmd_input=cmd_input)
+            write_operation=write_operation, auth_params=auth_params,
+            cmd_env=cmd_env)
 
     def spawnGit(self, subcmd, extra_args, write_operation=False,
                  send_path_as_option=False, auth_params=None,
-                 cmd_env=None, cmd_input=None):
+                 cmd_env=None):
         cmd = b'git'
         args = [b'git']
         if send_path_as_option:
@@ -545,7 +510,7 @@ class PackBackendProtocol(PackServerProtocol):
             env[b'TURNIP_HOOK_RPC_KEY'] = self.hookrpc_key
 
         self.log.info('Spawning {args}', args=args)
-        self.peer = GitProcessProtocol(self, cmd_input)
+        self.peer = GitProcessProtocol(self)
         self.spawnProcess(cmd, args, env=env)
 
     def spawnProcess(self, cmd, args, env=None):
