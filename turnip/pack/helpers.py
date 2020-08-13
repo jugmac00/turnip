@@ -27,7 +27,7 @@ import turnip.pack.hooks
 from turnip.version_info import version_info
 
 FLUSH_PKT = b'0000'
-DELIM_PKT = b'0001'
+DELIM_PKT = object()
 PKT_LEN_SIZE = 4
 PKT_PAYLOAD_MAX = 65520
 INCOMPLETE_PKT = object()
@@ -37,6 +37,8 @@ def encode_packet(payload):
     if payload is None:
         # flush-pkt.
         return FLUSH_PKT
+    if payload is DELIM_PKT:
+        return b'0001'
     else:
         # data-pkt
         if len(payload) > PKT_PAYLOAD_MAX:
@@ -48,63 +50,25 @@ def encode_packet(payload):
 
 def decode_packet(input):
     """Consume a packet, returning the payload and any unconsumed tail."""
+    if input.startswith(b'0001'):
+        return (DELIM_PKT, input[PKT_LEN_SIZE:])
     if len(input) < PKT_LEN_SIZE:
         return (INCOMPLETE_PKT, input)
     if input.startswith(FLUSH_PKT):
         # flush-pkt
         return (None, input[PKT_LEN_SIZE:])
-    # data-pkt
-    try:
-        pkt_len = int(input[:PKT_LEN_SIZE], 16)
-    except ValueError:
-        pkt_len = 0
-    if not (PKT_LEN_SIZE <= pkt_len <= (PKT_LEN_SIZE + PKT_PAYLOAD_MAX)):
-        raise ValueError("Invalid pkt-len")
-    if len(input) < pkt_len:
-        # Some of the packet is yet to be received.
-        return (INCOMPLETE_PKT, input)
-    # v2 protocol "hides" extra parameters after the end of the packet.
-    if len(input) > pkt_len and b'version=2\x00' in input:
-        if FLUSH_PKT not in input:
-            return INCOMPLETE_PKT, input
-        end = input.index(FLUSH_PKT)
-        return input[PKT_LEN_SIZE:end], input[end + len(FLUSH_PKT):]
-    return (input[PKT_LEN_SIZE:pkt_len], input[pkt_len:])
-
-
-def decode_packet_list(data):
-    remaining = data
-    retval = []
-    while remaining:
-        pkt, remaining = decode_packet(remaining)
-        retval.append(pkt)
-    return retval
-
-
-def decode_protocol_v2_params(data):
-    """Parse the protocol v2 extra parameters hidden behind the end of v1
-    protocol.
-
-    :return: An ordered dict with parsed v2 parameters.
-    """
-    params = OrderedDict()
-    cmd, remaining = decode_packet(data)
-    cmd = cmd.split(b'=', 1)[-1].strip()
-    capabilities, args = remaining.split(DELIM_PKT)
-    params[b"command"] = cmd
-    params[b"capabilities"] = decode_packet_list(capabilities)
-    for arg in decode_packet_list(args):
-        if arg is None:
-            continue
-        arg = arg.strip('\n')
-        if b' ' in arg:
-            k, v = arg.split(b' ', 1)
-            if k not in params:
-                params[k] = []
-            params[k].append(v)
-        else:
-            params[arg] = b""
-    return params
+    else:
+        # data-pkt
+        try:
+            pkt_len = int(input[:PKT_LEN_SIZE], 16)
+        except ValueError:
+            pkt_len = 0
+        if not (PKT_LEN_SIZE <= pkt_len <= (PKT_LEN_SIZE + PKT_PAYLOAD_MAX)):
+            raise ValueError("Invalid pkt-len")
+        if len(input) < pkt_len:
+            # Some of the packet is yet to be received.
+            return (INCOMPLETE_PKT, input)
+        return (input[PKT_LEN_SIZE:pkt_len], input[pkt_len:])
 
 
 def decode_request(data):
@@ -138,12 +102,6 @@ def decode_request(data):
         if name in params:
             raise ValueError('Parameters must not be repeated')
         params[name] = value
-
-    # If there are remaining bits at the end, we must be dealing with v2
-    # protocol. So, we append v2 parameters at the end of original parameters.
-    if bits[-1]:
-        for k, v in decode_protocol_v2_params(bits[-1]).items():
-            params[k] = v
 
     return command, pathname, params
 

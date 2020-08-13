@@ -495,27 +495,18 @@ class PackBackendProtocol(PackServerProtocol):
         cmd_input = None
         cmd_env = {}
         write_operation = False
-        if not self.isV2CompatibleRequest():
-            if command == b'git-upload-pack':
-                subcmd = b'upload-pack'
-            elif command == b'git-receive-pack':
-                subcmd = b'receive-pack'
-                write_operation = True
-            else:
-                self.die(b'Unsupported command in request')
-                return
-        else:
-            v2_command = params.get(b'command')
-            if command == b'git-upload-pack' and not v2_command:
-                self.expectNextCommand()
-                self.transport.loseConnection()
-                return
-            subcmd = b'upload-pack'
-            cmd_env["GIT_PROTOCOL"] = 'version=2'
-            send_path_as_option = True
-            # Do not include "advertise-refs" parameter.
+        version = self.params.get(b'version', 0)
+        cmd_env["GIT_PROTOCOL"] = 'version=%s' % version
+        if version == b'2':
             params.pop(b'turnip-advertise-refs', None)
-            cmd_input = self.getV2CommandInput()
+        if command == b'git-upload-pack':
+            subcmd = b'upload-pack'
+        elif command == b'git-receive-pack':
+            subcmd = b'receive-pack'
+            write_operation = True
+        else:
+            self.die(b'Unsupported command in request')
+            return
 
         args = []
         if params.pop(b'turnip-stateless-rpc', None):
