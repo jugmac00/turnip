@@ -27,9 +27,7 @@ from charms.turnip.base import (
 def configure_wsgi():
     celery_broker = get_rabbitmq_url()
     if celery_broker is None:
-        if not host.service_running('turnip-api'):
-            status.blocked('Waiting for rabbitmq username / password')
-        return
+        return host.service_running('turnip-api')
     config = hookenv.config()
     context = dict(config)
     context.update({
@@ -54,3 +52,4 @@ def configure_wsgi():
         host.service_stop('turnip-api')
     if not host.service_resume('turnip-api'):
         raise RuntimeError('Failed to start turnip-api')
+    return True
