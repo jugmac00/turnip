@@ -83,6 +83,7 @@ class FunctionalTestMixin(WithScenarios):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=30)
 
     scenarios = [
+        ('v0 protocol', {"protocol_version": b"0"}),
         ('v1 protocol', {"protocol_version": b"1"}),
         ('v2 protocol', {"protocol_version": b"2"}),
         ]
@@ -815,7 +816,7 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
         test_root = self.useFixture(TempDir()).path
         clone = os.path.join(test_root, 'clone')
         yield self.assertCommandSuccess((b'git', b'clone', self.ro_url, clone))
-        expected_requests = 1 if self.protocol_version == '1' else 2
+        expected_requests = 1 if self.protocol_version in ('0', '1') else 2
         self.assertEqual(
             [(b'test-user', b'test-password')] * expected_requests,
             self.virtinfo.authentications)

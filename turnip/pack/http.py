@@ -298,7 +298,6 @@ class BaseSmartHTTPResource(resource.Resource):
         by the virt service, if any.
         """
         params = {
-            b'turnip-frontend': b'http',
             b'turnip-can-authenticate': b'yes',
             b'turnip-request-id': str(uuid.uuid4()),
             b'version': six.ensure_binary(

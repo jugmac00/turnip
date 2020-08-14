@@ -200,7 +200,6 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
         self.assertEqual(200, self.request.responseCode)
         self.assertEqual(self.root.client_factory.params, {
             'version': '2',
-            'turnip-frontend': 'http',
             'turnip-advertise-refs': 'yes',
             'turnip-can-authenticate': 'yes',
             'turnip-request-id': mock.ANY,

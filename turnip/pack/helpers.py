@@ -26,7 +26,6 @@ import yaml
 import turnip.pack.hooks
 from turnip.version_info import version_info
 
-FLUSH_PKT = b'0000'
 DELIM_PKT = object()
 PKT_LEN_SIZE = 4
 PKT_PAYLOAD_MAX = 65520
@@ -36,7 +35,7 @@ INCOMPLETE_PKT = object()
 def encode_packet(payload):
     if payload is None:
         # flush-pkt.
-        return FLUSH_PKT
+        return b'0000'
     if payload is DELIM_PKT:
         return b'0001'
     else:
@@ -54,7 +53,7 @@ def decode_packet(input):
         return (DELIM_PKT, input[PKT_LEN_SIZE:])
     if len(input) < PKT_LEN_SIZE:
         return (INCOMPLETE_PKT, input)
-    if input.startswith(FLUSH_PKT):
+    if input.startswith(b'0000'):
         # flush-pkt
         return (None, input[PKT_LEN_SIZE:])
     else:
@@ -250,5 +249,5 @@ def get_capabilities_advertisement(version='1'):
         encode_packet(b"ls-refs\n") +
         encode_packet(b"fetch=shallow\n") +
         encode_packet(b"server-option\n") +
-        FLUSH_PKT
+        b'0000'
     )

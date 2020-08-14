@@ -26,11 +26,11 @@ from textwrap import dedent
 import time
 
 from turnip.pack import helpers
-import turnip.pack.hooks
 from turnip.pack.helpers import (
-    get_capabilities_advertisement,
     encode_packet,
+    get_capabilities_advertisement,
     )
+import turnip.pack.hooks
 from turnip.version_info import version_info
 
 TEST_DATA = b'0123456789abcdef'
