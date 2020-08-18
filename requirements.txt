@@ -62,7 +62,12 @@ testscenarios==0.5.0
 testtools==2.4.0
 traceback2==1.4.0
 translationstring==1.3
-Twisted[conch]==20.3.0
+# XXX 2020-08-18 pappacena: This feature is already merged to Twisted trunk, so
+# we should be able to get rid of this backport soon.
+# Backport of SSH session env variables setter from
+# https://github.com/twisted/twisted/pull/1173 to Twisted version 20.3.0.
+# See https://code.launchpad.net/~pappacena/twisted/+git/twisted/+ref/pr-1173
+Twisted[conch]==20.3.0-pr1173
 unittest2==1.1.0
 vine==1.3.0
 venusian==2.1.0

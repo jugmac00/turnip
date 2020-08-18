@@ -16,7 +16,11 @@ from lazr.sshserver.auth import (
     )
 from lazr.sshserver.service import SSHService
 from lazr.sshserver.session import DoNothingSession
-from twisted.conch.interfaces import ISession
+import six
+from twisted.conch.interfaces import (
+    ISession,
+    ISessionSetEnv,
+    )
 from twisted.cred.portal import (
     IRealm,
     Portal,
@@ -127,6 +131,13 @@ class SmartSSHSession(DoNothingSession):
         super(SmartSSHSession, self).__init__(*args, **kwargs)
         self.pack_protocol = None
 
+    def setEnv(self, name, value):
+        """Set an environment variable for this SSH session.v"""
+        self.avatar.setEnv(name, value)
+
+    def getProtocolVersion(self):
+        return self.avatar.getProtocolVersion()
+
     @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, ssh_protocol):
         """Establish a pack connection to the backend.
@@ -138,6 +149,7 @@ class SmartSSHSession(DoNothingSession):
             b'turnip-authenticated-user': self.avatar.username.encode('utf-8'),
             b'turnip-authenticated-uid': str(self.avatar.user_id),
             b'turnip-request-id': str(uuid.uuid4()),
+            b'version': self.getProtocolVersion(),
             }
         d = defer.Deferred()
         client_factory = factory(service, path, params, ssh_protocol, d)
@@ -186,10 +198,21 @@ class SmartSSHAvatar(LaunchpadAvatar):
 
     def __init__(self, user_dict, service):
         LaunchpadAvatar.__init__(self, user_dict)
+        self.env = {}
         self.service = service
 
         # Disable SFTP.
         self.subsystemLookup = {}
+
+    def setEnv(self, name, value):
+        self.env[name] = value
+
+    def getProtocolVersion(self):
+        version = self.env.get('GIT_PROTOCOL', b'version=0')
+        try:
+            return six.ensure_binary(version.split(b'version=', 1)[1])
+        except IndexError:
+            return b'0'
 
 
 @implementer(IRealm)
@@ -225,3 +248,4 @@ class SmartSSHService(SSHService):
 
 
 components.registerAdapter(SmartSSHSession, SmartSSHAvatar, ISession)
+components.registerAdapter(SmartSSHSession, SmartSSHAvatar, ISessionSetEnv)
