@@ -234,18 +234,18 @@ def translate_xmlrpc_fault(code):
     return result
 
 
-def get_capabilities_advertisement(version='1'):
+def get_capabilities_advertisement(version=b'1'):
     """Returns the capability advertisement binary string to be sent to
     clients for a given protocol version requested.
 
     If no binary data is sent, no advertisement is done and we declare to
     not be compatible with that specific version."""
-    if version != '2':
+    if version != b'2':
         return b""
     turnip_version = six.ensure_binary(version_info.get("revision_id", '-1'))
     return (
         encode_packet(b"version 2\n") +
-        encode_packet(b"agent=turnip/%s\n" % turnip_version) +
+        encode_packet(b"agent=git/2.25.1@turnip/%s\n" % turnip_version) +
         encode_packet(b"ls-refs\n") +
         encode_packet(b"fetch=shallow\n") +
         encode_packet(b"server-option\n") +
