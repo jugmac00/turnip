@@ -12,7 +12,6 @@ from charmhelpers.core import (
     templating,
     )
 
-from charms.layer import status
 from charms.turnip.base import (
     code_dir,
     data_dir,
