@@ -10,8 +10,12 @@ from __future__ import (
 import os.path
 import re
 import shutil
+import stat
 import subprocess
+import sys
 import tempfile
+from textwrap import dedent
+import time
 
 from fixtures import TempDir
 from pygit2 import (
@@ -19,11 +23,7 @@ from pygit2 import (
     init_repository,
     )
 import six
-import stat
-import sys
 from testtools import TestCase
-from textwrap import dedent
-import time
 
 from turnip.pack import helpers
 from turnip.pack.helpers import (
@@ -327,13 +327,13 @@ class TestCapabilityAdvertisement(TestCase):
         git_agent = encode_packet(b"agent=git/%s\n" % git_version_num)
 
         proc = subprocess.Popen(
-            ['git', 'upload-pack', root], env={"GIT_PROTOCOL": "version=2"},
+            ['git', 'upload-pack', root], env={"GIT_PROTOCOL": b"version=2"},
             stdout=subprocess.PIPE, stdin=subprocess.PIPE)
         git_advertised_capabilities, _ = proc.communicate()
 
         turnip_capabilities = get_capabilities_advertisement(version=b'2')
         turnip_agent = encode_packet(
-            b"agent=turnip/%s\n" % version_info["revision_id"])
+            b"agent=git/2.25.1@turnip/%s\n" % version_info["revision_id"])
 
         self.assertEqual(
             turnip_capabilities,

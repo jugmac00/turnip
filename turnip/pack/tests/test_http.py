@@ -208,7 +208,7 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
         ver = version_info["revision_id"]
         capabilities = (
             encode_packet(b'version 2\n') +
-            encode_packet(b'agent=turnip/%s\n' % ver) +
+            encode_packet(b'agent=git/2.25.1@turnip/%s\n' % ver) +
             encode_packet(b'ls-refs\n') +
             encode_packet(b'fetch=shallow\n') +
             encode_packet(b'server-option\n') +
