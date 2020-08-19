@@ -1,5 +1,5 @@
 [Unit]
-Description=Turnip API server
+Description=Turnip celery server
 After=network.target
 {%- if nfs %}
 BindsTo={{ data_mount_unit }}
@@ -14,7 +14,7 @@ Environment=PATH={{ venv_dir }}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/us
 Environment=REPO_STORE={{ data_dir }}/repos
 Environment=TURNIP_LOG_DIR={{ logs_dir }}
 Environment=CELERY_BROKER={{ celery_broker }}
-ExecStart={{ venv_dir }}/bin/gunicorn --config {{ config_file }} --paste api.ini
+ExecStart={{ venv_dir }}/bin/celery -A turnip.tasks worker --logfile={{ logs_dir }}/turnip-celery.log --pool=gevent
 ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID
 LimitNOFILE=1048576

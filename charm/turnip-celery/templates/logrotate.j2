@@ -1,0 +1,13 @@
+{{ base_dir }}/logs/turnip-celery.log {
+    rotate 90
+    daily
+    dateext
+    delaycompress
+    compress
+    missingok
+    create 0644 {{ user }} {{ group }}
+    postrotate
+        service turnip-celery reload
+    endscript
+}
+

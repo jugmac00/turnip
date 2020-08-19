@@ -14,11 +14,10 @@ from charms.reactive import (
     when_not_all,
     )
 
-from charms.turnip.api import configure_wsgi
+from charms.turnip.celery import configure_celery
 from charms.turnip.base import (
     configure_service,
     deconfigure_service,
-    publish_website,
     )
 
 
@@ -26,26 +25,25 @@ from charms.turnip.base import (
       'turnip.rabbitmq.available')
 @when_not('turnip.configured')
 def configure_turnip():
-    configure_wsgi()
     configure_service()
     set_flag('turnip.configured')
     clear_flag('turnip.storage.nrpe-external-master.published')
     clear_flag('turnip.nrpe-external-master.published')
-    clear_flag('turnip.turnip-api.published')
+    clear_flag('turnip.turnip-celery.published')
     status.active('Ready')
 
 
 @when('turnip.configured')
 @when_not_all('turnip.storage.available', 'turnip.rabbitmq.available')
 def deconfigure_turnip():
-    deconfigure_service('turnip-api')
+    deconfigure_service('turnip-celery')
     clear_flag('turnip.configured')
     status.blocked('Waiting for storage and rabbitmq to be available')
 
 
 @when('amqp.connected')
 def rabbitmq_available():
-    if configure_wsgi():
+    if configure_celery():
         set_flag('turnip.rabbitmq.available')
     else:
         clear_flag('turnip.rabbitmq.available')
@@ -57,10 +55,10 @@ def nrpe_available():
     nagios = endpoint_from_flag('nrpe-external-master.available')
     config = hookenv.config()
     nagios.add_check(
-        ['/usr/lib/nagios/plugins/check_http', '-H', 'localhost',
-         '-p', str(config['port']), '-j', 'OPTIONS', '-u', '/repo'],
-        name='check_api',
-        description='Git API check',
+        ['/usr/lib/nagios/plugins/check_procs', '-c', '1:128',
+         '-C', 'celery', '-a', '-A turnip.tasks worker'],
+        name='check_celery',
+        description='Git celery check',
         context=config['nagios_context'])
     set_flag('turnip.nrpe-external-master.published')
 
@@ -69,17 +67,3 @@ def nrpe_available():
 @when_not('nrpe-external-master.available')
 def nrpe_unavailable():
     clear_flag('turnip.nrpe-external-master.published')
-
-
-@when('turnip-api.available', 'turnip.configured')
-@when_not('turnip.turnip-api.published')
-def turnip_api_available():
-    turnip_api = endpoint_from_flag('turnip-api.available')
-    publish_website(turnip_api, 'turnip-api', hookenv.config()['port'])
-    set_flag('turnip.turnip-api.published')
-
-
-@when('turnip.turnip-api.published')
-@when_not('turnip-api.available')
-def turnip_api_unavailable():
-    clear_flag('turnip.turnip-api.published')
