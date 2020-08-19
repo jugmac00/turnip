@@ -130,13 +130,22 @@ class SmartSSHSession(DoNothingSession):
     def __init__(self, *args, **kwargs):
         super(SmartSSHSession, self).__init__(*args, **kwargs)
         self.pack_protocol = None
+        self.env = {}
 
     def setEnv(self, name, value):
-        """Set an environment variable for this SSH session.v"""
-        self.avatar.setEnv(name, value)
+        """Set an environment variable for this SSH session.
+
+        Note that it might be insecure to forward every env variable from
+        the user to subprocesses.
+        """
+        self.env[name] = value
 
     def getProtocolVersion(self):
-        return self.avatar.getProtocolVersion()
+        version = self.env.get('GIT_PROTOCOL', b'version=0')
+        try:
+            return six.ensure_binary(version.split(b'version=', 1)[1])
+        except IndexError:
+            return b'0'
 
     @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, ssh_protocol):
@@ -198,21 +207,25 @@ class SmartSSHAvatar(LaunchpadAvatar):
 
     def __init__(self, user_dict, service):
         LaunchpadAvatar.__init__(self, user_dict)
-        self.env = {}
+        self.current_session = None
         self.service = service
 
         # Disable SFTP.
         self.subsystemLookup = {}
 
-    def setEnv(self, name, value):
-        self.env[name] = value
+    def getSession(self):
+        """Adapt a SmartSSHAvatar to a SmartSSHSession object.
 
-    def getProtocolVersion(self):
-        version = self.env.get('GIT_PROTOCOL', b'version=0')
-        try:
-            return six.ensure_binary(version.split(b'version=', 1)[1])
-        except IndexError:
-            return b'0'
+        We need to keep track of the avatar's current session due to an
+        internal implementation detail of ISessionSetEnv. If we don't keep
+        track of the current session, Twisted will adapt the avatar to
+        ISession and ISessionSetEnv in different moments, which causes
+        SmartSSHSession.env to be cleared (and we end up losing the env
+        variables set). See components.registerAdapter() call below.
+        """
+        if self.current_session is None:
+            self.current_session = SmartSSHSession(self)
+        return self.current_session
 
 
 @implementer(IRealm)
@@ -247,5 +260,6 @@ class SmartSSHService(SSHService):
         self.backend_port = backend_port
 
 
-components.registerAdapter(SmartSSHSession, SmartSSHAvatar, ISession)
-components.registerAdapter(SmartSSHSession, SmartSSHAvatar, ISessionSetEnv)
+components.registerAdapter(
+    lambda avatar: avatar.getSession(), SmartSSHAvatar,
+    ISession, ISessionSetEnv)
