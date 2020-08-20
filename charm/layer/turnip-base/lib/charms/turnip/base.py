@@ -368,15 +368,10 @@ def publish_website(website, name, port):
 def get_rabbitmq_url():
     rabbitmq = endpoint_from_name('amqp')
 
-    vhost = rabbitmq.vhost() if rabbitmq.vhost() else "/"
-    if not rabbitmq.username():
-        try:
-            rabbitmq.request_access(username="turnip", vhost=vhost)
-        except Exception:
-            pass
-
     if not rabbitmq.username() or not rabbitmq.password():
-        return None
+        raise AssertionError(
+            'get_rabbitmq_url called when amqp relation data incomplete')
 
     user = "%s:%s" % (rabbitmq.username(), rabbitmq.password())
+    vhost = rabbitmq.vhost() if rabbitmq.vhost() else "/"
     return "pyamqp://%s@%s/%s" % (user, rabbitmq.private_address(), vhost)

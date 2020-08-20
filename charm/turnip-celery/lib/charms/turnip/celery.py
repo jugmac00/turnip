@@ -22,12 +22,7 @@ from charms.turnip.base import (
 
 
 def configure_celery():
-    """Configure celery service, connecting it to rabbitmq.
-
-    :return: True if service is running, False otherwise."""
-    celery_broker = get_rabbitmq_url()
-    if celery_broker is None:
-        return host.service_running('turnip-celery')
+    """Configure celery service, connecting it to rabbitmq."""
     config = hookenv.config()
     context = dict(config)
     context.update({
@@ -36,7 +31,7 @@ def configure_celery():
         'data_mount_unit': data_mount_unit(),
         'logs_dir': logs_dir(),
         'venv_dir': venv_dir(),
-        'celery_broker': celery_broker,
+        'celery_broker': get_rabbitmq_url(),
         })
     templating.render(
         'turnip-celery.service.j2',
@@ -47,4 +42,3 @@ def configure_celery():
     reload_systemd()
     if not host.service_resume('turnip-celery'):
         raise RuntimeError('Failed to start turnip-celery')
-    return True
