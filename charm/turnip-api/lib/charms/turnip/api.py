@@ -24,9 +24,6 @@ from charms.turnip.base import (
 
 
 def configure_wsgi():
-    celery_broker = get_rabbitmq_url()
-    if celery_broker is None:
-        return host.service_running('turnip-api')
     config = hookenv.config()
     context = dict(config)
     context.update({
@@ -36,7 +33,7 @@ def configure_wsgi():
         'data_mount_unit': data_mount_unit(),
         'logs_dir': logs_dir(),
         'venv_dir': venv_dir(),
-        'celery_broker': celery_broker,
+        'celery_broker': get_rabbitmq_url(),
         })
     if context['wsgi_workers'] == 0:
         context['wsgi_workers'] = cpu_count() * 2 + 1
@@ -51,4 +48,3 @@ def configure_wsgi():
         host.service_stop('turnip-api')
     if not host.service_resume('turnip-api'):
         raise RuntimeError('Failed to start turnip-api')
-    return True

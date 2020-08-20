@@ -21,10 +21,10 @@ from charms.turnip.base import (
     )
 
 
-@when('turnip.installed', 'turnip.storage.available',
-      'turnip.rabbitmq.available')
+@when('turnip.installed', 'turnip.storage.available', 'amqp.available')
 @when_not('turnip.configured')
 def configure_turnip():
+    configure_celery()
     configure_service()
     set_flag('turnip.configured')
     clear_flag('turnip.storage.nrpe-external-master.published')
@@ -34,7 +34,7 @@ def configure_turnip():
 
 
 @when('turnip.configured')
-@when_not_all('turnip.storage.available', 'turnip.rabbitmq.available')
+@when_not_all('turnip.storage.available', 'amqp.available')
 def deconfigure_turnip():
     deconfigure_service('turnip-celery')
     clear_flag('turnip.configured')
@@ -42,11 +42,19 @@ def deconfigure_turnip():
 
 
 @when('amqp.connected')
-def rabbitmq_available():
-    if configure_celery():
-        set_flag('turnip.rabbitmq.available')
-    else:
-        clear_flag('turnip.rabbitmq.available')
+@when_not('turnip.amqp.requested-access')
+def request_amqp_access(rabbitmq):
+    # Clear any previous request so that the rabbitmq-server charm notices
+    # the change.
+    rabbitmq.request_access(username='', vhost='')
+    rabbitmq.request_access(username='turnip', vhost='/')
+    set_flag('turnip.amqp.requested-access')
+
+
+@when('turnip.amqp.requested-access')
+@when_not('amqp.connected')
+def unrequest_amqp_access():
+    clear_flag('turnip.amqp.requested-access')
 
 
 @when('nrpe-external-master.available', 'turnip.configured')
