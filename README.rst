@@ -106,7 +106,7 @@ Run the following::
 
         sudo add-apt-repository ppa:launchpad/ppa
         sudo apt-get update
-        cat system-dependencies.txt charm/packages.txt | sudo xargs apt-get install -y --no-install-recommends
+        cat system-dependencies.txt dependencies-devel.txt charm/packages.txt | sudo xargs apt-get install -y --no-install-recommends
         make bootstrap
         mkdir -p /var/tmp/git.launchpad.test
 
