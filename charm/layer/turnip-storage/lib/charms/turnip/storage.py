@@ -20,6 +20,15 @@ from charms.turnip.base import (
     )
 
 
+def ensure_mounted():
+    # If the service is stopped, start it. Make sure it is also unmasked to
+    # avoid blocking other services that depends on the data mount.
+    data_mount = data_mount_unit()
+    host.service('unmask', data_mount)
+    if not host.service_running(data_mount):
+        host.service_resume(data_mount)
+
+
 def mount_data(mount_info):
     # We use a systemd.mount(5) unit rather than a line in /etc/fstab partly
     # because it's easier to deal with a file we can completely overwrite,

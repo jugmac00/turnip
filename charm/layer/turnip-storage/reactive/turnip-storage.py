@@ -19,6 +19,7 @@ from charms.reactive import (
 
 from charms.turnip.base import data_dir
 from charms.turnip.storage import (
+    ensure_mounted,
     ensure_repo_store_writable,
     mount_data,
     unmount_data,
@@ -77,6 +78,12 @@ def nfs_available():
             mount_data(mount_info)
             ensure_repo_store_writable()
         toggle_flag('turnip.storage.nfs', mount_info is not None)
+        update_storage_available()
+    # If mount-info didn't changed but is present, let's just make sure that
+    # the data storage is mounted.
+    elif mount_info is not None:
+        ensure_mounted()
+        set_flag('turnip.storage.nfs')
         update_storage_available()
 
 
