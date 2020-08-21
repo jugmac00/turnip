@@ -30,8 +30,8 @@ def mount_data(mount_info):
     context = dict(mount_info)
     context['data_dir'] = data_dir()
     templating.render('data.mount.j2', data_mount_conf, context, perms=0o644)
-    reload_systemd()
     host.service('unmask', data_mount)
+    reload_systemd()
     host.service_restart(data_mount)
     # systemctl shouldn't return successfully unless the mount completed,
     # but let's make sure.
