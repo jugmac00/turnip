@@ -10,13 +10,13 @@ from charmhelpers.core import (
     hookenv,
     host,
     templating,
+    unitdata,
     )
 
 from charms.turnip.base import (
     code_dir,
     data_dir,
     data_mount_unit,
-    get_rabbitmq_url,
     logs_dir,
     reload_systemd,
     venv_dir,
@@ -33,7 +33,7 @@ def configure_wsgi():
         'data_mount_unit': data_mount_unit(),
         'logs_dir': logs_dir(),
         'venv_dir': venv_dir(),
-        'celery_broker': get_rabbitmq_url(),
+        'celery_broker': unitdata.kv().get('turnip.amqp.url'),
         })
     if context['wsgi_workers'] == 0:
         context['wsgi_workers'] = cpu_count() * 2 + 1

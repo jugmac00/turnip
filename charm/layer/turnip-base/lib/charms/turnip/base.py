@@ -366,6 +366,11 @@ def publish_website(website, name, port):
 
 
 def get_rabbitmq_url():
+    """Get the RabbitMQ URL from relation data.
+
+    The relation data is only accessible from an amqp relation hook, so the
+    caller is expected to store the result for use by other hooks.
+    """
     rabbitmq = endpoint_from_name('amqp')
 
     if not rabbitmq.username() or not rabbitmq.password():

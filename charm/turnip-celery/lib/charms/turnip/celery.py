@@ -8,13 +8,13 @@ from charmhelpers.core import (
     hookenv,
     host,
     templating,
+    unitdata,
     )
 
 from charms.turnip.base import (
     code_dir,
     data_dir,
     data_mount_unit,
-    get_rabbitmq_url,
     logs_dir,
     reload_systemd,
     venv_dir,
@@ -31,7 +31,7 @@ def configure_celery():
         'data_mount_unit': data_mount_unit(),
         'logs_dir': logs_dir(),
         'venv_dir': venv_dir(),
-        'celery_broker': get_rabbitmq_url(),
+        'celery_broker': unitdata.kv().get('turnip.amqp.url'),
         })
     templating.render(
         'turnip-celery.service.j2',
