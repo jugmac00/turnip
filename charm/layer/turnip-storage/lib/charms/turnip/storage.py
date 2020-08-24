@@ -25,8 +25,10 @@ def ensure_mounted():
     # avoid blocking other services that depends on the data mount.
     data_mount = data_mount_unit()
     host.service('unmask', data_mount)
+    reload_systemd()
     if not host.service_running(data_mount):
         host.service_resume(data_mount)
+        subprocess.check_call(['mountpoint', '-q', data_dir()])
 
 
 def mount_data(mount_info):

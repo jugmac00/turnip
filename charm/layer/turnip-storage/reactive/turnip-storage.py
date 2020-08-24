@@ -83,6 +83,7 @@ def nfs_available():
     # the data storage is mounted.
     elif mount_info is not None:
         ensure_mounted()
+        ensure_repo_store_writable()
         set_flag('turnip.storage.nfs')
         update_storage_available()
 
