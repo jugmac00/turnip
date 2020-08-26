@@ -83,7 +83,7 @@ class FunctionalTestMixin(WithScenarios):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=30)
 
     scenarios = [
-        ('v0 protocol', {}),
+        ('v0 protocol', {"protocol_version": b"0"}),
         ('v1 protocol', {"protocol_version": b"1"}),
         ('v2 protocol', {"protocol_version": b"2"}),
         ]
