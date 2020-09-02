@@ -26,6 +26,7 @@ from turnip.api.tests.test_helpers import (
     open_repo,
     RepoFactory,
     )
+from turnip.tests.tasks import CeleryWorkerFixture
 
 
 class InitTestCase(TestCase):
@@ -359,6 +360,9 @@ class InitTestCase(TestCase):
             packed_refs, os.path.join(too_path, 'turnip-subordinate'))
 
     def test_copy_ref(self):
+        celery_fixture = CeleryWorkerFixture()
+        self.useFixture(celery_fixture)
+
         self.makeOrig()
         # Creates a new branch in the orig repository.
         orig_path = self.orig_path
@@ -380,7 +384,9 @@ class InitTestCase(TestCase):
         self.assertEqual([], dest.references.objects)
 
         dest_ref_name = 'refs/merge/123'
-        store.copy_ref(orig_path, orig_ref_name, dest_path, dest_ref_name)
+        store.copy_ref.apply_async(
+            (orig_path, orig_ref_name, dest_path, dest_ref_name))
+        celery_fixture.waitUntil(5, lambda: len(dest.references.objects) == 1)
 
         self.assertEqual(1, len(dest.references.objects))
         copied_ref = dest.references.objects[0]
@@ -397,6 +403,8 @@ class InitTestCase(TestCase):
         orig_blob_id = orig[orig_commit_oid].tree[0].id
 
         store.copy_ref(orig_path, orig_ref_name, dest_path, dest_ref_name)
+        celery_fixture.waitUntil(
+            5, lambda: dest[orig_blob_id].data == b'changed foobar content')
 
         self.assertEqual(1, len(dest.references.objects))
         copied_ref = dest.references.objects[0]

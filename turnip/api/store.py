@@ -28,7 +28,7 @@ from pygit2 import (
     )
 
 from turnip.pack.helpers import ensure_config
-
+from turnip.tasks import app
 
 REF_TYPE_NAME = {
     GIT_OBJ_COMMIT: 'commit',
@@ -114,6 +114,7 @@ def write_alternates(repo_path, alternate_repo_paths):
 object_dir_re = re.compile(r'\A[0-9a-f][0-9a-f]\Z')
 
 
+@app.task
 def copy_ref(from_root, from_ref, to_root, to_ref=None):
     """Copy a single ref from one git repository to another.
 
