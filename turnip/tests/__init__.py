@@ -8,6 +8,7 @@ from __future__ import (
     )
 
 from turnip.tests.logging import setupLogger
-
+from turnip.tests.tasks import setupCelery
 
 setupLogger()
+setupCelery()
