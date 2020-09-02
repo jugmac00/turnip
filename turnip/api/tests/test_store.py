@@ -95,8 +95,9 @@ class InitTestCase(TestCase):
 
     def makeOrig(self):
         self.orig_path = os.path.join(self.repo_store, 'orig/')
-        orig = RepoFactory(
-            self.orig_path, num_branches=3, num_commits=2, num_tags=2).build()
+        self.orig_factory = RepoFactory(
+            self.orig_path, num_branches=3, num_commits=2, num_tags=2)
+        orig = self.orig_factory.build()
         self.orig_refs = {}
         for ref in orig.references.objects:
             obj = orig[ref.target]
@@ -356,3 +357,51 @@ class InitTestCase(TestCase):
             self.orig_refs, os.path.join(to_path, 'turnip-subordinate'))
         self.assertPackedRefs(
             packed_refs, os.path.join(too_path, 'turnip-subordinate'))
+
+    def test_copy_ref(self):
+        self.makeOrig()
+        # Creates a new branch in the orig repository.
+        orig_path = self.orig_path
+        orig = self.orig_factory.repo
+        master_tip = orig.references['refs/heads/master'].target.hex
+
+        orig_branch_name = 'new-branch'
+        orig_ref_name = 'refs/heads/new-branch'
+        orig.create_branch(orig_branch_name, orig[master_tip])
+        orig_commit_oid = self.orig_factory.add_commit(
+            b'foobar file content', 'foobar.txt', parents=[master_tip],
+            ref=orig_ref_name)
+        orig_blob_id = orig[orig_commit_oid].tree[0].id
+
+        dest_path = os.path.join(self.repo_store, 'to/')
+        store.init_repo(dest_path, clone_from=self.orig_path)
+
+        dest = pygit2.Repository(dest_path)
+        self.assertEqual([], dest.references.objects)
+
+        dest_ref_name = 'refs/merge/123'
+        store.copy_ref(orig_path, orig_ref_name, dest_path, dest_ref_name)
+
+        self.assertEqual(1, len(dest.references.objects))
+        copied_ref = dest.references.objects[0]
+        self.assertEqual(dest_ref_name, copied_ref.name)
+        self.assertEqual(
+            orig.references[orig_ref_name].target,
+            dest.references[dest_ref_name].target)
+        self.assertEqual(b'foobar file content', dest[orig_blob_id].data)
+
+        # Updating and copying again should work.
+        orig_commit_oid = self.orig_factory.add_commit(
+            b'changed foobar content', 'foobar.txt', parents=[orig_commit_oid],
+            ref=orig_ref_name)
+        orig_blob_id = orig[orig_commit_oid].tree[0].id
+
+        store.copy_ref(orig_path, orig_ref_name, dest_path, dest_ref_name)
+
+        self.assertEqual(1, len(dest.references.objects))
+        copied_ref = dest.references.objects[0]
+        self.assertEqual(dest_ref_name, copied_ref.name)
+        self.assertEqual(
+            orig.references[orig_ref_name].target,
+            dest.references[dest_ref_name].target)
+        self.assertEqual(b'changed foobar content', dest[orig_blob_id].data)

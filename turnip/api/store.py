@@ -114,6 +114,34 @@ def write_alternates(repo_path, alternate_repo_paths):
 object_dir_re = re.compile(r'\A[0-9a-f][0-9a-f]\Z')
 
 
+def copy_ref(from_root, from_ref, to_root, to_ref=None):
+    """Copy a single ref from one git repository to another.
+
+    If `to_ref` is None, the copy will use the `from_ref` name from
+    origin to the destination repository.
+
+    This is implemented now using git client's "git fetch" command,
+    since it's way easier than trying to copy the refs, commits and objects
+    manually using pygit.
+
+    :param from_root: The root directory of the source git repository.
+    :param from_ref: The source ref name.
+    :param to_root: The root directory of the destination git repository.
+    :param to_ref: The destination ref name. If None, copy_ref will use the
+                   source ref name.
+    """
+    if to_ref is None:
+        to_ref = from_ref
+    cmd = [
+        b'git', b'fetch', b'--no-tags',
+        from_root, b'%s:%s' % (from_ref, to_ref)
+    ]
+    proc = subprocess.Popen(
+        cmd, cwd=to_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if proc.wait() != 0:
+        raise GitError("Error copying refs: %s" % proc.stderr.read())
+
+
 def copy_refs(from_root, to_root):
     """Copy refs from one .git directory to another.
 
