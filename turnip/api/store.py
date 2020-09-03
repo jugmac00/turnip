@@ -143,6 +143,12 @@ def copy_ref(from_root, from_ref, to_root, to_ref=None):
         raise GitError("Error copying refs: %s" % proc.stderr.read())
 
 
+@app.task
+def delete_ref(repo_root, ref_name):
+    repo = Repository(repo_root)
+    repo.references[ref_name].delete()
+
+
 def copy_refs(from_root, to_root):
     """Copy refs from one .git directory to another.
 

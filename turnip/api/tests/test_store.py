@@ -367,10 +367,10 @@ class InitTestCase(TestCase):
         # Creates a new branch in the orig repository.
         orig_path = self.orig_path
         orig = self.orig_factory.repo
-        master_tip = orig.references['refs/heads/master'].target.hex
+        master_tip = orig.references[b'refs/heads/master'].target.hex
 
-        orig_branch_name = 'new-branch'
-        orig_ref_name = 'refs/heads/new-branch'
+        orig_branch_name = b'new-branch'
+        orig_ref_name = b'refs/heads/new-branch'
         orig.create_branch(orig_branch_name, orig[master_tip])
         orig_commit_oid = self.orig_factory.add_commit(
             b'foobar file content', 'foobar.txt', parents=[master_tip],
@@ -383,7 +383,7 @@ class InitTestCase(TestCase):
         dest = pygit2.Repository(dest_path)
         self.assertEqual([], dest.references.objects)
 
-        dest_ref_name = 'refs/merge/123'
+        dest_ref_name = b'refs/merge/123'
         store.copy_ref.apply_async(
             (orig_path, orig_ref_name, dest_path, dest_ref_name))
         celery_fixture.waitUntil(5, lambda: len(dest.references.objects) == 1)
@@ -402,9 +402,15 @@ class InitTestCase(TestCase):
             ref=orig_ref_name)
         orig_blob_id = orig[orig_commit_oid].tree[0].id
 
-        store.copy_ref(orig_path, orig_ref_name, dest_path, dest_ref_name)
-        celery_fixture.waitUntil(
-            5, lambda: dest[orig_blob_id].data == b'changed foobar content')
+        store.copy_ref.apply_async(
+            (orig_path, orig_ref_name, dest_path, dest_ref_name))
+
+        def waitForNewCommit():
+            try:
+                return dest[orig_blob_id].data == b'changed foobar content'
+            except KeyError:
+                return False
+        celery_fixture.waitUntil(5, waitForNewCommit)
 
         self.assertEqual(1, len(dest.references.objects))
         copied_ref = dest.references.objects[0]
@@ -413,3 +419,28 @@ class InitTestCase(TestCase):
             orig.references[orig_ref_name].target,
             dest.references[dest_ref_name].target)
         self.assertEqual(b'changed foobar content', dest[orig_blob_id].data)
+
+    def test_delete_ref(self):
+        celery_fixture = CeleryWorkerFixture()
+        self.useFixture(celery_fixture)
+
+        self.makeOrig()
+        orig_path = self.orig_path
+        orig = self.orig_factory.repo
+
+        master_tip = orig.references[b'refs/heads/master'].target.hex
+        new_branch_name = b'new-branch'
+        new_ref_name = b'refs/heads/new-branch'
+        orig.create_branch(new_branch_name, orig[master_tip])
+        self.orig_factory.add_commit(
+            b'foobar file content', 'foobar.txt', parents=[master_tip],
+            ref=new_ref_name)
+
+        before_refs_len = len(orig.references.objects)
+        store.delete_ref.apply_async((orig_path, new_ref_name))
+        celery_fixture.waitUntil(
+            5, lambda: len(orig.references.objects) < before_refs_len)
+
+        self.assertEqual(before_refs_len - 1, len(orig.references.objects))
+        self.assertNotIn(
+            new_branch_name, [i.name for i in orig.references.objects])

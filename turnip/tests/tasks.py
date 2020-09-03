@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 
-from testtools.testcase import fixtures
+import fixtures
 
 from turnip.config import config
 from turnip.tasks import app
@@ -93,6 +93,4 @@ class CeleryWorkerFixture(fixtures.Fixture):
 
     def _setUp(self):
         self.startCeleryWorker()
-
-    def _cleanup(self):
-        self.stopCeleryWorker()
+        self.addCleanup(self.stopCeleryWorker)
