@@ -156,6 +156,38 @@ class RepackAPI(BaseAPI):
         return
 
 
+@resource(path='/repo/{name}/refs-copy/{ref:.*}/')
+class RefCopyAPI(BaseAPI):
+    """Provides HTTP API for git references copy operations."""
+
+    def __init__(self, request, context=None):
+        super(RefCopyAPI, self).__init__()
+        self.request = request
+
+    @validate_path
+    def post(self, repo_store, repo_name):
+        ref = self.request.matchdict['ref']
+        if not ref.startswith(b"refs/"):
+            ref = 'refs/' + ref
+
+        # Make sure the source ref exists
+        try:
+            store.get_ref(repo_store, repo_name, ref)
+        except (KeyError, GitError):
+            return exc.HTTPNotFound()
+
+        orig_path = os.path.join(repo_store, repo_name)
+        orig_ref_name = ref
+        for dest in self.request.json.get('destinations'):
+            dest_repo = dest.get('repo')
+            dest_ref_name = dest.get('ref')
+            dest_path = os.path.join(repo_store, dest_repo)
+            store.copy_ref.apply_async(
+                (orig_path, orig_ref_name, dest_path, dest_ref_name)
+            )
+        return Response(status=202)
+
+
 @resource(collection_path='/repo/{name}/refs',
           path='/repo/{name}/refs/{ref:.*}')
 class RefAPI(BaseAPI):

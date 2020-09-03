@@ -338,6 +338,59 @@ class ApiTestCase(TestCase):
         resp = self.app.delete(quote(url), expect_errors=True)
         self.assertEqual(404, resp.status_code)
 
+    def test_copy_ref_api(self):
+        celery_fixture = CeleryWorkerFixture()
+        self.useFixture(celery_fixture)
+        repo1_path = os.path.join(self.repo_root, 'repo1')
+        repo2_path = os.path.join(self.repo_root, 'repo2')
+        repo3_path = os.path.join(self.repo_root, 'repo3')
+
+        repo1_factory = RepoFactory(
+            repo1_path, num_branches=5, num_commits=1, num_tags=1)
+        repo1 = repo1_factory.build()
+        self.assertEqual(7, len(repo1.references.objects))
+
+        repo2_factory = RepoFactory(
+            repo2_path, num_branches=1, num_commits=1, num_tags=1)
+        repo2 = repo2_factory.build()
+        self.assertEqual(3, len(repo2.references.objects))
+
+        repo3_factory = RepoFactory(
+            repo3_path, num_branches=1, num_commits=1, num_tags=1)
+        repo3 = repo3_factory.build()
+        self.assertEqual(3, len(repo3.references.objects))
+
+        url = '/repo/repo1/refs-copy/heads/branch-4/'
+        body = {
+            "destinations": [
+                {b"repo": b'repo2', b"ref": b"refs/merge/123/head"},
+                {b"repo": b'repo3', b"ref": b"refs/merge/987/head"}]}
+        resp = self.app.post_json(quote(url), body)
+        self.assertEqual(202, resp.status_code)
+
+        def branchCreated():
+            repo2_refs = [i.name for i in repo2.references.objects]
+            repo3_refs = [i.name for i in repo3.references.objects]
+            return (b'refs/merge/123/head' in repo2_refs and
+                    b'refs/merge/987/head' in repo3_refs)
+
+        celery_fixture.waitUntil(5, branchCreated)
+        self.assertEqual(4, len(repo2.references.objects))
+        self.assertEqual(202, resp.status_code)
+        self.assertEqual('', resp.body)
+
+    def test_copy_non_existing_ref(self):
+        celery_fixture = CeleryWorkerFixture()
+        self.useFixture(celery_fixture)
+
+        repo = RepoFactory(
+            self.repo_store, num_branches=5, num_commits=1, num_tags=1).build()
+        self.assertEqual(7, len(repo.references.objects))
+
+        url = '/repo/repo1/refs-copy/heads/this-ref-doesnt-exist-at-all/'
+        resp = self.app.post(quote(url), {}, expect_errors=True)
+        self.assertEqual(404, resp.status_code)
+
     def test_repo_compare_commits(self):
         """Ensure expected changes exist in diff patch."""
         repo = RepoFactory(self.repo_store)
