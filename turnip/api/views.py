@@ -9,6 +9,7 @@ from cornice.resource import resource
 from cornice.util import extract_json_data
 from pygit2 import GitError
 import pyramid.httpexceptions as exc
+from pyramid.response import Response
 
 from turnip.config import config
 from turnip.api import store
@@ -180,6 +181,18 @@ class RefAPI(BaseAPI):
             return store.get_ref(repo_store, repo_name, ref)
         except (KeyError, GitError):
             return exc.HTTPNotFound()
+
+    @validate_path
+    def delete(self, repo_store, repo_name):
+        ref = 'refs/' + self.request.matchdict['ref']
+        # Make sure the ref actually exists. Otherwise, raise a 404.
+        try:
+            store.get_ref(repo_store, repo_name, ref)
+        except (KeyError, GitError):
+            return exc.HTTPNotFound()
+        repo_path = os.path.join(repo_store, repo_name)
+        store.delete_ref.apply_async((repo_path, ref))
+        return Response(status=202)
 
 
 @resource(path='/repo/{name}/compare/{commits}')

@@ -32,6 +32,7 @@ from turnip.api.tests.test_helpers import (
     open_repo,
     RepoFactory,
     )
+from turnip.tests.tasks import CeleryWorkerFixture
 
 
 class ApiTestCase(TestCase):
@@ -301,6 +302,41 @@ class ApiTestCase(TestCase):
         tag = self.tag.get('ref')
         resp = self.get_ref(tag)
         self.assertTrue(tag in resp)
+
+    def test_delete_ref(self):
+        celery_fixture = CeleryWorkerFixture()
+        self.useFixture(celery_fixture)
+
+        repo = RepoFactory(
+            self.repo_store, num_branches=5, num_commits=1, num_tags=1).build()
+        self.assertEqual(7, len(repo.references.objects))
+
+        ref = 'refs/heads/branch-0'
+        url = '/repo/{}/{}'.format(self.repo_path, ref)
+        resp = self.app.delete(quote(url))
+
+        def branchDeleted():
+            refs = [i.name for i in repo.references.objects]
+            return b'refs/heads/branch-0' not in refs
+
+        celery_fixture.waitUntil(5, branchDeleted)
+
+        self.assertEqual(6, len(repo.references.objects))
+        self.assertEqual(202, resp.status_code)
+        self.assertEqual('', resp.body)
+
+    def test_delete_non_existing_ref(self):
+        celery_fixture = CeleryWorkerFixture()
+        self.useFixture(celery_fixture)
+
+        repo = RepoFactory(
+            self.repo_store, num_branches=5, num_commits=1, num_tags=1).build()
+        self.assertEqual(7, len(repo.references.objects))
+
+        ref = 'refs/heads/this-branch-doesnt-exist'
+        url = '/repo/{}/{}'.format(self.repo_path, ref)
+        resp = self.app.delete(quote(url), expect_errors=True)
+        self.assertEqual(404, resp.status_code)
 
     def test_repo_compare_commits(self):
         """Ensure expected changes exist in diff patch."""
