@@ -385,7 +385,7 @@ class InitTestCase(TestCase):
 
         dest_ref_name = b'refs/merge/123'
         store.copy_ref.apply_async(
-            (orig_path, orig_ref_name, dest_path, dest_ref_name))
+            (orig_path, orig_commit_oid.hex, dest_path, dest_ref_name))
         celery_fixture.waitUntil(5, lambda: len(dest.references.objects) == 1)
 
         self.assertEqual(1, len(dest.references.objects))
@@ -396,7 +396,8 @@ class InitTestCase(TestCase):
             dest.references[dest_ref_name].target)
         self.assertEqual(b'foobar file content', dest[orig_blob_id].data)
 
-        # Updating and copying again should work.
+        # Updating and copying again should work too, and it should be
+        # compatible with using the ref name instead of the commit ID too.
         orig_commit_oid = self.orig_factory.add_commit(
             b'changed foobar content', 'foobar.txt', parents=[orig_commit_oid],
             ref=orig_ref_name)
