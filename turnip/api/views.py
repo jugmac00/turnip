@@ -156,7 +156,7 @@ class RepackAPI(BaseAPI):
         return
 
 
-@resource(path='/repo/{name}/refs-copy/{ref:.*}/')
+@resource(path='/repo/{name}/refs-copy')
 class RefCopyAPI(BaseAPI):
     """Provides HTTP API for git references copy operations."""
 
@@ -164,27 +164,38 @@ class RefCopyAPI(BaseAPI):
         super(RefCopyAPI, self).__init__()
         self.request = request
 
+    def _validate_ref(self, repo_store, repo_name, ref_or_commit):
+        """Checks if a ref name or commit ID exists in repo. If not, raises
+        404 exception."""
+        # Checks if it's a commit.
+        try:
+            store.get_commit(repo_store, repo_name, ref_or_commit)
+            return
+        except GitError:
+            pass
+        # Checks if it's a ref name.
+        try:
+            store.get_ref(repo_store, repo_name, ref_or_commit)
+            return
+        except KeyError:
+            raise exc.HTTPNotFound()
+
     @validate_path
     def post(self, repo_store, repo_name):
-        ref = self.request.matchdict['ref']
-        if not ref.startswith(b"refs/"):
-            ref = 'refs/' + ref
-
-        # Make sure the source ref exists
-        try:
-            store.get_ref(repo_store, repo_name, ref)
-        except (KeyError, GitError):
-            return exc.HTTPNotFound()
-
         orig_path = os.path.join(repo_store, repo_name)
-        orig_ref_name = ref
-        for dest in self.request.json.get('destinations'):
+        copy_ref_calls = []
+        for operation in self.request.json.get('operations'):
+            source = operation["from"]
+            self._validate_ref(repo_store, repo_name, source)
+            dest = operation["to"]
             dest_repo = dest.get('repo')
             dest_ref_name = dest.get('ref')
             dest_path = os.path.join(repo_store, dest_repo)
-            store.copy_ref.apply_async(
-                (orig_path, orig_ref_name, dest_path, dest_ref_name)
-            )
+            copy_ref_calls.append(
+                (orig_path, source, dest_path, dest_ref_name))
+
+        for args in copy_ref_calls:
+            store.copy_ref.apply_async(args)
         return Response(status=202)
 
 

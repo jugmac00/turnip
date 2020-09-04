@@ -360,11 +360,16 @@ class ApiTestCase(TestCase):
         repo3 = repo3_factory.build()
         self.assertEqual(3, len(repo3.references.objects))
 
-        url = '/repo/repo1/refs-copy/heads/branch-4/'
+        url = '/repo/repo1/refs-copy'
         body = {
-            "destinations": [
-                {b"repo": b'repo2', b"ref": b"refs/merge/123/head"},
-                {b"repo": b'repo3', b"ref": b"refs/merge/987/head"}]}
+            "operations": [
+                {
+                    b"from": b"refs/heads/branch-4",
+                    b"to": {b"repo": b'repo2', b"ref": b"refs/merge/123/head"}
+                }, {
+                    b"from": b"refs/heads/branch-4",
+                    b"to": {b"repo": b'repo3', b"ref": b"refs/merge/987/head"}
+                }]}
         resp = self.app.post_json(quote(url), body)
         self.assertEqual(202, resp.status_code)
 
@@ -383,12 +388,19 @@ class ApiTestCase(TestCase):
         celery_fixture = CeleryWorkerFixture()
         self.useFixture(celery_fixture)
 
+        repo_path = os.path.join(self.repo_root, 'repo1')
         repo = RepoFactory(
-            self.repo_store, num_branches=5, num_commits=1, num_tags=1).build()
+            repo_path, num_branches=5, num_commits=1, num_tags=1).build()
         self.assertEqual(7, len(repo.references.objects))
 
-        url = '/repo/repo1/refs-copy/heads/this-ref-doesnt-exist-at-all/'
-        resp = self.app.post(quote(url), {}, expect_errors=True)
+        body = {
+            "operations": [{
+                b"from": b"refs/heads/this-ref-doesnt-exist-at-all",
+                b"to": {b"repo": b'repo2', b"ref": b"refs/merge/123/head"}
+            }]}
+
+        url = '/repo/repo1/refs-copy'
+        resp = self.app.post_json(quote(url), body, expect_errors=True)
         self.assertEqual(404, resp.status_code)
 
     def test_repo_compare_commits(self):
