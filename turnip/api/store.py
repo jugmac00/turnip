@@ -126,10 +126,10 @@ def copy_ref(from_root, from_ref, to_root, to_ref=None):
     manually using pygit.
 
     :param from_root: The root directory of the source git repository.
-    :param from_ref: The source ref name.
+    :param from_ref: The source ref name or commit id.
     :param to_root: The root directory of the destination git repository.
-    :param to_ref: The destination ref name. If None, copy_ref will use the
-                   source ref name.
+    :param to_ref: The destination ref name. If None, copy_ref will use
+                   `from_ref` as the target name.
     """
     if to_ref is None:
         to_ref = from_ref
