@@ -928,13 +928,10 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
         start = datetime.now()
         while datetime.now() <= (start + timeout):
             self._doReactorIteration()
-            try:
-                resp = self.app.get('/repo/{}'.format(repo_path),
-                                    expect_errors=True)
-                if resp.status_code == 200 and resp.json['is_available']:
-                    return
-            except:
-                pass
+            resp = self.app.get('/repo/{}'.format(repo_path),
+                                expect_errors=True)
+            if resp.status_code == 200 and resp.json['is_available']:
+                return
             time.sleep(0.1)
         self.fail(
             "Repository %s was not created after %s secs"
@@ -988,7 +985,8 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
             [], self.virtinfo.xmlrpc_abortRepoCreation.call_args_list)
 
     def test_repo_async_creation_aborts_when_fails_to_create_locally(self):
-        """Repo can be initialised with optional clone asynchronously."""
+        """If we fail to create the repository locally, abortRepoCreation
+        XML-RPC method should be called."""
         self.useFixture(
             EnvironmentVariable("REPO_STORE", '/tmp/invalid/path/to/repos/'))
         self.useFixture(CeleryWorkerFixture())
@@ -1019,7 +1017,8 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
             [], self.virtinfo.xmlrpc_confirmRepoCreation.call_args_list)
 
     def test_repo_async_creation_aborts_when_fails_confirm(self):
-        """Repo can be initialised with optional clone asynchronously."""
+        """If we fail to confirm the repository creation, abortRepoCreation
+        XML-RPC method should be called."""
         self.useFixture(CeleryWorkerFixture())
         self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock(
             side_effect=Exception("?"))
