@@ -25,6 +25,9 @@ applications:
           service_port: 9419
       ssl_cert: "%SSL_CERT%"
       ssl_key: "%SSL_KEY%"
+  rabbitmq-server:
+    charm: cs:rabbitmq-server
+    num_units: 1
   turnip-pack-backend:
     charm: ./dist/builds/turnip-pack-backend
     num_units: 1
@@ -74,6 +77,14 @@ applications:
       build_label: "%BUILD_LABEL%"
     resources:
       turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
+  turnip-celery:
+    charm: ./dist/builds/turnip-celery
+    num_units: 1
+    to: [turnip-pack-backend]
+    options:
+      build_label: "%BUILD_LABEL%"
+    resources:
+      turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
 relations:
   - ["haproxy", "turnip-pack-backend"]
   - ["haproxy", "turnip-pack-virt:turnip-pack-backend"]
@@ -85,3 +96,5 @@ relations:
   - ["haproxy", "turnip-pack-frontend-http:turnip-pack-virt"]
   - ["haproxy", "turnip-pack-frontend-http:turnip-pack-frontend-http"]
   - ["haproxy", "turnip-api"]
+  - ['rabbitmq-server:amqp', "turnip-api:amqp"]
+  - ['rabbitmq-server:amqp', "turnip-celery:amqp"]

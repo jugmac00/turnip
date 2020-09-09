@@ -1,0 +1,5 @@
+options:
+  celery_broker:
+    type: string
+    default: pyamqp://guest@localhost//
+    description: Celery broker URL

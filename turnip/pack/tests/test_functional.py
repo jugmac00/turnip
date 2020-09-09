@@ -35,6 +35,7 @@ from fixtures import (
     TempDir,
     )
 from pygit2 import GIT_OID_HEX_ZERO
+from testscenarios.testcase import WithScenarios
 from testtools import TestCase
 from testtools.content import text_content
 from testtools.deferredruntest import AsynchronousDeferredRunTest
@@ -77,9 +78,15 @@ from turnip.pack.tests.fake_servers import (
 from turnip.version_info import version_info
 
 
-class FunctionalTestMixin(object):
+class FunctionalTestMixin(WithScenarios):
 
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=30)
+
+    scenarios = [
+        ('v0 protocol', {"protocol_version": b"0"}),
+        ('v1 protocol', {"protocol_version": b"1"}),
+        ('v2 protocol', {"protocol_version": b"2"}),
+        ]
 
     def startVirtInfo(self):
         # Set up a fake virt information XML-RPC server which just
@@ -120,6 +127,12 @@ class FunctionalTestMixin(object):
 
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
+        if command[0] == b'git' and getattr(self, 'protocol_version', None):
+            args = list(command[1:])
+            command = [b'git']
+            command.extend(
+                [b'-c', b'protocol.version=%s' % self.protocol_version])
+            command.extend(args)
         out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], env=os.environ, path=path)
         if code != 0:
@@ -130,6 +143,11 @@ class FunctionalTestMixin(object):
 
     @defer.inlineCallbacks
     def assertCommandFailure(self, command, path='.'):
+        if command[0] == b'git' and getattr(self, 'protocol_version', None):
+            args = list(command[1:])
+            command = [
+                b'git', b'-c', b'protocol.version=%s' % self.protocol_version
+            ] + args
         out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], env=os.environ, path=path)
         if code == 0:

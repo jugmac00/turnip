@@ -57,7 +57,6 @@ ifeq ($(PIP_SOURCE_DIR),)
 endif
 	mkdir -p $(ENV)
 	(echo '[easy_install]'; \
-	 echo "allow_hosts = ''"; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
 	$(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
@@ -65,6 +64,7 @@ endif
 	$(PIP) install $(PIP_ARGS) -c requirements.txt \
 		-e '.[test,deploy]'
 
+bootstrap-test: PATH := /usr/sbin:/sbin:$(PATH)
 bootstrap-test:
 	-sudo rabbitmqctl delete_vhost turnip-test-vhost
 	-sudo rabbitmqctl add_vhost turnip-test-vhost
@@ -149,7 +149,7 @@ publish-tarball: build-tarball
 	[ ! -e ~/.config/swift/turnip ] || . ~/.config/swift/turnip; \
 	./publish-to-swift --debug \
 		$(SWIFT_CONTAINER_NAME) $(SWIFT_OBJECT_PATH) \
-		$(TARBALL_BUILD_PATH)
+		$(TARBALL_BUILD_PATH) turnip=$(TARBALL_BUILD_LABEL)
 
 .PHONY: build check clean dist lint run-api run-pack test
 .PHONY: build-tarball publish-tarball

@@ -33,7 +33,7 @@ class LessDummyRequest(requesthelper.DummyRequest):
 
     @property
     def value(self):
-        return "".join(self.written)
+        return b"".join(self.written)
 
     def write(self, data):
         self.startedWriting = 1
@@ -115,9 +115,9 @@ class ErrorTestMixin(object):
     @defer.inlineCallbacks
     def test_backend_immediately_dies(self):
         # If the backend disappears before it says anything, that's OK.
-        yield self.performRequest('')
+        yield self.performRequest(b'')
         self.assertEqual(200, self.request.responseCode)
-        self.assertEqual('', self.request.value)
+        self.assertEqual(b'', self.request.value)
 
     @defer.inlineCallbacks
     def test_backend_virt_error(self):
@@ -125,7 +125,7 @@ class ErrorTestMixin(object):
         yield self.performRequest(
             helpers.encode_packet(b'ERR turnip virt error: NOT_FOUND enoent'))
         self.assertEqual(404, self.request.responseCode)
-        self.assertEqual('enoent', self.request.value)
+        self.assertEqual(b'enoent', self.request.value)
 
     @defer.inlineCallbacks
     def test_backend_virt_error_unknown(self):
@@ -133,7 +133,7 @@ class ErrorTestMixin(object):
         yield self.performRequest(
             helpers.encode_packet(b'ERR turnip virt error: random yay'))
         self.assertEqual(500, self.request.responseCode)
-        self.assertEqual('yay', self.request.value)
+        self.assertEqual(b'yay', self.request.value)
 
 
 class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
@@ -145,7 +145,7 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
     def setUp(self):
         super(TestSmartHTTPRefsResource, self).setUp()
         self.root = FakeRoot()
-        self.request = LessDummyRequest([''])
+        self.request = LessDummyRequest([b''])
         self.request.method = b'GET'
 
     def makeResource(self, service):
@@ -156,13 +156,13 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
         yield self.performRequest(service=None)
         self.assertEqual(404, self.request.responseCode)
         self.assertEqual(
-            "Only git smart HTTP clients are supported.", self.request.value)
+            b"Only git smart HTTP clients are supported.", self.request.value)
 
     @defer.inlineCallbacks
     def test_unsupported_service(self):
         yield self.performRequest(service=b'foo')
         # self.assertEqual(403, self.request.responseCode)
-        self.assertEqual("Unsupported service.", self.request.value)
+        self.assertEqual(b"Unsupported service.", self.request.value)
 
     @defer.inlineCallbacks
     def test_backend_error(self):
@@ -172,7 +172,7 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
         yield self.performRequest(
             helpers.encode_packet(b'ERR so borked'))
         self.assertEqual(500, self.request.responseCode)
-        self.assertEqual('so borked', self.request.value)
+        self.assertEqual(b'so borked', self.request.value)
 
     @defer.inlineCallbacks
     def test_good(self):
@@ -181,9 +181,9 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
             b'And I am raw, since we got a good packet to start with.')
         self.assertEqual(200, self.request.responseCode)
         self.assertEqual(
-            '001e# service=git-upload-pack\n'
-            '0000001bI am git protocol data.'
-            'And I am raw, since we got a good packet to start with.',
+            b'001e# service=git-upload-pack\n'
+            b'0000001bI am git protocol data.'
+            b'And I am raw, since we got a good packet to start with.',
             self.request.value)
 
 
@@ -209,7 +209,7 @@ class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
         yield self.performRequest(
             helpers.encode_packet(b'ERR so borked'))
         self.assertEqual(200, self.request.responseCode)
-        self.assertEqual('0011ERR so borked', self.request.value)
+        self.assertEqual(b'0011ERR so borked', self.request.value)
 
     @defer.inlineCallbacks
     def test_good(self):
@@ -218,8 +218,8 @@ class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
             b'And I am raw, since we got a good packet to start with.')
         self.assertEqual(200, self.request.responseCode)
         self.assertEqual(
-            '001bI am git protocol data.'
-            'And I am raw, since we got a good packet to start with.',
+            b'001bI am git protocol data.'
+            b'And I am raw, since we got a good packet to start with.',
             self.request.value)
 
 
@@ -247,4 +247,4 @@ class TestHTTPAuthRootResource(TestCase):
         root.reactor.advance(15)
         self.assertTrue(d.called)
         self.assertEqual(504, request.responseCode)
-        self.assertEqual('Path translation timed out.', request.value)
+        self.assertEqual(b'Path translation timed out.', request.value)

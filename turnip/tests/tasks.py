@@ -2,9 +2,11 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 import atexit
+from datetime import datetime, timedelta
 import os
 import subprocess
 import sys
+import time
 
 from testtools.testcase import fixtures
 
@@ -77,8 +79,18 @@ class CeleryWorkerFixture(fixtures.Fixture):
         # Cleanup the queue.
         app.control.purge()
 
+    def waitUntil(self, seconds, callable, *args, **kwargs):
+        """Waits some seconds until a callable(*args, **kwargs) returns
+        true. Raises exception if that never happens"""
+        start = datetime.now()
+        while datetime.now() < start + timedelta(seconds=seconds):
+            if callable(*args, **kwargs):
+                return
+            time.sleep(0.2)
+        raise AttributeError(
+            "%s(*%s, **%s) never returned True after %s seconds" %
+            (callable.func_name, args, kwargs, seconds))
+
     def _setUp(self):
         self.startCeleryWorker()
-
-    def _cleanup(self):
-        self.stopCeleryWorker()
+        self.addCleanup(self.stopCeleryWorker)

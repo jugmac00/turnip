@@ -11,6 +11,7 @@ from collections import defaultdict
 import hashlib
 
 from lazr.sshserver.auth import NoSuchPersonWithName
+import six
 from six.moves import xmlrpc_client
 from twisted.web import xmlrpc
 
@@ -81,24 +82,24 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.abort_repo_creation_call_args = []
 
     def getInternalPath(self, pathname):
-        if pathname.startswith(b'/+rw'):
+        if pathname.startswith('/+rw'):
             pathname = pathname[4:]
-        return hashlib.sha256(pathname).hexdigest()
+        return hashlib.sha256(six.ensure_binary(pathname)).hexdigest()
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:
             raise xmlrpc.Fault(3, "Unauthorized")
 
         self.translations.append((pathname, permission, auth_params))
-        writable = pathname.startswith(b'/+rw')
+        writable = pathname.startswith('/+rw')
 
-        if permission != b'read' and not writable:
+        if permission != 'read' and not writable:
             raise xmlrpc.Fault(2, "Repository is read-only")
         retval = {'path': self.getInternalPath(pathname)}
 
-        if b"-new" in pathname:
-            if b"/clone-from:" in pathname:
-                clone_path = pathname.split(b"/clone-from:", 1)[1]
+        if "-new" in pathname:
+            if "/clone-from:" in pathname:
+                clone_path = pathname.split("/clone-from:", 1)[1]
                 clone_from = self.getInternalPath(clone_path)
             else:
                 clone_from = None
