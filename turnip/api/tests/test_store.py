@@ -359,7 +359,7 @@ class InitTestCase(TestCase):
         self.assertPackedRefs(
             packed_refs, os.path.join(too_path, 'turnip-subordinate'))
 
-    def test_copy_ref(self):
+    def test_fetch_refs(self):
         celery_fixture = CeleryWorkerFixture()
         self.useFixture(celery_fixture)
 
@@ -384,8 +384,8 @@ class InitTestCase(TestCase):
         self.assertEqual([], dest.references.objects)
 
         dest_ref_name = b'refs/merge/123'
-        store.copy_ref.apply_async(
-            (orig_path, orig_commit_oid.hex, dest_path, dest_ref_name))
+        store.fetch_refs.apply_async(args=([
+            (orig_path, orig_commit_oid.hex, dest_path, dest_ref_name)], ))
         celery_fixture.waitUntil(5, lambda: len(dest.references.objects) == 1)
 
         self.assertEqual(1, len(dest.references.objects))
@@ -403,8 +403,8 @@ class InitTestCase(TestCase):
             ref=orig_ref_name)
         orig_blob_id = orig[orig_commit_oid].tree[0].id
 
-        store.copy_ref.apply_async(
-            (orig_path, orig_ref_name, dest_path, dest_ref_name))
+        store.fetch_refs.apply_async(args=([
+            (orig_path, orig_ref_name, dest_path, dest_ref_name)], ))
 
         def waitForNewCommit():
             try:
@@ -438,7 +438,8 @@ class InitTestCase(TestCase):
             ref=new_ref_name)
 
         before_refs_len = len(orig.references.objects)
-        store.delete_ref.apply_async((orig_path, new_ref_name))
+        operations = [(orig_path, new_ref_name)]
+        store.delete_refs.apply_async((operations, ))
         celery_fixture.waitUntil(
             5, lambda: len(orig.references.objects) < before_refs_len)
 
