@@ -16,6 +16,7 @@ from charmhelpers.core import (
 from charmhelpers.fetch import apt_install
 from charmhelpers.payload import archive
 from charms.layer import status
+from charms.reactive import endpoint_from_name
 import six
 import yaml
 
@@ -288,7 +289,9 @@ def configure_service(service_name=None):
             host.service_stop(service_name)
         if not host.service_resume(service_name):
             raise RuntimeError('Failed to start {}'.format(service_name))
-    hookenv.open_port(config['port'])
+    port = config.get('port')
+    if port is not None:
+        hookenv.open_port(port)
     configure_logrotate(config)
 
 
@@ -360,3 +363,20 @@ def publish_website(website, name, port):
             'port': str(port),
             'services': haproxy_services_yaml,
             })
+
+
+def get_rabbitmq_url():
+    """Get the RabbitMQ URL from relation data.
+
+    The relation data is only accessible from an amqp relation hook, so the
+    caller is expected to store the result for use by other hooks.
+    """
+    rabbitmq = endpoint_from_name('amqp')
+
+    if not rabbitmq.username() or not rabbitmq.password():
+        raise AssertionError(
+            'get_rabbitmq_url called when amqp relation data incomplete')
+
+    user = "%s:%s" % (rabbitmq.username(), rabbitmq.password())
+    vhost = rabbitmq.vhost() if rabbitmq.vhost() else "/"
+    return "pyamqp://%s@%s/%s" % (user, rabbitmq.private_address(), vhost)

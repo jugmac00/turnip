@@ -64,6 +64,7 @@ endif
 	$(PIP) install $(PIP_ARGS) -c requirements.txt \
 		-e '.[test,deploy]'
 
+bootstrap-test: PATH := /usr/sbin:/sbin:$(PATH)
 bootstrap-test:
 	-sudo rabbitmqctl delete_vhost turnip-test-vhost
 	-sudo rabbitmqctl add_vhost turnip-test-vhost

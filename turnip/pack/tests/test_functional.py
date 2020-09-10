@@ -148,7 +148,13 @@ class FunctionalTestMixin(WithScenarios):
 
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
-        out, err, code = yield self.getProcessOutputAndValue(
+        if command[0] == b'git' and getattr(self, 'protocol_version', None):
+            args = list(command[1:])
+            command = [b'git']
+            command.extend(
+                [b'-c', b'protocol.version=%s' % self.protocol_version])
+            command.extend(args)
+        out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], env=os.environ, path=path)
         if code != 0:
             self.addDetail('stdout', text_content(out))
@@ -158,7 +164,12 @@ class FunctionalTestMixin(WithScenarios):
 
     @defer.inlineCallbacks
     def assertCommandFailure(self, command, path='.'):
-        out, err, code = yield self.getProcessOutputAndValue(
+        if command[0] == b'git' and getattr(self, 'protocol_version', None):
+            args = list(command[1:])
+            command = [
+                b'git', b'-c', b'protocol.version=%s' % self.protocol_version
+            ] + args
+        out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], env=os.environ, path=path)
         if code == 0:
             self.addDetail('stdout', text_content(out))
