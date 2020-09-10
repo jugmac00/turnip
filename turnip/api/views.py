@@ -183,7 +183,7 @@ class RefCopyAPI(BaseAPI):
     @validate_path
     def post(self, repo_store, repo_name):
         orig_path = os.path.join(repo_store, repo_name)
-        copy_ref_calls = []
+        copy_refs_args = []
         for operation in self.request.json.get('operations'):
             source = operation["from"]
             self._validate_ref(repo_store, repo_name, source)
@@ -191,11 +191,10 @@ class RefCopyAPI(BaseAPI):
             dest_repo = dest.get('repo')
             dest_ref_name = dest.get('ref')
             dest_path = os.path.join(repo_store, dest_repo)
-            copy_ref_calls.append(
+            copy_refs_args.append(
                 (orig_path, source, dest_path, dest_ref_name))
 
-        for args in copy_ref_calls:
-            store.copy_ref.apply_async(args)
+        store.fetch_refs.apply_async(args=(copy_refs_args, ))
         return Response(status=202)
 
 
@@ -234,7 +233,7 @@ class RefAPI(BaseAPI):
         except (KeyError, GitError):
             return exc.HTTPNotFound()
         repo_path = os.path.join(repo_store, repo_name)
-        store.delete_ref.apply_async((repo_path, ref))
+        store.delete_refs.apply_async(args=([(repo_path, ref)], ))
         return Response(status=202)
 
 
