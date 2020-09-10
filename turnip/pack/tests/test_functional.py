@@ -127,11 +127,12 @@ class FunctionalTestMixin(WithScenarios):
 
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
-        if command[0] == b'git':
+        if command[0] == b'git' and getattr(self, 'protocol_version', None):
             args = list(command[1:])
-            command = [
-                b'git', b'-c', b'protocol.version=%s' % self.protocol_version
-            ] + args
+            command = [b'git']
+            command.extend(
+                [b'-c', b'protocol.version=%s' % self.protocol_version])
+            command.extend(args)
         out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], env=os.environ, path=path)
         if code != 0:
@@ -142,7 +143,7 @@ class FunctionalTestMixin(WithScenarios):
 
     @defer.inlineCallbacks
     def assertCommandFailure(self, command, path='.'):
-        if command[0] == b'git':
+        if command[0] == b'git' and getattr(self, 'protocol_version', None):
             args = list(command[1:])
             command = [
                 b'git', b'-c', b'protocol.version=%s' % self.protocol_version

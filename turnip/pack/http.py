@@ -329,7 +329,7 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
 
     def render_GET(self, request):
         try:
-            service = request.args['service'][0]
+            service = request.args[b'service'][0]
         except (KeyError, IndexError):
             return fail_request(
                 request, b'Only git smart HTTP clients are supported.',

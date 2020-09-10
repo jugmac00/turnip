@@ -19,7 +19,8 @@ CHARMS := \
 	turnip-pack-frontend-git \
 	turnip-pack-frontend-ssh \
 	turnip-pack-frontend-http \
-	turnip-api
+	turnip-api \
+	turnip-celery
 
 PUBLISH_REPO_PREFIX := lp:~canonical-launchpad-branches/turnip/+git/charm-build-
 PUBLISHDIR := $(BUILDDIR)/publish
@@ -49,6 +50,7 @@ build-turnip-pack-frontend-git: dist/.built-turnip-pack-frontend-git
 build-turnip-pack-frontend-ssh: dist/.built-turnip-pack-frontend-ssh
 build-turnip-pack-frontend-http: dist/.built-turnip-pack-frontend-http
 build-turnip-api: dist/.built-turnip-api
+build-turnip-celery: dist/.built-turnip-celery
 
 dist/.built-%: $(CHARM_DEPS) | $(BUILDDIR)
 	@echo "Building $*..."
