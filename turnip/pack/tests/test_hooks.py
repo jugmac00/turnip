@@ -265,6 +265,14 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
             b"You do not have permission to push to refs/heads/verboten.\n")
 
     @defer.inlineCallbacks
+    def test_rejected_readonly_namespaces(self):
+        # An read-only ref is rejected.
+        yield self.assertRejected(
+            [(b'refs/merge/123/heads', self.old_sha1, self.new_sha1)],
+            {b'refs/heads/master': ['push', 'force_push', 'create']},
+            b"refs/merge/123/heads is in a read-only namespace.\n")
+
+    @defer.inlineCallbacks
     def test_rejected_multiple(self):
         # A combination of valid and invalid refs is still rejected.
         yield self.assertRejected(
@@ -440,6 +448,14 @@ class TestUpdateHook(TestCase):
             ['ref', 'old', 'new'])
         self.assertEqual(
             [b'You do not have permission to force-push to ref.'], output)
+
+    def test_read_only_ref(self):
+        # User does not have permission to force-push to a read-only namespace
+        output = hook.match_update_rules(
+            {'ref': ['create']},
+            [b'refs/merge/123/head', 'old', 'new'])
+        self.assertEqual(
+            [b'refs/merge/123/head is in a read-only namespace.'], output)
 
 
 class TestDeterminePermissions(TestCase):
