@@ -7,6 +7,7 @@ from __future__ import (
     unicode_literals,
     )
 
+from collections import OrderedDict
 import enum
 import hashlib
 import os.path
@@ -23,8 +24,9 @@ import six
 import yaml
 
 import turnip.pack.hooks
+from turnip.version_info import version_info
 
-
+DELIM_PKT = object()
 PKT_LEN_SIZE = 4
 PKT_PAYLOAD_MAX = 65520
 INCOMPLETE_PKT = object()
@@ -34,6 +36,8 @@ def encode_packet(payload):
     if payload is None:
         # flush-pkt.
         return b'0000'
+    if payload is DELIM_PKT:
+        return b'0001'
     else:
         # data-pkt
         if len(payload) > PKT_PAYLOAD_MAX:
@@ -45,6 +49,8 @@ def encode_packet(payload):
 
 def decode_packet(input):
     """Consume a packet, returning the payload and any unconsumed tail."""
+    if input.startswith(b'0001'):
+        return (DELIM_PKT, input[PKT_LEN_SIZE:])
     if len(input) < PKT_LEN_SIZE:
         return (INCOMPLETE_PKT, input)
     if input.startswith(b'0000'):
@@ -80,7 +86,7 @@ def decode_request(data):
     if len(bits) < 2 or bits[-1] != b'':
         raise ValueError('Invalid git-proto-request')
     pathname = bits[0]
-    params = {}
+    params = OrderedDict()
     for index, param in enumerate(bits[1:-1]):
         if param == b'':
             if (index < len(bits) - 1):
@@ -94,7 +100,7 @@ def decode_request(data):
         if name in params:
             raise ValueError('Parameters must not be repeated')
         params[name] = value
-    return (command, pathname, params)
+    return command, pathname, params
 
 
 def encode_request(command, pathname, params):
@@ -105,7 +111,7 @@ def encode_request(command, pathname, params):
     if b' ' in command or b'\0' in pathname:
         raise ValueError('Metacharacter in arguments')
     bits = [pathname]
-    for name in sorted(params):
+    for name in params:
         value = params[name]
         value = six.ensure_binary(value) if value is not None else b''
         name = six.ensure_binary(name)
@@ -226,3 +232,22 @@ def translate_xmlrpc_fault(code):
     else:
         result = TurnipFaultCode.INTERNAL_SERVER_ERROR
     return result
+
+
+def get_capabilities_advertisement(version=b'1'):
+    """Returns the capability advertisement binary string to be sent to
+    clients for a given protocol version requested.
+
+    If no binary data is sent, no advertisement is done and we declare to
+    not be compatible with that specific version."""
+    if version != b'2':
+        return b""
+    turnip_version = six.ensure_binary(version_info.get("revision_id", '-1'))
+    return (
+        encode_packet(b"version 2\n") +
+        encode_packet(b"agent=git/2.25.1@turnip/%s\n" % turnip_version) +
+        encode_packet(b"ls-refs\n") +
+        encode_packet(b"fetch=shallow\n") +
+        encode_packet(b"server-option\n") +
+        b'0000'
+    )

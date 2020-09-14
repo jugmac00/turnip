@@ -24,7 +24,10 @@ from turnip.pack import (
     helpers,
     http,
     )
+from turnip.pack.helpers import encode_packet
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
+from turnip.tests.compat import mock
+from turnip.version_info import version_info
 
 
 class LessDummyRequest(requesthelper.DummyRequest):
@@ -74,12 +77,14 @@ class FakeRoot(object):
 
     def __init__(self):
         self.backend_transport = None
+        self.client_factory = None
         self.backend_connected = defer.Deferred()
 
     def authenticateWithPassword(self, user, password):
         return {}
 
     def connectToBackend(self, client_factory):
+        self.client_factory = client_factory
         self.backend_transport = testing.StringTransportWithDisconnection()
         p = client_factory.buildProtocol(None)
         self.backend_transport.protocol = p
@@ -184,6 +189,36 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
             b'001e# service=git-upload-pack\n'
             b'0000001bI am git protocol data.'
             b'And I am raw, since we got a good packet to start with.',
+            self.request.value)
+
+    @defer.inlineCallbacks
+    def test_good_v2_included_version_and_capabilities(self):
+        self.request.requestHeaders.addRawHeader("Git-Protocol", "version=2")
+        yield self.performRequest(
+            helpers.encode_packet(b'I am git protocol data.') +
+            b'And I am raw, since we got a good packet to start with.')
+        self.assertEqual(200, self.request.responseCode)
+        self.assertEqual(self.root.client_factory.params, {
+            'version': '2',
+            'turnip-advertise-refs': 'yes',
+            'turnip-can-authenticate': 'yes',
+            'turnip-request-id': mock.ANY,
+            'turnip-stateless-rpc': 'yes'})
+
+        ver = version_info["revision_id"]
+        capabilities = (
+            encode_packet(b'version 2\n') +
+            encode_packet(b'agent=git/2.25.1@turnip/%s\n' % ver) +
+            encode_packet(b'ls-refs\n') +
+            encode_packet(b'fetch=shallow\n') +
+            encode_packet(b'server-option\n') +
+            b'0000'
+            )
+        self.assertEqual(
+            capabilities +
+            '001e# service=git-upload-pack\n'
+            '0000001bI am git protocol data.'
+            'And I am raw, since we got a good packet to start with.',
             self.request.value)
 
 

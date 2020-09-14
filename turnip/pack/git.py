@@ -77,7 +77,7 @@ class UnstoppableProducerWrapper(object):
         pass
 
 
-class PackProtocol(protocol.Protocol):
+class PackProtocol(protocol.Protocol, object):
 
     paused = False
     raw = False
@@ -415,7 +415,7 @@ class PackProxyServerProtocol(PackServerProtocol):
     def resumeProducing(self):
         # Send our translated request and then open the gate to the client.
         self.sendNextCommand()
-        PackServerProtocol.resumeProducing(self)
+        super(PackProxyServerProtocol, self).resumeProducing()
 
     def readConnectionLost(self):
         # Forward the closed stdin down the stack.
@@ -456,7 +456,12 @@ class PackBackendProtocol(PackServerProtocol):
             self.resumeProducing()
             return
 
+        cmd_env = {}
         write_operation = False
+        version = params.get(b'version', 0)
+        cmd_env["GIT_PROTOCOL"] = 'version=%s' % version
+        if version == b'2':
+            params.pop(b'turnip-advertise-refs', None)
         if command == b'git-upload-pack':
             subcmd = b'upload-pack'
         elif command == b'git-receive-pack':
@@ -472,13 +477,14 @@ class PackBackendProtocol(PackServerProtocol):
         if params.pop(b'turnip-advertise-refs', None):
             args.append(b'--advertise-refs')
         args.append(self.path)
-        self.spawnGit(subcmd,
-                      args,
-                      write_operation=write_operation,
-                      auth_params=auth_params)
+        self.spawnGit(
+            subcmd, args,
+            write_operation=write_operation, auth_params=auth_params,
+            cmd_env=cmd_env)
 
     def spawnGit(self, subcmd, extra_args, write_operation=False,
-                 send_path_as_option=False, auth_params=None):
+                 send_path_as_option=False, auth_params=None,
+                 cmd_env=None):
         cmd = b'git'
         args = [b'git']
         if send_path_as_option:
@@ -487,6 +493,7 @@ class PackBackendProtocol(PackServerProtocol):
         args.extend(extra_args)
 
         env = {}
+        env.update((cmd_env or {}))
         if write_operation and self.factory.hookrpc_handler:
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.

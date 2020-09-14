@@ -229,8 +229,9 @@ class TestPackBackendProtocol(TestCase):
             [('foo.git', )], self.virtinfo.confirm_repo_creation_call_args)
 
         self.assertEqual(
-            (b'git', [b'git', b'upload-pack', full_path], {}),
-            self.proto.test_process)
+            (b'git', [b'git', b'upload-pack', full_path], {
+                'GIT_PROTOCOL': 'version=0'
+            }), self.proto.test_process)
 
     @defer.inlineCallbacks
     def test_create_repo_fails_to_confirm(self):
@@ -267,7 +268,7 @@ class TestPackBackendProtocol(TestCase):
         self.assertEqual(
             (b'git',
              [b'git', b'upload-pack', full_path],
-             {}),
+             {'GIT_PROTOCOL': 'version=0'}),
             self.proto.test_process)
 
     def test_git_receive_pack_calls_spawnProcess(self):

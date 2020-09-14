@@ -29,6 +29,7 @@ from paste.auth.cookie import (
     decode as decode_cookie,
     encode as encode_cookie,
     )
+import six
 from twisted.internet import (
     defer,
     error,
@@ -57,9 +58,10 @@ from turnip.pack.git import (
 from turnip.pack.helpers import (
     encode_packet,
     encode_request,
+    get_capabilities_advertisement,
     translate_xmlrpc_fault,
     TurnipFaultCode,
-    )
+)
 try:
     from turnip.version_info import version_info
 except ImportError:
@@ -78,6 +80,16 @@ def fail_request(request, message, code=http.INTERNAL_SERVER_ERROR):
     # Some callsites want to be able to return from render_*, so make
     # that possible.
     return b''
+
+
+def get_protocol_version_from_request(request):
+    version_header = request.requestHeaders.getRawHeaders(
+        'git-protocol', [b'version=1'])[0]
+    try:
+        return six.ensure_binary(version_header).split(b'version=', 1)[1]
+    except IndexError:
+        pass
+    return b'1'
 
 
 class HTTPPackClientProtocol(PackProtocol):
@@ -99,7 +111,11 @@ class HTTPPackClientProtocol(PackProtocol):
 
     def startGoodResponse(self):
         """Prepare the HTTP response for forwarding from the backend."""
-        raise NotImplementedError()
+        self.factory.http_request.write(
+            get_capabilities_advertisement(self.getProtocolVersion()))
+
+    def getProtocolVersion(self):
+        return get_protocol_version_from_request(self.factory.http_request)
 
     def backendConnected(self):
         """Called when the backend is connected and has sent a good packet."""
@@ -209,6 +225,7 @@ class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
         self.factory.http_request.setHeader(
             b'Content-Type',
             b'application/x-%s-advertisement' % self.factory.command)
+        super(HTTPPackClientRefsProtocol, self).startGoodResponse()
 
     def backendConnected(self):
         HTTPPackClientProtocol.backendConnected(self)
@@ -221,10 +238,11 @@ class HTTPPackClientCommandProtocol(HTTPPackClientProtocol):
 
     def startGoodResponse(self):
         """Prepare the HTTP response for forwarding from the backend."""
-        self.factory.http_request.setResponseCode(http.OK)
-        self.factory.http_request.setHeader(
-            b'Content-Type',
-            b'application/x-%s-result' % self.factory.command)
+        if self.getProtocolVersion() != b'2':
+            self.factory.http_request.setResponseCode(http.OK)
+            self.factory.http_request.setHeader(
+                b'Content-Type',
+                b'application/x-%s-result' % self.factory.command)
 
 
 class HTTPPackClientFactory(protocol.ClientFactory):
@@ -282,6 +300,8 @@ class BaseSmartHTTPResource(resource.Resource):
         params = {
             b'turnip-can-authenticate': b'yes',
             b'turnip-request-id': str(uuid.uuid4()),
+            b'version': six.ensure_binary(
+                get_protocol_version_from_request(request))
             }
         authenticated_params = yield self.authenticateUser(request)
         for key, value in authenticated_params.items():
