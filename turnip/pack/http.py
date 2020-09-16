@@ -84,12 +84,12 @@ def fail_request(request, message, code=http.INTERNAL_SERVER_ERROR):
 
 def get_protocol_version_from_request(request):
     version_header = request.requestHeaders.getRawHeaders(
-        'git-protocol', [b'version=1'])[0]
+        'git-protocol', [b'version=0'])[0]
     try:
         return six.ensure_binary(version_header).split(b'version=', 1)[1]
     except IndexError:
         pass
-    return b'1'
+    return b'0'
 
 
 class HTTPPackClientProtocol(PackProtocol):
