@@ -25,6 +25,7 @@ from turnip.pack import (
     http,
     )
 from turnip.pack.helpers import encode_packet
+from turnip.pack.http import get_protocol_version_from_request
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
 from turnip.tests.compat import mock
 from turnip.version_info import version_info
@@ -283,3 +284,14 @@ class TestHTTPAuthRootResource(TestCase):
         self.assertTrue(d.called)
         self.assertEqual(504, request.responseCode)
         self.assertEqual(b'Path translation timed out.', request.value)
+
+
+class TestProtocolVersion(TestCase):
+    def test_get_protocol_version_from_request_default_zero(self):
+        request = LessDummyRequest("/foo")
+        self.assertEqual(b'0', get_protocol_version_from_request(request))
+
+    def test_get_protocol_version_from_request(self):
+        request = LessDummyRequest("/foo")
+        request.requestHeaders.setRawHeaders('git-protocol', [b'version=2'])
+        self.assertEqual(b'2', get_protocol_version_from_request(request))
