@@ -89,7 +89,7 @@ def get_protocol_version_from_request(request):
         return six.ensure_binary(version_header).split(b'version=', 1)[1]
     except IndexError:
         pass
-    return b'1'
+    return b'0'
 
 
 class HTTPPackClientProtocol(PackProtocol):

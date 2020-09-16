@@ -291,6 +291,11 @@ class TestProtocolVersion(TestCase):
         request = LessDummyRequest("/foo")
         self.assertEqual(b'0', get_protocol_version_from_request(request))
 
+    def test_get_protocol_version_from_request_fallback_to_zero(self):
+        request = LessDummyRequest("/foo")
+        request.requestHeaders.setRawHeaders('git-protocol', [b'invalid'])
+        self.assertEqual(b'0', get_protocol_version_from_request(request))
+
     def test_get_protocol_version_from_request(self):
         request = LessDummyRequest("/foo")
         request.requestHeaders.setRawHeaders('git-protocol', [b'version=2'])
