@@ -305,8 +305,8 @@ class BaseSmartHTTPResource(resource.Resource):
             }
         authenticated_params = yield self.authenticateUser(request)
         for key, value in authenticated_params.items():
-            encoded_key = ('turnip-authenticated-' + key).encode('utf-8')
-            params[encoded_key] = unicode(value).encode('utf-8')
+            encoded_key = ('turnip-authenticated-' + six.ensure_str(key))
+            params[encoded_key] = six.ensure_str(value)
         params.update(self.extra_params)
         d = defer.Deferred()
         client_factory = factory(service, path, params, content, request, d)
@@ -802,7 +802,9 @@ class SmartHTTPFrontendResource(resource.Resource):
         proxy = xmlrpc.Proxy(self.virtinfo_endpoint)
         try:
             translated = yield proxy.callRemote(
-                'authenticateWithPassword', user, password)
+                'authenticateWithPassword',
+                six.ensure_str(user),
+                six.ensure_str(password))
         except xmlrpc.Fault as e:
             code = translate_xmlrpc_fault(e.faultCode)
             if code == TurnipFaultCode.UNAUTHORIZED:
