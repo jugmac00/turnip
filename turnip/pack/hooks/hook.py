@@ -25,6 +25,12 @@ from turnip.compat.files import fd_buffer
 GIT_OID_HEX_ZERO = '0'*40
 
 
+# Users cannot update references in this list.
+READONLY_REF_NAMESPACES = [
+    b'refs/merge/',
+]
+
+
 def check_ancestor(old, new):
     # This is a delete, setting the new ref.
     if new == GIT_OID_HEX_ZERO:
@@ -42,6 +48,8 @@ def is_default_branch(pushed_branch):
 
 
 def determine_permissions_outcome(old, ref, rule_lines):
+    if any(ref.startswith(i) for i in READONLY_REF_NAMESPACES):
+        return b"%s is in a read-only namespace." % ref
     rule = rule_lines.get(ref, [])
     if old == GIT_OID_HEX_ZERO:
         # We are creating a new ref
@@ -88,6 +96,8 @@ def match_update_rules(rule_lines, ref_line):
     the rule_lines to confirm that the user has permissions for that operation.
     """
     ref, old, new = ref_line
+    if any(ref.startswith(i) for i in READONLY_REF_NAMESPACES):
+        return [b"%s is in a read-only namespace." % ref]
 
     # If it's a create, the old ref doesn't exist
     if old == GIT_OID_HEX_ZERO:
