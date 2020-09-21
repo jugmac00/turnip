@@ -6,9 +6,11 @@
 from __future__ import print_function, unicode_literals
 
 import base64
+from datetime import timedelta, datetime
 import os
 import subprocess
 from textwrap import dedent
+import time
 import unittest
 import uuid
 
@@ -23,6 +25,8 @@ from testtools.matchers import (
     Equals,
     MatchesSetwise,
     )
+from twisted.internet import reactor as default_reactor
+from twisted.web import server
 from webtest import TestApp
 
 from turnip import api
@@ -32,12 +36,14 @@ from turnip.api.tests.test_helpers import (
     open_repo,
     RepoFactory,
     )
+from turnip.config import config
+from turnip.pack.tests.fake_servers import FakeVirtInfoService
+from turnip.tests.compat import mock
+from turnip.tests.tasks import CeleryWorkerFixture
 
 
-class ApiTestCase(TestCase):
-
-    def setUp(self):
-        super(ApiTestCase, self).setUp()
+class ApiRepoStoreMixin:
+    def setupRepoStore(self):
         repo_store = self.useFixture(TempDir()).path
         self.useFixture(EnvironmentVariable("REPO_STORE", repo_store))
         self.app = TestApp(api.main({}))
@@ -46,6 +52,13 @@ class ApiTestCase(TestCase):
         self.repo_root = repo_store
         self.commit = {'ref': 'refs/heads/master', 'message': 'test commit.'}
         self.tag = {'ref': 'refs/tags/tag0', 'message': 'tag message'}
+
+
+class ApiTestCase(TestCase, ApiRepoStoreMixin):
+
+    def setUp(self):
+        super(ApiTestCase, self).setUp()
+        self.setupRepoStore()
 
     def assertReferencesEqual(self, repo, expected, observed):
         self.assertEqual(
@@ -880,6 +893,159 @@ class ApiTestCase(TestCase):
                 self.repo_path, factory.repo[c1].tree.hex),
             expect_errors=True)
         self.assertEqual(404, resp.status_code)
+
+
+class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
+
+    def setUp(self):
+        super(AsyncRepoCreationAPI, self).setUp()
+        self.setupRepoStore()
+        # XML-RPC server
+        self.virtinfo = FakeVirtInfoService(allowNone=True)
+        self.virtinfo_listener = default_reactor.listenTCP(0, server.Site(
+            self.virtinfo))
+        self.virtinfo_port = self.virtinfo_listener.getHost().port
+        self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
+        self.addCleanup(self.virtinfo_listener.stopListening)
+        config.defaults['virtinfo_endpoint'] = self.virtinfo_url
+
+    def _doReactorIteration(self):
+        """Yield to the reactor so it can process virtinfo requests.
+
+        This is a bit hacky, but allow us to simulate the twisted XML-RPC
+        fake server without needing to make this test suite async.
+        Making this test suite async could make it less realistic, since the
+        API beign tested itself is not running over twisted event loop.
+        """
+        reactor_iterations = (
+            len(default_reactor._reads) + len(default_reactor._writes))
+        for i in range(reactor_iterations):
+            default_reactor.iterate()
+
+    def assertRepositoryCreatedAsynchronously(self, repo_path, timeout_secs=5):
+        """Waits up to `timeout_secs` for a repository to be available."""
+        timeout = timedelta(seconds=timeout_secs)
+        start = datetime.now()
+        while datetime.now() <= (start + timeout):
+            self._doReactorIteration()
+            resp = self.app.get('/repo/{}'.format(repo_path),
+                                expect_errors=True)
+            if resp.status_code == 200 and resp.json['is_available']:
+                return
+            time.sleep(0.1)
+        self.fail(
+            "Repository %s was not created after %s secs"
+            % (repo_path, timeout_secs))
+
+    def assertAnyMockCalledAsync(self, mocks, timeout_secs=5):
+        """Asserts that any of the mocks in *args will be called in the
+        next timeout_secs seconds.
+        """
+        timeout = timedelta(seconds=timeout_secs)
+        start = datetime.now()
+        while datetime.now() <= (start + timeout):
+            self._doReactorIteration()
+            if any(i.called for i in mocks):
+                return
+            time.sleep(0.1)
+        self.fail(
+            "None of the given args was called after %s seconds."
+            % timeout_secs)
+
+    def test_repo_async_creation_with_clone(self):
+        """Repo can be initialised with optional clone asynchronously."""
+        self.useFixture(CeleryWorkerFixture())
+        self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock(return_value=None)
+        self.virtinfo.xmlrpc_abortRepoCreation = mock.Mock(return_value=None)
+
+        factory = RepoFactory(self.repo_store, num_commits=2)
+        factory.build()
+        new_repo_path = uuid.uuid1().hex
+        resp = self.app.post_json('/repo', {
+            'async': True,
+            'repo_path': new_repo_path,
+            'clone_from': self.repo_path,
+            'clone_refs': True})
+
+        self.assertRepositoryCreatedAsynchronously(new_repo_path)
+
+        repo1_revlist = get_revlist(factory.repo)
+        clone_from = resp.json['repo_url'].split('/')[-1]
+        repo2 = open_repo(os.path.join(self.repo_root, clone_from))
+        repo2_revlist = get_revlist(repo2)
+
+        self.assertEqual(repo1_revlist, repo2_revlist)
+        self.assertEqual(200, resp.status_code)
+        self.assertIn(new_repo_path, resp.json['repo_url'])
+
+        self.assertEqual([mock.call(
+            mock.ANY, new_repo_path, {"user": "+launchpad-services"})],
+            self.virtinfo.xmlrpc_confirmRepoCreation.call_args_list)
+        self.assertEqual(
+            [], self.virtinfo.xmlrpc_abortRepoCreation.call_args_list)
+
+    def test_repo_async_creation_aborts_when_fails_to_create_locally(self):
+        """If we fail to create the repository locally, abortRepoCreation
+        XML-RPC method should be called."""
+        self.useFixture(
+            EnvironmentVariable("REPO_STORE", '/tmp/invalid/path/to/repos/'))
+        self.useFixture(CeleryWorkerFixture())
+        self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock(return_value=None)
+        self.virtinfo.xmlrpc_abortRepoCreation = mock.Mock(return_value=None)
+
+        factory = RepoFactory(self.repo_store, num_commits=2)
+        factory.build()
+        new_repo_path = uuid.uuid1().hex
+        self.app.post_json('/repo', {
+            'async': True,
+            'repo_path': new_repo_path,
+            'clone_from': self.repo_path,
+            'clone_refs': True})
+
+        # Wait until the repository creation is either confirmed or aborted
+        # (and we hope it was aborted...)
+        self.assertAnyMockCalledAsync([
+            self.virtinfo.xmlrpc_confirmRepoCreation,
+            self.virtinfo.xmlrpc_abortRepoCreation])
+        self.assertFalse(
+            os.path.exists(os.path.join(self.repo_root, new_repo_path)))
+
+        self.assertEqual([mock.call(
+            mock.ANY, new_repo_path, {"user": "+launchpad-services"})],
+            self.virtinfo.xmlrpc_abortRepoCreation.call_args_list)
+        self.assertEqual(
+            [], self.virtinfo.xmlrpc_confirmRepoCreation.call_args_list)
+
+    def test_repo_async_creation_aborts_when_fails_confirm(self):
+        """If we fail to confirm the repository creation, abortRepoCreation
+        XML-RPC method should be called."""
+        self.useFixture(CeleryWorkerFixture())
+        self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock(
+            side_effect=Exception("?"))
+        self.virtinfo.xmlrpc_abortRepoCreation = mock.Mock(return_value=None)
+
+        factory = RepoFactory(self.repo_store, num_commits=2)
+        factory.build()
+        new_repo_path = uuid.uuid1().hex
+        self.app.post_json('/repo', {
+            'async': True,
+            'repo_path': new_repo_path,
+            'clone_from': self.repo_path,
+            'clone_refs': True})
+
+        # Wait until the repository creation is either confirmed or aborted
+        # (and we hope it was aborted...)
+        self.assertAnyMockCalledAsync([
+            self.virtinfo.xmlrpc_abortRepoCreation])
+        self.assertFalse(
+            os.path.exists(os.path.join(self.repo_root, new_repo_path)))
+
+        self.assertEqual([mock.call(
+            mock.ANY, new_repo_path, {"user": "+launchpad-services"})],
+            self.virtinfo.xmlrpc_abortRepoCreation.call_args_list)
+        self.assertEqual([mock.call(
+            mock.ANY, new_repo_path, {"user": "+launchpad-services"})],
+            self.virtinfo.xmlrpc_confirmRepoCreation.call_args_list)
 
 
 if __name__ == '__main__':
