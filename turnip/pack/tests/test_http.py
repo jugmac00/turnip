@@ -9,6 +9,7 @@ from __future__ import (
 
 from io import BytesIO
 
+import six
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (
@@ -200,13 +201,13 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
             b'And I am raw, since we got a good packet to start with.')
         self.assertEqual(200, self.request.responseCode)
         self.assertEqual(self.root.client_factory.params, {
-            'version': '2',
-            'turnip-advertise-refs': 'yes',
-            'turnip-can-authenticate': 'yes',
-            'turnip-request-id': mock.ANY,
-            'turnip-stateless-rpc': 'yes'})
+            b'version': b'2',
+            b'turnip-advertise-refs': b'yes',
+            b'turnip-can-authenticate': b'yes',
+            b'turnip-request-id': mock.ANY,
+            b'turnip-stateless-rpc': b'yes'})
 
-        ver = version_info["revision_id"]
+        ver = six.ensure_binary(version_info["revision_id"])
         capabilities = (
             encode_packet(b'version 2\n') +
             encode_packet(b'agent=git/2.25.1@turnip/%s\n' % ver) +
@@ -217,9 +218,9 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
             )
         self.assertEqual(
             capabilities +
-            '001e# service=git-upload-pack\n'
-            '0000001bI am git protocol data.'
-            'And I am raw, since we got a good packet to start with.',
+            b'001e# service=git-upload-pack\n'
+            b'0000001bI am git protocol data.'
+            b'And I am raw, since we got a good packet to start with.',
             self.request.value)
 
 
