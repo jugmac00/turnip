@@ -323,7 +323,8 @@ class TestCapabilityAdvertisement(TestCase):
         subprocess.call(['git', 'init', root])
 
         git_version = subprocess.check_output(['git', '--version'])
-        git_version_num = six.ensure_binary(git_version.split(' ')[-1].strip())
+        git_version_num = six.ensure_binary(
+            git_version.split(b' ')[-1].strip())
         git_agent = encode_packet(b"agent=git/%s\n" % git_version_num)
 
         proc = subprocess.Popen(
@@ -332,8 +333,8 @@ class TestCapabilityAdvertisement(TestCase):
         git_advertised_capabilities, _ = proc.communicate()
 
         turnip_capabilities = get_capabilities_advertisement(version=b'2')
-        turnip_agent = encode_packet(
-            b"agent=git/2.25.1@turnip/%s\n" % version_info["revision_id"])
+        version = six.ensure_binary(version_info["revision_id"])
+        turnip_agent = encode_packet(b"agent=git/2.25.1@turnip/%s\n" % version)
 
         self.assertEqual(
             turnip_capabilities,
