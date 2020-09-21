@@ -799,7 +799,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
             b'HEAD refs/heads/new-head')
         self.assertEqual(200, response.code)
         body = yield client.readBody(response)
-        self.assertEqual((b'ACK HEAD\n', ''), helpers.decode_packet(body))
+        self.assertEqual((b'ACK HEAD\n', b''), helpers.decode_packet(body))
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/new-head', head_target)
         self.assertEqual(
@@ -816,7 +816,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         self.assertEqual(200, response.code)
         body = yield client.readBody(response)
         self.assertEqual(
-            (b'ERR Symbolic ref target may not start with "-"\n', ''),
+            (b'ERR Symbolic ref target may not start with "-"\n', b''),
             helpers.decode_packet(body))
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/master', head_target)

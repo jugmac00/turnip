@@ -222,10 +222,10 @@ class PackServerProtocol(PackProxyProtocol):
     def createAuthParams(self, params):
         auth_params = {}
         for key, value in params.items():
-            key = six.ensure_binary(key)
-            if key.startswith(b'turnip-authenticated-'):
-                decoded_key = key[len(b'turnip-authenticated-'):]
-                auth_params[decoded_key] = value
+            key = six.ensure_str(key)
+            if key.startswith('turnip-authenticated-'):
+                decoded_key = key[len('turnip-authenticated-'):]
+                auth_params[decoded_key] = six.ensure_str(value)
         if 'uid' in auth_params:
             auth_params['uid'] = int(auth_params['uid'])
         if params.get(b'turnip-can-authenticate') == b'yes':
