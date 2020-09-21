@@ -35,6 +35,7 @@ from fixtures import (
     TempDir,
     )
 from pygit2 import GIT_OID_HEX_ZERO
+import six
 from testscenarios.testcase import WithScenarios
 from testtools import TestCase
 from testtools.content import text_content
@@ -108,7 +109,7 @@ class FunctionalTestMixin(WithScenarios):
         dir = tempfile.mkdtemp(prefix=b'turnip-test-hook-')
         self.addCleanup(shutil.rmtree, dir, ignore_errors=True)
 
-        self.hookrpc_sock_path = os.path.join(dir, 'hookrpc_sock')
+        self.hookrpc_sock_path = os.path.join(dir, b'hookrpc_sock')
         self.hookrpc_listener = reactor.listenUNIX(
             self.hookrpc_sock_path, HookRPCServerFactory(self.hookrpc_handler))
         self.addCleanup(self.hookrpc_listener.stopListening)
@@ -618,7 +619,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.startVirtInfo()
         self.startHookRPC()
         self.startPackBackend()
-        self.internal_name = hashlib.sha256(b'/test').hexdigest()
+        self.internal_name = six.ensure_binary(hashlib.sha256(
+            b'/test').hexdigest())
         yield self.assertCommandSuccess(
             (b'git', b'init', b'--bare', self.internal_name), path=self.root)
 
