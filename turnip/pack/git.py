@@ -44,7 +44,7 @@ from turnip.pack.helpers import (
 ERROR_PREFIX = b'ERR '
 VIRT_ERROR_PREFIX = b'turnip virt error: '
 
-SAFE_PARAMS = frozenset(['host', 'version'])
+SAFE_PARAMS = frozenset([b'host', b'version'])
 
 
 class RequestIDLogger(Logger):
@@ -531,10 +531,11 @@ class PackBackendProtocol(PackServerProtocol):
         try:
             repo_path = compose_path(self.factory.root, pathname)
             if clone_from:
-                clone_path = compose_path(self.factory.root, clone_from)
+                clone_path = six.ensure_str(
+                    compose_path(self.factory.root, clone_from))
             else:
                 clone_path = None
-            store.init_repo(repo_path, clone_path)
+            store.init_repo(six.ensure_str(repo_path), clone_path)
             yield proxy.callRemote(
                 "confirmRepoCreation", six.ensure_text(pathname),
                 auth_params).addTimeout(xmlrpc_timeout, default_reactor)
