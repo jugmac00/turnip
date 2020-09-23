@@ -158,8 +158,8 @@ class FunctionalTestMixin(WithScenarios):
         out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], env=os.environ, path=path)
         if code != 0:
-            self.addDetail('stdout', text_content(out))
-            self.addDetail('stderr', text_content(err))
+            self.addDetail('stdout', text_content(six.ensure_text(out)))
+            self.addDetail('stderr', text_content(six.ensure_text(err)))
             self.assertEqual(0, code)
         defer.returnValue(out)
 
@@ -173,8 +173,8 @@ class FunctionalTestMixin(WithScenarios):
         out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], env=os.environ, path=path)
         if code == 0:
-            self.addDetail('stdout', text_content(out))
-            self.addDetail('stderr', text_content(err))
+            self.addDetail('stdout', text_content(six.ensure_text(out)))
+            self.addDetail('stderr', text_content(six.ensure_text(err)))
             self.assertNotEqual(0, code)
         defer.returnValue((out, err))
 
