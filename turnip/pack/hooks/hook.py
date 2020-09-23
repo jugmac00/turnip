@@ -22,7 +22,7 @@ from turnip.compat.files import fd_buffer
 
 # XXX twom 2018-10-23 This should be a pygit2 import, but
 # that currently causes CFFI warnings to be returned to the client.
-GIT_OID_HEX_ZERO = '0'*40
+GIT_OID_HEX_ZERO = b'0'*40
 
 
 # Users cannot update references in this list.
@@ -152,7 +152,9 @@ def rpc_invoke(sock, method, args):
 
 
 def check_ref_permissions(sock, rpc_key, ref_paths):
-    ref_paths = [base64.b64encode(path).decode('UTF-8') for path in ref_paths]
+    ref_paths = [
+        base64.b64encode(six.ensure_binary(path)).decode('UTF-8')
+        for path in ref_paths]
     rule_lines = rpc_invoke(
         sock, 'check_ref_permissions',
         {'key': rpc_key, 'paths': ref_paths})
@@ -215,9 +217,13 @@ if __name__ == '__main__':
             send_mp_url(lines[0])
         sys.exit(0)
     elif hook == 'update':
-        ref = sys.argv[1]
+        if six.PY3:
+            argvb = [os.fsencode(i) for i in sys.argv]
+        else:
+            argvb = sys.argv
+        ref = argvb[1]
         rule_lines = check_ref_permissions(sock, rpc_key, [ref])
-        errors = match_update_rules(rule_lines, sys.argv[1:4])
+        errors = match_update_rules(rule_lines, argvb[1:4])
         for error in errors:
             stdout.write(error + b'\n')
         sys.exit(1 if errors else 0)
