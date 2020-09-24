@@ -67,7 +67,7 @@ translationstring==1.3
 # Backport of SSH session env variables setter from
 # https://github.com/twisted/twisted/pull/1173 to Twisted version 20.3.0.
 # See https://code.launchpad.net/~launchpad/twisted/+git/twisted/+ref/pr-1173
-Twisted[conch]==20.3.0+lp1
+Twisted[conch]==20.3.0+lp2
 unittest2==1.1.0
 vine==1.3.0
 venusian==2.1.0
