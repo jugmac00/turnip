@@ -306,7 +306,7 @@ class BaseSmartHTTPResource(resource.Resource):
         authenticated_params = yield self.authenticateUser(request)
         for key, value in authenticated_params.items():
             encoded_key = ('turnip-authenticated-' + six.ensure_str(key))
-            params[encoded_key] = six.ensure_str(value)
+            params[encoded_key] = six.text_type(value)
         params.update(self.extra_params)
         d = defer.Deferred()
         client_factory = factory(service, path, params, content, request, d)
