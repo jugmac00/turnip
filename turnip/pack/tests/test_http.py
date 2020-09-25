@@ -57,6 +57,14 @@ class LessDummyRequest(requesthelper.DummyRequest):
         return None
 
 
+class AuthenticatedLessDummyRequest(LessDummyRequest):
+    def getUser(self):
+        return 'dummy-username'
+
+    def getPassword(self):
+        return 'dummy-password'
+
+
 def render_resource(resource, request):
     result = resource.render(request)
     if result is server.NOT_DONE_YET:
@@ -83,7 +91,15 @@ class FakeRoot(object):
         self.backend_connected = defer.Deferred()
 
     def authenticateWithPassword(self, user, password):
-        return {}
+        """Pretends to talk to Launchpad XML-RPC service to authenticate the user.
+
+        This method returns a dict with different data types to make sure
+        nothing breaks when forwarding this data across the layers.
+        """
+        return {
+            "lp-int-data": 1, "lp-text-data": "banana",
+            "lp-float-data": 1.23987, "lp-bool-data": True,
+            "lp-none-data": None, "lp-bytes-data": b"bytes"}
 
     def connectToBackend(self, client_factory):
         self.client_factory = client_factory
@@ -183,6 +199,19 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def test_good(self):
+        yield self.performRequest(
+            helpers.encode_packet(b'I am git protocol data.') +
+            b'And I am raw, since we got a good packet to start with.')
+        self.assertEqual(200, self.request.responseCode)
+        self.assertEqual(
+            b'001e# service=git-upload-pack\n'
+            b'0000001bI am git protocol data.'
+            b'And I am raw, since we got a good packet to start with.',
+            self.request.value)
+
+    @defer.inlineCallbacks
+    def test_good_authenticated(self):
+        self.request = AuthenticatedLessDummyRequest([b''])
         yield self.performRequest(
             helpers.encode_packet(b'I am git protocol data.') +
             b'And I am raw, since we got a good packet to start with.')
