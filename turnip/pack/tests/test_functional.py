@@ -35,6 +35,7 @@ from fixtures import (
     TempDir,
     )
 from pygit2 import GIT_OID_HEX_ZERO
+import six
 from testscenarios.testcase import WithScenarios
 from testtools import TestCase
 from testtools.content import text_content
@@ -108,7 +109,7 @@ class FunctionalTestMixin(WithScenarios):
         dir = tempfile.mkdtemp(prefix=b'turnip-test-hook-')
         self.addCleanup(shutil.rmtree, dir, ignore_errors=True)
 
-        self.hookrpc_sock_path = os.path.join(dir, 'hookrpc_sock')
+        self.hookrpc_sock_path = os.path.join(dir, b'hookrpc_sock')
         self.hookrpc_listener = reactor.listenUNIX(
             self.hookrpc_sock_path, HookRPCServerFactory(self.hookrpc_handler))
         self.addCleanup(self.hookrpc_listener.stopListening)
@@ -125,6 +126,27 @@ class FunctionalTestMixin(WithScenarios):
         self.backend_port = self.backend_listener.getHost().port
         self.addCleanup(self.backend_listener.stopListening)
 
+    def getProcessOutput(self, executable, args=(), env=None, path=None,
+                         reactor=None, errortoo=0):
+        if executable == b'git':
+            protocol_args = [
+                b'-c', b'protocol.version=%s' % self.protocol_version]
+            args = protocol_args + list(args)
+            args = tuple(args)
+        return utils.getProcessOutput(
+            executable, args, env=env or {}, path=path, reactor=reactor,
+            errortoo=errortoo)
+
+    def getProcessOutputAndValue(self, executable, args=(), env=None,
+                                 path=None, reactor=None):
+        if executable == b'git':
+            protocol_args = [
+                b'-c', b'protocol.version=%s' % self.protocol_version]
+            args = protocol_args + list(args)
+            args = tuple(args)
+        return utils.getProcessOutputAndValue(
+            executable, args, env=env or {}, path=path, reactor=reactor)
+
     @defer.inlineCallbacks
     def assertCommandSuccess(self, command, path='.'):
         if command[0] == b'git' and getattr(self, 'protocol_version', None):
@@ -136,8 +158,8 @@ class FunctionalTestMixin(WithScenarios):
         out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], env=os.environ, path=path)
         if code != 0:
-            self.addDetail('stdout', text_content(out))
-            self.addDetail('stderr', text_content(err))
+            self.addDetail('stdout', text_content(six.ensure_text(out)))
+            self.addDetail('stderr', text_content(six.ensure_text(err)))
             self.assertEqual(0, code)
         defer.returnValue(out)
 
@@ -151,8 +173,8 @@ class FunctionalTestMixin(WithScenarios):
         out, err, code = yield utils.getProcessOutputAndValue(
             command[0], command[1:], env=os.environ, path=path)
         if code == 0:
-            self.addDetail('stdout', text_content(out))
-            self.addDetail('stderr', text_content(err))
+            self.addDetail('stdout', text_content(six.ensure_text(out)))
+            self.addDetail('stderr', text_content(six.ensure_text(err)))
             self.assertNotEqual(0, code)
         defer.returnValue((out, err))
 
@@ -178,7 +200,7 @@ class FunctionalTestMixin(WithScenarios):
         # There are no "matching" branches yet, so an attempt to push all
         # matching branches will exit early on the client side and not push
         # anything.  Make sure that the frontend disconnects appropriately.
-        out, err, code = yield utils.getProcessOutputAndValue(
+        out, err, code = yield self.getProcessOutputAndValue(
             b'git', (b'push', b'origin', b':'), env=os.environ, path=clone1)
         self.assertEqual(b'', out)
         self.assertIn(b'No refs in common and none specified', err)
@@ -305,7 +327,7 @@ class FunctionalTestMixin(WithScenarios):
         parsed_url = list(urlsplit(self.url))
         parsed_url[2] = b'/fail'
         fail_url = urlunsplit(parsed_url)
-        output = yield utils.getProcessOutput(
+        output = yield self.getProcessOutput(
             b'git', (b'clone', fail_url),
             env=os.environ, path=test_root, errortoo=True)
         self.assertIn(
@@ -496,7 +518,7 @@ class FunctionalTestMixin(WithScenarios):
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'newref'), path=clone1)
 
-        out, err, code = yield utils.getProcessOutputAndValue(
+        out, err, code = yield self.getProcessOutputAndValue(
             b'git', (b'push', b'origin', b':newref'),
             env=os.environ, path=clone1)
         # Check that the GIT_OID_HEX_ZERO does not appear in our output,
@@ -532,7 +554,7 @@ class FunctionalTestMixin(WithScenarios):
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'newref'), path=clone1)
 
-        out, err, code = yield utils.getProcessOutputAndValue(
+        out, err, code = yield self.getProcessOutputAndValue(
             b'git', (b'push', b'origin', b':newref'),
             env=os.environ, path=clone1)
         # Check that the GIT_OID_HEX_ZERO does not appear in our output,
@@ -597,7 +619,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.startVirtInfo()
         self.startHookRPC()
         self.startPackBackend()
-        self.internal_name = hashlib.sha256(b'/test').hexdigest()
+        self.internal_name = six.ensure_binary(hashlib.sha256(
+            b'/test').hexdigest())
         yield self.assertCommandSuccess(
             (b'git', b'init', b'--bare', self.internal_name), path=self.root)
 
@@ -636,7 +659,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             path=clone1)
 
         # A push attempt is rejected.
-        out = yield utils.getProcessOutput(
+        out = yield self.getProcessOutput(
             b'git', (b'push', b'origin', b'master'),
             env=os.environ, path=clone1, errortoo=True)
         self.assertThat(
@@ -644,7 +667,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.assertEqual([], self.virtinfo.push_notifications)
 
         # The remote repository is still empty.
-        out = yield utils.getProcessOutput(
+        out = yield self.getProcessOutput(
             b'git', (b'clone', self.ro_url, clone2),
             env=os.environ, errortoo=True)
         self.assertIn(b'You appear to have cloned an empty repository.', out)
@@ -664,7 +687,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
         test_root = self.useFixture(TempDir()).path
         self.virtinfo.xmlrpc_translatePath = fake_translatePath
-        output = yield utils.getProcessOutput(
+        output = yield self.getProcessOutput(
             b'git',
             (b'clone', b'%s://localhost:%d/fail' % (self.scheme, self.port)),
             env=os.environ, path=test_root, errortoo=True)
@@ -763,7 +786,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def get_symbolic_ref(self, path, name):
-        out = yield utils.getProcessOutput(
+        out = yield self.getProcessOutput(
             b'git', (b'symbolic-ref', name), env=os.environ, path=path)
         defer.returnValue(out.rstrip(b'\n'))
 
@@ -776,7 +799,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
             b'HEAD refs/heads/new-head')
         self.assertEqual(200, response.code)
         body = yield client.readBody(response)
-        self.assertEqual((b'ACK HEAD\n', ''), helpers.decode_packet(body))
+        self.assertEqual((b'ACK HEAD\n', b''), helpers.decode_packet(body))
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/new-head', head_target)
         self.assertEqual(
@@ -793,7 +816,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         self.assertEqual(200, response.code)
         body = yield client.readBody(response)
         self.assertEqual(
-            (b'ERR Symbolic ref target may not start with "-"\n', ''),
+            (b'ERR Symbolic ref target may not start with "-"\n', b''),
             helpers.decode_packet(body))
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/master', head_target)
@@ -817,16 +840,19 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
         test_root = self.useFixture(TempDir()).path
         clone = os.path.join(test_root, 'clone')
         yield self.assertCommandSuccess((b'git', b'clone', self.ro_url, clone))
+        expected_requests = 1 if self.protocol_version in (b'0', b'1') else 2
         self.assertEqual(
-            [(b'test-user', b'test-password')], self.virtinfo.authentications)
-        self.assertThat(self.virtinfo.translations, MatchesListwise([
-            MatchesListwise([
+            [(b'test-user', b'test-password')] * expected_requests,
+            self.virtinfo.authentications)
+        self.assertEqual(expected_requests, len(self.virtinfo.translations))
+        for translation in self.virtinfo.translations:
+            self.assertThat(translation, MatchesListwise([
                 Equals(b'/test'), Equals(b'read'),
                 MatchesDict({
                     b'can-authenticate': Is(True),
                     b'request-id': Not(Is(None)),
-                    b'user': Equals(b'test-user'),
-                    })])]))
+                    b'user': Equals(b'test-user')})
+                ]))
 
     @defer.inlineCallbacks
     def test_authenticated_push(self):

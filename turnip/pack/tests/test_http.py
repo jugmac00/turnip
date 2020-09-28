@@ -9,6 +9,7 @@ from __future__ import (
 
 from io import BytesIO
 
+import six
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (
@@ -24,7 +25,11 @@ from turnip.pack import (
     helpers,
     http,
     )
+from turnip.pack.helpers import encode_packet
+from turnip.pack.http import get_protocol_version_from_request
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
+from turnip.tests.compat import mock
+from turnip.version_info import version_info
 
 
 class LessDummyRequest(requesthelper.DummyRequest):
@@ -52,6 +57,14 @@ class LessDummyRequest(requesthelper.DummyRequest):
         return None
 
 
+class AuthenticatedLessDummyRequest(LessDummyRequest):
+    def getUser(self):
+        return 'dummy-username'
+
+    def getPassword(self):
+        return 'dummy-password'
+
+
 def render_resource(resource, request):
     result = resource.render(request)
     if result is server.NOT_DONE_YET:
@@ -74,12 +87,22 @@ class FakeRoot(object):
 
     def __init__(self):
         self.backend_transport = None
+        self.client_factory = None
         self.backend_connected = defer.Deferred()
 
     def authenticateWithPassword(self, user, password):
-        return {}
+        """Pretends to talk to Launchpad XML-RPC service to authenticate the user.
+
+        This method returns a dict with different data types to make sure
+        nothing breaks when forwarding this data across the layers.
+        """
+        return {
+            "lp-int-data": 1, "lp-text-data": "banana",
+            "lp-float-data": 1.23987, "lp-bool-data": True,
+            "lp-none-data": None, "lp-bytes-data": b"bytes"}
 
     def connectToBackend(self, client_factory):
+        self.client_factory = client_factory
         self.backend_transport = testing.StringTransportWithDisconnection()
         p = client_factory.buildProtocol(None)
         self.backend_transport.protocol = p
@@ -186,6 +209,49 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
             b'And I am raw, since we got a good packet to start with.',
             self.request.value)
 
+    @defer.inlineCallbacks
+    def test_good_authenticated(self):
+        self.request = AuthenticatedLessDummyRequest([b''])
+        yield self.performRequest(
+            helpers.encode_packet(b'I am git protocol data.') +
+            b'And I am raw, since we got a good packet to start with.')
+        self.assertEqual(200, self.request.responseCode)
+        self.assertEqual(
+            b'001e# service=git-upload-pack\n'
+            b'0000001bI am git protocol data.'
+            b'And I am raw, since we got a good packet to start with.',
+            self.request.value)
+
+    @defer.inlineCallbacks
+    def test_good_v2_included_version_and_capabilities(self):
+        self.request.requestHeaders.addRawHeader("Git-Protocol", "version=2")
+        yield self.performRequest(
+            helpers.encode_packet(b'I am git protocol data.') +
+            b'And I am raw, since we got a good packet to start with.')
+        self.assertEqual(200, self.request.responseCode)
+        self.assertEqual(self.root.client_factory.params, {
+            b'version': b'2',
+            b'turnip-advertise-refs': b'yes',
+            b'turnip-can-authenticate': b'yes',
+            b'turnip-request-id': mock.ANY,
+            b'turnip-stateless-rpc': b'yes'})
+
+        ver = six.ensure_binary(version_info["revision_id"])
+        capabilities = (
+            encode_packet(b'version 2\n') +
+            encode_packet(b'agent=git/2.25.1@turnip/%s\n' % ver) +
+            encode_packet(b'ls-refs\n') +
+            encode_packet(b'fetch=shallow\n') +
+            encode_packet(b'server-option\n') +
+            b'0000'
+            )
+        self.assertEqual(
+            capabilities +
+            b'001e# service=git-upload-pack\n'
+            b'0000001bI am git protocol data.'
+            b'And I am raw, since we got a good packet to start with.',
+            self.request.value)
+
 
 class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
 
@@ -248,3 +314,19 @@ class TestHTTPAuthRootResource(TestCase):
         self.assertTrue(d.called)
         self.assertEqual(504, request.responseCode)
         self.assertEqual(b'Path translation timed out.', request.value)
+
+
+class TestProtocolVersion(TestCase):
+    def test_get_protocol_version_from_request_default_zero(self):
+        request = LessDummyRequest("/foo")
+        self.assertEqual(b'0', get_protocol_version_from_request(request))
+
+    def test_get_protocol_version_from_request_fallback_to_zero(self):
+        request = LessDummyRequest("/foo")
+        request.requestHeaders.setRawHeaders('git-protocol', [b'invalid'])
+        self.assertEqual(b'0', get_protocol_version_from_request(request))
+
+    def test_get_protocol_version_from_request(self):
+        request = LessDummyRequest("/foo")
+        request.requestHeaders.setRawHeaders('git-protocol', [b'version=2'])
+        self.assertEqual(b'2', get_protocol_version_from_request(request))
