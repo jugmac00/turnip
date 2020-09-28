@@ -240,8 +240,8 @@ class RefAPI(BaseAPI):
         except (KeyError, GitError):
             return exc.HTTPNotFound()
         repo_path = os.path.join(repo_store, repo_name)
-        store.delete_refs.apply_async(args=([(repo_path, ref)], ))
-        return Response(status=202)
+        store.delete_refs([(repo_path, ref)])
+        return Response(status=200)
 
 
 @resource(path='/repo/{name}/compare/{commits}')

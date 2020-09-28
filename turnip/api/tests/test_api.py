@@ -327,14 +327,8 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         url = '/repo/{}/{}'.format(self.repo_path, ref)
         resp = self.app.delete(quote(url))
 
-        def branchDeleted():
-            refs = [i.name for i in repo.references.objects]
-            return b'refs/heads/branch-0' not in refs
-
-        celery_fixture.waitUntil(5, branchDeleted)
-
         self.assertEqual(6, len(repo.references.objects))
-        self.assertEqual(202, resp.status_code)
+        self.assertEqual(200, resp.status_code)
         self.assertEqual('', resp.body)
 
     def test_delete_non_existing_ref(self):
