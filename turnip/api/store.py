@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import uuid
+from collections import defaultdict
 
 from contextlib2 import (
     contextmanager,
@@ -118,6 +119,59 @@ def write_alternates(repo_path, alternate_repo_paths):
 
 
 object_dir_re = re.compile(r'\A[0-9a-f][0-9a-f]\Z')
+
+
+@app.task
+def fetch_refs(operations):
+    """Copy a set of refs from one git repository to another.
+
+    This is implemented now using git client's "git fetch" command,
+    since it's way easier than trying to copy the refs, commits and objects
+    manually using pygit.
+
+    :param operations: A list of tuples describing the copy operations,
+        in the format (from_root, from_ref, to_root, to_ref). If "to_ref" is
+        None, the target ref will have the same name as the source ref.
+    """
+    # Group copy operations by source/dest repositories pairs.
+    grouped_refs = defaultdict(set)
+    for from_root, from_ref, to_root, to_ref in operations:
+        grouped_refs[(from_root, to_root)].add((from_ref, to_ref))
+
+    # A pair of (cmd, stderr) errors happened during the copy.
+    errors = []
+    for repo_pair, refs_pairs in grouped_refs.items():
+        from_root, to_root = repo_pair
+        cmd = [b'git', b'fetch', b'--no-tags', from_root]
+        cmd += [b"%s:%s" % (a, b if b else a) for a, b in refs_pairs]
+
+        # XXX pappacena: On Python3, this could be replaced with
+        # stdout=subprocess.DEVNULL.
+        with open(os.devnull, 'wb') as devnull:
+            proc = subprocess.Popen(
+                cmd, cwd=to_root,
+                stdout=devnull, stderr=subprocess.PIPE)
+            _, stderr = proc.communicate()
+        if proc.returncode != 0:
+            errors.append(cmd, stderr)
+
+    if errors:
+        details = b"\n ".join(b"%s = %s" % (cmd, err) for cmd, err in errors)
+        raise GitError(b"Error copying refs: %s" % details)
+
+
+@app.task
+def delete_refs(operations):
+    """Remove refs from repositories.
+
+    :param operations: A list of tuples (repo_root, ref_name) to be deleted.
+    """
+    repos = {}
+    for repo_root, ref_name in operations:
+        if repo_root not in repos:
+            repos[repo_root] = Repository(repo_root)
+        repo = repos[repo_root]
+        repo.references[ref_name].delete()
 
 
 def copy_refs(from_root, to_root):
