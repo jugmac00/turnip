@@ -52,9 +52,8 @@ class CeleryWorkerFixture(fixtures.Fixture):
             return
         bin_path = os.path.dirname(sys.executable)
         celery = os.path.join(bin_path, 'celery')
-        turnip_path = os.path.join(os.path.dirname(__file__), '..')
         cmd = [
-            celery, 'worker', '-A', 'tasks', '--quiet',
+            celery, 'worker', '-A', 'turnip.tasks', '--quiet',
             '--pool=gevent',
             '--concurrency=20',
             '--broker=%s' % BROKER_URL,
@@ -62,7 +61,7 @@ class CeleryWorkerFixture(fixtures.Fixture):
 
         # Send to the subprocess, as env variables, the same configurations we
         # are currently using.
-        proc_env = {'PYTHONPATH': turnip_path}
+        proc_env = {}
         for k in config.defaults:
             proc_env[k.upper()] = str(config.get(k))
         proc_env.update(self.env or {})

@@ -9,8 +9,11 @@ from __future__ import (
 
 import os.path
 import re
+import shutil
 import stat
+import subprocess
 import sys
+import tempfile
 from textwrap import dedent
 import time
 
@@ -19,11 +22,16 @@ from pygit2 import (
     Config,
     init_repository,
     )
+import six
 from testtools import TestCase
 
 from turnip.pack import helpers
+from turnip.pack.helpers import (
+    encode_packet,
+    get_capabilities_advertisement,
+    )
 import turnip.pack.hooks
-
+from turnip.version_info import version_info
 
 TEST_DATA = b'0123456789abcdef'
 TEST_PKT = b'00140123456789abcdef'
@@ -303,3 +311,31 @@ class TestEnsureHooks(TestCase):
                 self.assertEqual(expected_bytes, actual.read())
         # The hook is executable.
         self.assertTrue(os.stat(self.hook('hook.py')).st_mode & stat.S_IXUSR)
+
+
+class TestCapabilityAdvertisement(TestCase):
+    def test_returning_same_output_as_git_command(self):
+        """Make sure that our hard-coded feature advertisement matches what
+        our git command advertises."""
+        root = tempfile.mkdtemp(prefix=b'turnip-test-root-')
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        # Create a dummy repository
+        subprocess.call(['git', 'init', root])
+
+        git_version = subprocess.check_output(['git', '--version'])
+        git_version_num = six.ensure_binary(
+            git_version.split(b' ')[-1].strip())
+        git_agent = encode_packet(b"agent=git/%s\n" % git_version_num)
+
+        proc = subprocess.Popen(
+            ['git', 'upload-pack', root], env={"GIT_PROTOCOL": b"version=2"},
+            stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        git_advertised_capabilities, _ = proc.communicate()
+
+        turnip_capabilities = get_capabilities_advertisement(version=b'2')
+        version = six.ensure_binary(version_info["revision_id"])
+        turnip_agent = encode_packet(b"agent=git/2.25.1@turnip/%s\n" % version)
+
+        self.assertEqual(
+            turnip_capabilities,
+            git_advertised_capabilities.replace(git_agent, turnip_agent))
