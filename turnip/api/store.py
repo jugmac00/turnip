@@ -150,7 +150,7 @@ def fetch_refs(operations):
             errors.append(cmd, stderr)
 
     if errors:
-        details = b"--> ".join(b"%s = %s" % (cmd, err) for cmd, err in errors)
+        details = b"\n ".join(b"%s = %s" % (cmd, err) for cmd, err in errors)
         raise GitError(b"Error copying refs: %s" % details)
 
 
