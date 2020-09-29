@@ -11,9 +11,13 @@ from __future__ import (
 __metaclass__ = type
 
 
+import json
+import os.path
 import uuid
-
 import six
+import socket
+import statsd
+import threading
 from twisted.internet import (
     defer,
     error,
@@ -45,6 +49,32 @@ ERROR_PREFIX = b'ERR '
 VIRT_ERROR_PREFIX = b'turnip virt error: '
 
 SAFE_PARAMS = frozenset([b'host', b'version'])
+
+
+class ThreadSafeSingleton(type):
+    _instances = {}
+    _singleton_lock = threading.Lock()
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            with cls._singleton_lock:
+                if cls not in cls._instances:
+                    cls._instances[cls] = super(
+                        ThreadSafeSingleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+
+class StatsdGitClient():
+    __metaclass__ = ThreadSafeSingleton
+
+    def __init__(self, *args, **kwargs):
+        self.host = args[0]
+        self.port = args[1]
+        self.prefix = args[2]
+        self.client = statsd.StatsClient(self.host, self.port, self.prefix)
+
+    def get_client(self):
+        return self.client
 
 
 class RequestIDLogger(Logger):
@@ -235,13 +265,15 @@ class PackServerProtocol(PackProxyProtocol):
         return auth_params
 
 
-class GitProcessProtocol(protocol.ProcessProtocol):
+class GitProcessProtocol(protocol.ProcessProtocol, object):
 
     _err_buffer = b''
+    _resource_usage_buffer = b''
 
     def __init__(self, peer):
         self.peer = peer
         self.out_started = False
+        self.client = self.peer.factory.statsd_client.get_client()
 
     def connectionMade(self):
         self.peer.setPeer(self)
@@ -249,6 +281,12 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.transport.registerProducer(
             UnstoppableProducerWrapper(self.peer.transport), True)
         self.peer.resumeProducing()
+
+    def childDataReceived(self, childFD, data):
+        if childFD == 3:
+            self.resourceUsageReceived(data)
+        else:
+            super(GitProcessProtocol, self).childDataReceived(childFD, data)
 
     def outReceived(self, data):
         self.out_started = True
@@ -258,6 +296,10 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         # Just store it up so we can forward and/or log it when the
         # process is done.
         self._err_buffer += data
+
+    def resourceUsageReceived(self, data):
+        # Just store it up so we can deal with it when the process is done.
+        self._resource_usage_buffer += data
 
     def outConnectionLost(self):
         if self._err_buffer:
@@ -299,6 +341,35 @@ class GitProcessProtocol(protocol.ProcessProtocol):
                 code=code)
             self.peer.sendPacket(ERROR_PREFIX + 'backend exited %d' % code)
         self.peer.processEnded(reason)
+        if self._resource_usage_buffer:
+            try:
+                resource_usage = json.loads(
+                    self._resource_usage_buffer.decode('UTF-8'))
+
+                gauge_name = ("host={},repo={},operation={},metric=maxrss"
+                              .format(
+                                  socket.gethostname(),
+                                  self.peer.raw_pathname,
+                                  self.peer.command))
+
+                self.client.gauge(gauge_name, resource_usage['maxrss'])
+
+                gauge_name = ("host={},repo={},operation={},metric=stime"
+                              .format(
+                                  socket.gethostname(),
+                                  self.peer.raw_pathname,
+                                  self.peer.command))
+                self.client.gauge(gauge_name, resource_usage['stime'])
+
+                gauge_name = ("host={},repo={},operation={},metric=utime"
+                              .format(
+                                  socket.gethostname(),
+                                  self.peer.raw_pathname,
+                                  self.peer.command))
+                self.client.gauge(gauge_name, resource_usage['utime'])
+
+            except ValueError:
+                pass
 
     def pauseProducing(self):
         self.transport.pauseProducing()
@@ -485,8 +556,9 @@ class PackBackendProtocol(PackServerProtocol):
     def spawnGit(self, subcmd, extra_args, write_operation=False,
                  send_path_as_option=False, auth_params=None,
                  cmd_env=None):
-        cmd = b'git'
-        args = [b'git']
+        cmd = os.path.join(
+            os.path.dirname(__file__), 'git_helper.py').encode('UTF-8')
+        args = [cmd]
         if send_path_as_option:
             args.extend([b'-C', self.path])
         args.append(subcmd)
@@ -507,10 +579,12 @@ class PackBackendProtocol(PackServerProtocol):
 
         self.log.info('Spawning {args}', args=args)
         self.peer = GitProcessProtocol(self)
-        self.spawnProcess(cmd, args, env=env)
+        self.spawnProcess(
+            cmd, args, env=env, childFDs={0: "w", 1: "r", 2: "r", 3: "r"})
 
-    def spawnProcess(self, cmd, args, env=None):
-        default_reactor.spawnProcess(self.peer, cmd, args, env=env)
+    def spawnProcess(self, cmd, args, env=None, childFDs=None):
+        default_reactor.spawnProcess(
+            self.peer, cmd, args, env=env, childFDs=childFDs)
 
     def expectNextCommand(self):
         """Enables this connection to receive the next command."""
@@ -620,10 +694,12 @@ class PackBackendFactory(protocol.Factory):
     def __init__(self,
                  root,
                  hookrpc_handler=None,
-                 hookrpc_sock=None):
+                 hookrpc_sock=None,
+                 statsd_client=None):
         self.root = root
         self.hookrpc_handler = hookrpc_handler
         self.hookrpc_sock = hookrpc_sock
+        self.statsd_client = statsd_client
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):

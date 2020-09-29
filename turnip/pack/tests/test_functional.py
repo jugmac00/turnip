@@ -39,7 +39,9 @@ import six
 from testscenarios.testcase import WithScenarios
 from testtools import TestCase
 from testtools.content import text_content
-from testtools.deferredruntest import AsynchronousDeferredRunTest
+from testtools.deferredruntest import (
+    AsynchronousDeferredRunTestForBrokenTwisted,
+    )
 from testtools.matchers import (
     Equals,
     Is,
@@ -76,12 +78,14 @@ from turnip.pack.tests.fake_servers import (
     FakeAuthServerService,
     FakeVirtInfoService,
     )
+from turnip.pack.tests.test_helpers import MockStatsd
 from turnip.version_info import version_info
 
 
 class FunctionalTestMixin(WithScenarios):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=30)
+    run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
+        timeout=30)
 
     scenarios = [
         ('v0 protocol', {"protocol_version": b"0"}),
@@ -119,10 +123,12 @@ class FunctionalTestMixin(WithScenarios):
         # get confused on Python 2.
         self.root = tempfile.mkdtemp(prefix=b'turnip-test-root-')
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.statsd_client = MockStatsd()
         self.backend_listener = reactor.listenTCP(
             0,
             PackBackendFactory(
-                self.root, self.hookrpc_handler, self.hookrpc_sock_path))
+                self.root, self.hookrpc_handler, self.hookrpc_sock_path,
+                self.statsd_client))
         self.backend_port = self.backend_listener.getHost().port
         self.addCleanup(self.backend_listener.stopListening)
 
@@ -613,6 +619,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             0, server.Site(self.authserver))
         self.authserver_port = self.authserver_listener.getHost().port
         self.authserver_url = b'http://localhost:%d/' % self.authserver_port
+        self.addCleanup(self.authserver_listener.stopListening)
 
         # Run a backend server in a repo root containing an empty repo
         # for the path '/test'.
@@ -629,14 +636,9 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             PackVirtFactory(
                 b'localhost', self.backend_port, self.virtinfo_url, 15))
         self.virt_port = self.virt_listener.getHost().port
+        self.addCleanup(self.virt_listener.stopListening)
         self.virtinfo.ref_permissions = {
             b'refs/heads/master': ['create', 'push']}
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        super(FrontendFunctionalTestMixin, self).tearDown()
-        yield self.virt_listener.stopListening()
-        yield self.authserver_listener.stopListening()
 
     @defer.inlineCallbacks
     def test_read_only(self):
@@ -711,15 +713,11 @@ class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         self.frontend_listener = reactor.listenTCP(
             0, PackFrontendFactory(b'localhost', self.virt_port))
         self.port = self.frontend_listener.getHost().port
+        self.addCleanup(self.frontend_listener.stopListening)
 
         # Always use a writable URL for now.
         self.url = b'git://localhost:%d/+rw/test' % self.port
         self.ro_url = b'git://localhost:%d/test' % self.port
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield super(TestGitFrontendFunctional, self).tearDown()
-        yield self.frontend_listener.stopListening()
 
 
 class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
@@ -744,15 +742,11 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
                 }))
         self.frontend_listener = reactor.listenTCP(0, frontend_site)
         self.port = self.frontend_listener.getHost().port
+        self.addCleanup(self.frontend_listener.stopListening)
 
         # Always use a writable URL for now.
         self.url = b'http://localhost:%d/+rw/test' % self.port
         self.ro_url = b'http://localhost:%d/test' % self.port
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield super(TestSmartHTTPFrontendFunctional, self).tearDown()
-        yield self.frontend_listener.stopListening()
 
     @defer.inlineCallbacks
     def test_root_revision_header(self):

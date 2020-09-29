@@ -17,6 +17,7 @@ from turnip.pack.git import (
     PackBackendFactory,
     PackFrontendFactory,
     PackVirtFactory,
+    StatsdGitClient,
     )
 from turnip.pack.hookrpc import (
     HookRPCHandler,
@@ -37,6 +38,9 @@ REPO_STORE = config.get('repo_store')
 HOOKRPC_PATH = config.get('hookrpc_path') or REPO_STORE
 VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 VIRTINFO_TIMEOUT = int(config.get('virtinfo_timeout'))
+STATSD_HOST = config.get('statsd_host')
+STATSD_PORT = config.get('statsd_port')
+STATSD_PREFIX = config.get('statsd_prefix')
 
 # turnipserver.py is preserved for convenience in development, services
 # in production are run in separate processes.
@@ -48,11 +52,15 @@ VIRTINFO_TIMEOUT = int(config.get('virtinfo_timeout'))
 hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT, VIRTINFO_TIMEOUT)
 hookrpc_sock_path = os.path.join(
     HOOKRPC_PATH, 'hookrpc_sock_%d' % PACK_BACKEND_PORT)
+
+statsd_client = StatsdGitClient(STATSD_HOST, STATSD_PORT, STATSD_PREFIX)
+
 reactor.listenTCP(
     PACK_BACKEND_PORT,
     PackBackendFactory(REPO_STORE,
                        hookrpc_handler,
-                       hookrpc_sock_path))
+                       hookrpc_sock_path,
+                       statsd_client))
 if os.path.exists(hookrpc_sock_path):
     os.unlink(hookrpc_sock_path)
 reactor.listenUNIX(hookrpc_sock_path, HookRPCServerFactory(hookrpc_handler))

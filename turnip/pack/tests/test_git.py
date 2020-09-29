@@ -35,6 +35,7 @@ from turnip.pack import (
     helpers,
     )
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
+from turnip.pack.tests.test_helpers import MockStatsd
 from turnip.pack.tests.test_hooks import MockHookRPCHandler
 from turnip.tests.compat import mock
 
@@ -116,7 +117,7 @@ class DummyPackBackendProtocol(git.PackBackendProtocol):
 
     test_process = None
 
-    def spawnProcess(self, cmd, args, env=None):
+    def spawnProcess(self, cmd, args, env=None, childFDs=None):
         if self.test_process is not None:
             raise AssertionError('Process already spawned.')
         self.test_process = (cmd, args, env)
@@ -178,9 +179,11 @@ class TestPackBackendProtocol(TestCase):
         super(TestPackBackendProtocol, self).setUp()
         self.root = self.useFixture(TempDir()).path
         self.hookrpc_handler = MockHookRPCHandler()
+        self.statsd_client = MockStatsd()
         self.hookrpc_sock = os.path.join(self.root, 'hookrpc_sock')
         self.factory = git.PackBackendFactory(
-            self.root, self.hookrpc_handler, self.hookrpc_sock)
+            self.root, self.hookrpc_handler,
+            self.hookrpc_sock, self.statsd_client)
         self.proto = DummyPackBackendProtocol()
         self.proto.factory = self.factory
         self.transport = testing.StringTransportWithDisconnection()
@@ -195,6 +198,9 @@ class TestPackBackendProtocol(TestCase):
         self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
         self.addCleanup(self.virtinfo_listener.stopListening)
         self.setupConfig()
+
+        self.git_helper = os.path.join(
+            os.path.dirname(git.__file__), 'git_helper.py').encode('UTF-8')
 
     def setupConfig(self):
         config.defaults['virtinfo_endpoint'] = self.virtinfo_url
@@ -229,7 +235,7 @@ class TestPackBackendProtocol(TestCase):
             [('foo.git', )], self.virtinfo.confirm_repo_creation_call_args)
 
         self.assertEqual(
-            (b'git', [b'git', b'upload-pack', full_path], {
+            (self.git_helper, [self.git_helper, b'upload-pack', full_path], {
                 'GIT_PROTOCOL': 'version=0'
             }), self.proto.test_process)
 
@@ -266,8 +272,8 @@ class TestPackBackendProtocol(TestCase):
             b'git-upload-pack', b'/foo.git', {b'host': b'example.com'})
         full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
         self.assertEqual(
-            (b'git',
-             [b'git', b'upload-pack', full_path],
+            (self.git_helper,
+             [self.git_helper, b'upload-pack', full_path],
              {'GIT_PROTOCOL': 'version=0'}),
             self.proto.test_process)
 
@@ -280,8 +286,11 @@ class TestPackBackendProtocol(TestCase):
             b'git-receive-pack', b'/foo.git', {b'host': b'example.com'})
         self.assertThat(
             self.proto.test_process, MatchesListwise([
-                Equals(b'git'),
-                Equals([b'git', b'receive-pack', repo_dir.encode('utf-8')]),
+                Equals(self.git_helper),
+                Equals([
+                    self.git_helper, b'receive-pack',
+                    repo_dir.encode('utf-8'),
+                    ]),
                 ContainsDict(
                     {b'TURNIP_HOOK_RPC_SOCK': Equals(self.hookrpc_sock)})]))
 
@@ -296,10 +305,10 @@ class TestPackBackendProtocol(TestCase):
         self.proto.packetReceived(b'HEAD refs/heads/master')
         self.assertThat(
             self.proto.test_process, MatchesListwise([
-                Equals(b'git'),
+                Equals(self.git_helper),
                 Equals([
-                    b'git', b'-C', repo_dir.encode('utf-8'), b'symbolic-ref',
-                    b'HEAD', b'refs/heads/master']),
+                    self.git_helper, b'-C', repo_dir.encode('utf-8'),
+                    b'symbolic-ref', b'HEAD', b'refs/heads/master']),
                 ContainsDict(
                     {b'TURNIP_HOOK_RPC_SOCK': Equals(self.hookrpc_sock)})]))
 

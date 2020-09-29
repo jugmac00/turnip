@@ -20,7 +20,10 @@ from twisted.scripts.twistd import ServerOptions
 
 from turnip.config import config
 from turnip.log import RotatableFileLogObserver
-from turnip.pack.git import PackBackendFactory
+from turnip.pack.git import (
+    PackBackendFactory,
+    StatsdGitClient,
+    )
 from turnip.pack.hookrpc import (
     HookRPCHandler,
     HookRPCServerFactory,
@@ -37,11 +40,14 @@ def getPackBackendServices():
     hookrpc_path = config.get('hookrpc_path') or repo_store
     hookrpc_sock_path = os.path.join(
         hookrpc_path, 'hookrpc_sock_%d' % pack_backend_port)
+    statsd_client = StatsdGitClient(config.get('statsd_host'), config.get('statsd_port')
+        config.get('statsd_prefix'))
     pack_backend_service = internet.TCPServer(
         pack_backend_port,
         PackBackendFactory(repo_store,
                            hookrpc_handler,
-                           hookrpc_sock_path))
+                           hookrpc_sock_path,
+                           statsd_client))
     if os.path.exists(hookrpc_sock_path):
         os.unlink(hookrpc_sock_path)
     hookrpc_service = internet.UNIXServer(

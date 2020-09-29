@@ -32,6 +32,8 @@ from turnip.pack.helpers import (
     )
 import turnip.pack.hooks
 from turnip.version_info import version_info
+from zope.interface import implementer
+from zope.interface import Interface
 
 TEST_DATA = b'0123456789abcdef'
 TEST_PKT = b'00140123456789abcdef'
@@ -339,3 +341,73 @@ class TestCapabilityAdvertisement(TestCase):
         self.assertEqual(
             turnip_capabilities,
             git_advertised_capabilities.replace(git_agent, turnip_agent))
+
+
+class IStats(Interface):
+    def incr(self, key=None):
+        """
+        increment a key
+
+        :param key: the key to increment
+        :return: nothing
+        """
+
+    def decr(self, key=None):
+        """
+        decrement a key
+
+        :param key: the key to decrement
+        :return: nothing
+        """
+
+    def timing(self, key=None, ms=None):
+        """
+        record an execution time for this key
+
+        :param key: the key to report for
+        :param ms: the timing in milliseconds
+        :return: nothing
+        """
+
+    def gauge(self, key=None, value=None):
+        """
+        gauge a value
+
+        :param key: the key to gauge for
+        :param value: the gauged value
+        :return: nothing
+        """
+
+
+@implementer(IStats)
+class MockStatsd():
+    def __init__(self):
+        self.vals = dict()
+        self.timings = dict()
+
+    def get_instance(self):
+        return self
+
+    def incr(self, key=None):
+        if key not in self.vals:
+            self.vals[key] = 1
+        else:
+            self.vals[key] += 1
+
+    def decr(self, key=None):
+        if key not in self.vals:
+            self.vals[key] = -1
+        else:
+            self.vals[key] -= 1
+
+    def timing(self, key=None, ms=None):
+        self.timings[key] = ms
+
+    def gauge(self, key=None, value=None):
+        self.vals[key] = value
+
+    def set(self, key=None, value=None):
+        self.vals[key] = value
+
+    def get_client(self):
+        return self
