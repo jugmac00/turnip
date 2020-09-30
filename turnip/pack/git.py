@@ -561,6 +561,12 @@ class PackBackendProtocol(PackServerProtocol):
                 self.log.info(
                     "Deleting local repo creation attempt %s." % repo_path)
                 store.delete_repo(repo_path)
+            # Just using `raise` here could cause an error like "exceptions
+            # must be old-style classes or derived from BaseException,
+            # not NoneType", since proxy.callRemote and Twisted event loop
+            # could clean up the current exception. That's why we store
+            # current exception at the begining of the `except` block and
+            # reraise it here.
             six.reraise(t, v, tb)
 
     def packetReceived(self, data):
