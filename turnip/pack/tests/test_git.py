@@ -239,8 +239,11 @@ class TestPackBackendProtocol(TestCase):
         self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock(
             side_effect=Fault(1, "?"))
         store = mock.Mock()
+
         # Make `init_repo` create a fake repo directory.
-        store.init_repo.side_effect = lambda path, clone, log: os.mkdir(path)
+        def init_repo_side_effect(path, *args, **kwargs):
+            os.mkdir(path)
+        store.init_repo.side_effect = init_repo_side_effect
         self.useFixture(MonkeyPatch("turnip.pack.git.store", store))
 
         params = {b'host': b'example.com'}
