@@ -23,4 +23,4 @@ main_site_root: https://launchpad.test/
 celery_broker: pyamqp://guest@localhost//
 statsd_host: launchpad.test
 statsd_port: 8125
-statsd_prefix: lp.turnip
+statsd_prefix: turnip.test

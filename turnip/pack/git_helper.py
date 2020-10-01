@@ -27,9 +27,9 @@ if __name__ == '__main__':
     resource_fd = os.fdopen(3, 'w')
     rusage = resource.getrusage(resource.RUSAGE_CHILDREN)
     resource_fd.write(json.dumps({
-        "utime": rusage.ru_utime,
-        "stime": rusage.ru_stime,
-        "maxrss": rusage.ru_maxrss,
+        "user_time": rusage.ru_utime,
+        "system_time": rusage.ru_stime,
+        "max_rss": rusage.ru_maxrss,
         }))
 
     # Pass on git's exit status.

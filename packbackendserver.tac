@@ -1,4 +1,4 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2020 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 # You can run this .tac file directly with:
@@ -12,6 +12,7 @@ from __future__ import (
 
 import os.path
 
+import statsd
 from twisted.application import (
     service,
     internet,
@@ -22,7 +23,6 @@ from turnip.config import config
 from turnip.log import RotatableFileLogObserver
 from turnip.pack.git import (
     PackBackendFactory,
-    StatsdGitClient,
     )
 from turnip.pack.hookrpc import (
     HookRPCHandler,
@@ -40,8 +40,15 @@ def getPackBackendServices():
     hookrpc_path = config.get('hookrpc_path') or repo_store
     hookrpc_sock_path = os.path.join(
         hookrpc_path, 'hookrpc_sock_%d' % pack_backend_port)
-    statsd_client = StatsdGitClient(config.get('statsd_host'), config.get('statsd_port')
-        config.get('statsd_prefix'))
+    statsd_host = config.get('statsd_host')
+    statsd_port = config.get('statsd_port')
+    statsd_prefix = config.get('statsd_prefix')
+    if (statsd_host and statsd_port and statsd_prefix):
+        statsd_client = statsd.StatsClient(statsd_host,
+                        statsd_port',
+                        statsd_prefix)
+    else:
+        statsd_client = None
     pack_backend_service = internet.TCPServer(
         pack_backend_port,
         PackBackendFactory(repo_store,

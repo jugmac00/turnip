@@ -1,4 +1,4 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2020 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -9,6 +9,7 @@ from __future__ import (
 
 import os
 
+import statsd
 from twisted.internet import reactor
 from twisted.web import server
 
@@ -17,7 +18,6 @@ from turnip.pack.git import (
     PackBackendFactory,
     PackFrontendFactory,
     PackVirtFactory,
-    StatsdGitClient,
     )
 from turnip.pack.hookrpc import (
     HookRPCHandler,
@@ -52,9 +52,10 @@ STATSD_PREFIX = config.get('statsd_prefix')
 hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT, VIRTINFO_TIMEOUT)
 hookrpc_sock_path = os.path.join(
     HOOKRPC_PATH, 'hookrpc_sock_%d' % PACK_BACKEND_PORT)
-
-statsd_client = StatsdGitClient(STATSD_HOST, STATSD_PORT, STATSD_PREFIX)
-
+if (STATSD_HOST and STATSD_PORT and STATSD_PREFIX):
+    statsd_client = statsd.StatsClient(STATSD_HOST, STATSD_PORT, STATSD_PREFIX)
+else:
+    statsd_client = None
 reactor.listenTCP(
     PACK_BACKEND_PORT,
     PackBackendFactory(REPO_STORE,

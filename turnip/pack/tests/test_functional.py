@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2020 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -7,7 +7,7 @@ from __future__ import (
     print_function,
     unicode_literals,
     )
-
+    
 import base64
 import hashlib
 import io
@@ -36,6 +36,7 @@ from fixtures import (
     )
 from pygit2 import GIT_OID_HEX_ZERO
 import six
+import socket
 from testscenarios.testcase import WithScenarios
 from testtools import TestCase
 from testtools.content import text_content
@@ -183,6 +184,62 @@ class FunctionalTestMixin(WithScenarios):
             self.addDetail('stderr', text_content(six.ensure_text(err)))
             self.assertNotEqual(0, code)
         defer.returnValue((out, err))
+
+    def assertStatsdSuccess(self, repo, command):
+        metrics = ['user_time', 'system_time', 'user_time']
+        for metric in metrics:
+            key = (
+                (u'host={},repo={},operation={},metric={}')
+                .format(socket.gethostname(), repo, command, metric ))
+            
+            self.assertIsNotNone(self.statsd_client.vals[key])
+
+    @defer.inlineCallbacks
+    def test_statsd_metrics(self):
+        test_root = self.useFixture(TempDir()).path
+        clone1 = os.path.join(test_root, 'clone1')
+
+        # At this point we have no data sent to statsd
+        self.assertEqual({}, self.statsd_client.vals)
+
+        # Clone the empty repo from the backend and commit to it.
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+        
+        if isinstance(self,TestBackendFunctional):
+            repo = '/test'
+        else:
+            repo = self.internal_name
+        self.assertStatsdSuccess(repo, 'git-upload-pack')
+        self.assertStatsdSuccess(repo, 'git-upload-pack')
+        self.assertStatsdSuccess(repo, 'git-upload-pack')
+
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone1)
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master'), path=clone1)
+
+        # At this point we have receive-pack stats
+        if (isinstance(self,TestSmartHTTPFrontendFunctional) or
+            isinstance(self, TestSmartHTTPFrontendWithAuthFunctional) or
+            isinstance(self, TestSmartSSHServiceFunctional)):
+            repo = self.internal_name
+            self.assertStatsdSuccess(repo, 'git-receive-pack')
+            self.assertStatsdSuccess(repo, 'git-receive-pack')
+            self.assertStatsdSuccess(repo, 'git-receive-pack')
 
     @defer.inlineCallbacks
     def test_clone_and_push(self):

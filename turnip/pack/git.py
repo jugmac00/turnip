@@ -1,4 +1,4 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2020 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -14,10 +14,11 @@ __metaclass__ = type
 import json
 import os.path
 import uuid
-import six
 import socket
-import statsd
 import threading
+
+import six
+import statsd
 from twisted.internet import (
     defer,
     error,
@@ -49,32 +50,6 @@ ERROR_PREFIX = b'ERR '
 VIRT_ERROR_PREFIX = b'turnip virt error: '
 
 SAFE_PARAMS = frozenset([b'host', b'version'])
-
-
-class ThreadSafeSingleton(type):
-    _instances = {}
-    _singleton_lock = threading.Lock()
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            with cls._singleton_lock:
-                if cls not in cls._instances:
-                    cls._instances[cls] = super(
-                        ThreadSafeSingleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class StatsdGitClient():
-    __metaclass__ = ThreadSafeSingleton
-
-    def __init__(self, *args, **kwargs):
-        self.host = args[0]
-        self.port = args[1]
-        self.prefix = args[2]
-        self.client = statsd.StatsClient(self.host, self.port, self.prefix)
-
-    def get_client(self):
-        return self.client
 
 
 class RequestIDLogger(Logger):
@@ -273,7 +248,7 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
     def __init__(self, peer):
         self.peer = peer
         self.out_started = False
-        self.client = self.peer.factory.statsd_client.get_client()
+        self.statsd_client = self.peer.factory.statsd_client
 
     def connectionMade(self):
         self.peer.setPeer(self)
@@ -341,32 +316,32 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                 code=code)
             self.peer.sendPacket(ERROR_PREFIX + 'backend exited %d' % code)
         self.peer.processEnded(reason)
-        if self._resource_usage_buffer:
+        if self._resource_usage_buffer and self.statsd_client:
             try:
                 resource_usage = json.loads(
                     self._resource_usage_buffer.decode('UTF-8'))
 
-                gauge_name = ("host={},repo={},operation={},metric=maxrss"
+                gauge_name = ("host={},repo={},operation={},metric=max_rss"
                               .format(
                                   socket.gethostname(),
                                   self.peer.raw_pathname,
                                   self.peer.command))
 
-                self.client.gauge(gauge_name, resource_usage['maxrss'])
+                self.statsd_client.gauge(gauge_name, resource_usage['max_rss'])
 
-                gauge_name = ("host={},repo={},operation={},metric=stime"
+                gauge_name = ("host={},repo={},operation={},metric=system_time"
                               .format(
                                   socket.gethostname(),
                                   self.peer.raw_pathname,
                                   self.peer.command))
-                self.client.gauge(gauge_name, resource_usage['stime'])
+                self.statsd_client.gauge(gauge_name, resource_usage['system_time'])
 
-                gauge_name = ("host={},repo={},operation={},metric=utime"
+                gauge_name = ("host={},repo={},operation={},metric=user_time"
                               .format(
                                   socket.gethostname(),
                                   self.peer.raw_pathname,
                                   self.peer.command))
-                self.client.gauge(gauge_name, resource_usage['utime'])
+                self.statsd_client.gauge(gauge_name, resource_usage['user_time'])
 
             except ValueError:
                 pass
