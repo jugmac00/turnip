@@ -15,10 +15,8 @@ import json
 import os.path
 import uuid
 import socket
-import threading
 
 import six
-import statsd
 from twisted.internet import (
     defer,
     error,
@@ -334,14 +332,16 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                                   socket.gethostname(),
                                   self.peer.raw_pathname,
                                   self.peer.command))
-                self.statsd_client.gauge(gauge_name, resource_usage['system_time'])
+                self.statsd_client.gauge(gauge_name,
+                                         resource_usage['system_time'])
 
                 gauge_name = ("host={},repo={},operation={},metric=user_time"
                               .format(
                                   socket.gethostname(),
                                   self.peer.raw_pathname,
                                   self.peer.command))
-                self.statsd_client.gauge(gauge_name, resource_usage['user_time'])
+                self.statsd_client.gauge(gauge_name,
+                                         resource_usage['user_time'])
 
             except ValueError:
                 pass

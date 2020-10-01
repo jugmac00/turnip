@@ -7,7 +7,7 @@ from __future__ import (
     print_function,
     unicode_literals,
     )
-    
+
 import base64
 import hashlib
 import io
@@ -190,8 +190,7 @@ class FunctionalTestMixin(WithScenarios):
         for metric in metrics:
             key = (
                 (u'host={},repo={},operation={},metric={}')
-                .format(socket.gethostname(), repo, command, metric ))
-            
+                .format(socket.gethostname(), repo, command, metric))
             self.assertIsNotNone(self.statsd_client.vals[key])
 
     @defer.inlineCallbacks
@@ -212,8 +211,8 @@ class FunctionalTestMixin(WithScenarios):
         yield self.assertCommandSuccess(
             (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
             path=clone1)
-        
-        if isinstance(self,TestBackendFunctional):
+
+        if isinstance(self, TestBackendFunctional):
             repo = '/test'
         else:
             repo = self.internal_name
@@ -233,9 +232,9 @@ class FunctionalTestMixin(WithScenarios):
             (b'git', b'push', b'origin', b'master'), path=clone1)
 
         # At this point we have receive-pack stats
-        if (isinstance(self,TestSmartHTTPFrontendFunctional) or
-            isinstance(self, TestSmartHTTPFrontendWithAuthFunctional) or
-            isinstance(self, TestSmartSSHServiceFunctional)):
+        if (isinstance(self, TestSmartHTTPFrontendFunctional) or
+           isinstance(self, TestSmartHTTPFrontendWithAuthFunctional) or
+           isinstance(self, TestSmartSSHServiceFunctional)):
             repo = self.internal_name
             self.assertStatsdSuccess(repo, 'git-receive-pack')
             self.assertStatsdSuccess(repo, 'git-receive-pack')
