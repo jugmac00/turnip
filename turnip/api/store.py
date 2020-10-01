@@ -297,7 +297,6 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
                 sub_path, os.path.join(clone_from, 'turnip-subordinate')))
         packable_refs.update(import_into_subordinate(sub_path, clone_from))
 
-
         log_info(logger, "Running write_packed_refs(%s, %s)" %
                  (sub_path, packable_refs))
         write_packed_refs(sub_path, packable_refs)
