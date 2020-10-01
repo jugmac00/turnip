@@ -266,13 +266,19 @@ class AlreadyExistsError(GitError):
             "Repository '%s' already exists" % path)
         self.path = path
 
+def log_info(logger, msg):
+    if logger:
+        logger.info(msg)
 
 def init_repo(repo_path, clone_from=None, clone_refs=False,
-              alternate_repo_paths=None, is_bare=True):
+              alternate_repo_paths=None, is_bare=True, logger=None):
     """Initialise a new git repository or clone from existing."""
     if os.path.exists(repo_path):
         raise AlreadyExistsError(repo_path)
+    log_info(logger, "Running init_repository(%s, %s)" % (repo_path, is_bare))
     init_repository(repo_path, is_bare)
+
+    log_info(logger, "Running set_repository_creating(%s, True)" % repo_path)
     set_repository_creating(repo_path, True)
 
     if clone_from:
@@ -281,12 +287,19 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         # repo. This lets git-receive-pack expose available commits as
         # extra haves without polluting refs in the real repo.
         sub_path = os.path.join(repo_path, 'turnip-subordinate')
+        log_info(
+            logger, "Running init_repository for subordinate %s" % sub_path)
         init_repository(sub_path, True)
+
         packable_refs = {}
         if os.path.exists(os.path.join(clone_from, 'turnip-subordinate')):
             packable_refs.update(import_into_subordinate(
                 sub_path, os.path.join(clone_from, 'turnip-subordinate')))
         packable_refs.update(import_into_subordinate(sub_path, clone_from))
+
+
+        log_info(logger, "Running write_packed_refs(%s, %s)" %
+                 (sub_path, packable_refs))
         write_packed_refs(sub_path, packable_refs)
 
     new_alternates = []
@@ -294,6 +307,9 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         new_alternates.extend(alternate_repo_paths)
     if clone_from:
         new_alternates.append('../turnip-subordinate')
+
+    log_info(logger, "Running write_alternates(%s, %s)" %
+             (repo_path, new_alternates))
     write_alternates(repo_path, new_alternates)
 
     if clone_from and clone_refs:
@@ -301,10 +317,18 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         # can just copy all refs from the origin. Unlike
         # pygit2.clone_repository, this won't set up a remote.
         # TODO: Filter out internal (eg. MP) refs.
+
+        log_info(logger, "Running copy_refs(%s, %s)" % (clone_from, repo_path))
         packable_refs = copy_refs(clone_from, repo_path)
+
+        log_info(logger, "Running write_packed_refs(%s, %s)" %
+                 (repo_path, packable_refs))
         write_packed_refs(repo_path, packable_refs)
 
+    log_info(logger, "Running ensure_config(%s)" % repo_path)
     ensure_config(repo_path)  # set repository configuration defaults
+
+    log_info(logger, "Running set_repository_creating(%s, False)" % repo_path)
     set_repository_creating(repo_path, False)
 
 

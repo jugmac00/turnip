@@ -540,7 +540,8 @@ class PackBackendProtocol(PackServerProtocol):
             self.log.info(
                 "Creating repository %s, clone of %s" %
                 (repo_path, clone_path))
-            store.init_repo(six.ensure_str(repo_path), clone_path)
+            store.init_repo(six.ensure_str(repo_path), clone_path,
+                            logger=self.log)
             self.log.info(
                 "Confirming with Launchpad repo %s creation." % repo_path)
             yield proxy.callRemote(
@@ -552,7 +553,7 @@ class PackBackendProtocol(PackServerProtocol):
             raise
         except Exception as e:
             t, v, tb = sys.exc_info()
-            self.log.info(
+            self.log.failure(
                 "Aborting on Launchpad repo %s creation: %s" % (repo_path, e))
             yield proxy.callRemote(
                 "abortRepoCreation", six.ensure_text(pathname),
