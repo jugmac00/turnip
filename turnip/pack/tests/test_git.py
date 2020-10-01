@@ -222,7 +222,8 @@ class TestPackBackendProtocol(TestCase):
 
         full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
         self.assertEqual(
-            [mock.call(full_path, None)], store.init_repo.call_args_list)
+            [mock.call(full_path, None, log=mock.ANY)],
+            store.init_repo.call_args_list)
         self.assertEqual([], store.delete_repo.call_args_list)
 
         self.assertEqual(
@@ -239,7 +240,7 @@ class TestPackBackendProtocol(TestCase):
             side_effect=Fault(1, "?"))
         store = mock.Mock()
         # Make `init_repo` create a fake repo directory.
-        store.init_repo.side_effect = lambda path, clone: os.mkdir(path)
+        store.init_repo.side_effect = lambda path, clone, log: os.mkdir(path)
         self.useFixture(MonkeyPatch("turnip.pack.git.store", store))
 
         params = {b'host': b'example.com'}
@@ -248,7 +249,8 @@ class TestPackBackendProtocol(TestCase):
 
         full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
         self.assertEqual(
-            [mock.call(full_path, None)], store.init_repo.call_args_list)
+            [mock.call(full_path, None, log=mock.ANY)],
+            store.init_repo.call_args_list)
         self.assertEqual(
             [mock.call(full_path, )], store.delete_repo.call_args_list)
 
