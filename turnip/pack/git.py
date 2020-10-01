@@ -12,9 +12,10 @@ __metaclass__ = type
 
 
 import json
-import os.path
-import uuid
+import os
 import socket
+import sys
+import uuid
 
 import six
 from twisted.internet import (
@@ -577,26 +578,44 @@ class PackBackendProtocol(PackServerProtocol):
         xmlrpc_endpoint = config.get("virtinfo_endpoint")
         xmlrpc_timeout = int(config.get("virtinfo_timeout"))
         proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
+        repo_path = compose_path(self.factory.root, pathname)
+        if clone_from:
+            clone_path = six.ensure_str(
+                compose_path(self.factory.root, clone_from))
+        else:
+            clone_path = None
         try:
-            repo_path = compose_path(self.factory.root, pathname)
-            if clone_from:
-                clone_path = six.ensure_str(
-                    compose_path(self.factory.root, clone_from))
-            else:
-                clone_path = None
+            self.log.info(
+                "Creating repository %s, clone of %s" %
+                (repo_path, clone_path))
             store.init_repo(six.ensure_str(repo_path), clone_path)
+            self.log.info(
+                "Confirming with Launchpad repo %s creation." % repo_path)
             yield proxy.callRemote(
                 "confirmRepoCreation", six.ensure_text(pathname),
                 auth_params).addTimeout(xmlrpc_timeout, default_reactor)
         except AlreadyExistsError:
             # Do not abort nor try to delete existing repositories.
+            self.log.info("Repository %s already exists." % repo_path)
             raise
-        except Exception:
+        except Exception as e:
+            t, v, tb = sys.exc_info()
+            self.log.info(
+                "Aborting on Launchpad repo %s creation: %s" % (repo_path, e))
             yield proxy.callRemote(
                 "abortRepoCreation", six.ensure_text(pathname),
                 auth_params).addTimeout(xmlrpc_timeout, default_reactor)
-            store.delete_repo(repo_path)
-            raise
+            if os.path.exists(repo_path):
+                self.log.info(
+                    "Deleting local repo creation attempt %s." % repo_path)
+                store.delete_repo(repo_path)
+            # Just using `raise` here could cause an error like "exceptions
+            # must be old-style classes or derived from BaseException,
+            # not NoneType", since proxy.callRemote and Twisted event loop
+            # could clean up the current exception. That's why we store
+            # current exception at the begining of the `except` block and
+            # reraise it here.
+            six.reraise(t, v, tb)
 
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
