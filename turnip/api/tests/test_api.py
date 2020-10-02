@@ -339,10 +339,17 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
             self.repo_store, num_branches=5, num_commits=1, num_tags=1).build()
         self.assertEqual(7, len(repo.references.objects))
 
-        ref = 'refs/heads/this-branch-doesnt-exist'
+        ref = 'refs/heads/fake-branch'
         url = '/repo/{}/{}'.format(self.repo_path, ref)
         resp = self.app.delete(quote(url), expect_errors=True)
         self.assertEqual(404, resp.status_code)
+        self.assertEqual({
+            'status': 'error',
+            'errors': [{
+                'description': 'Ref refs/heads/fake-branch does not exist.',
+                'location': 'body',
+                'name': u'operations'
+            }]}, resp.json)
 
     def test_copy_ref_api(self):
         celery_fixture = CeleryWorkerFixture()
@@ -401,13 +408,26 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
 
         body = {
             "operations": [{
-                b"from": b"refs/heads/this-ref-doesnt-exist-at-all",
+                b"from": b"refs/heads/nope",
+                b"to": {b"repo": b'repo2', b"ref": b"refs/merge/123/head"}
+            }, {
+                b"from": b"refs/heads/no-ref",
                 b"to": {b"repo": b'repo2', b"ref": b"refs/merge/123/head"}
             }]}
 
         url = '/repo/repo1/refs-copy'
         resp = self.app.post_json(quote(url), body, expect_errors=True)
         self.assertEqual(404, resp.status_code)
+        self.assertEqual({
+            'status': 'error',
+            'errors': [{
+                'description': 'Ref refs/heads/nope does not exist.',
+                'location': 'body',
+                'name': u'operations'
+            }, {
+                'description': 'Ref refs/heads/no-ref does not exist.',
+                'location': 'body', 'name': u'operations'
+            }]}, resp.json)
 
     def test_repo_compare_commits(self):
         """Ensure expected changes exist in diff patch."""
