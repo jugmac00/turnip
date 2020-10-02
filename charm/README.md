@@ -27,6 +27,7 @@ authenticate users, and so on.  This may be Launchpad or the stub
     $ juju config turnip-pack-backend virtinfo_endpoint="$VIRT_ENDPOINT"
     $ juju config turnip-pack-virt virtinfo_endpoint="$VIRT_ENDPOINT"
     $ juju config turnip-pack-frontend-http virtinfo_endpoint="$VIRT_ENDPOINT"
+    $ juju config turnip-celery virtinfo_endpoint="$VIRT_ENDPOINT"
 
 # Contact Information
 

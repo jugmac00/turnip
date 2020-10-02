@@ -3,3 +3,11 @@ options:
     type: string
     default: pyamqp://guest@localhost//
     description: Celery broker URL
+  virtinfo_endpoint:
+    type: string
+    default: http://localhost:6543/githosting
+    description: Virtinfo endpoint (Launchpad/Turnipcake)
+  virtinfo_timeout:
+    type: int
+    default: 15
+    description: Timeout for virtinfo requests, in seconds.
