@@ -13,6 +13,7 @@ import hashlib
 import io
 import os
 import random
+import re
 import shutil
 import stat
 import tempfile
@@ -36,7 +37,6 @@ from fixtures import (
     )
 from pygit2 import GIT_OID_HEX_ZERO
 import six
-import socket
 from testscenarios.testcase import WithScenarios
 from testtools import TestCase
 from testtools.content import text_content
@@ -186,59 +186,56 @@ class FunctionalTestMixin(WithScenarios):
         defer.returnValue((out, err))
 
     def assertStatsdSuccess(self, repo, command):
-        metrics = ['user_time', 'system_time', 'user_time']
-        for metric in metrics:
-            key = (
-                (u'host={},repo={},operation={},metric={}')
-                .format(socket.gethostname(), repo, command, metric))
-            self.assertIsNotNone(self.statsd_client.vals[key])
+        metrics = ['max_rss', 'system_time', 'user_time']
+        repository = re.sub('[^0-9a-zA-Z]+', '-', repo)
+        self.assertThat(self.statsd_client.vals, MatchesDict({
+            u'repo={},operation={},metric={}'.format(
+                repository, command, metric): Not(Is(None))
+            for metric in metrics}))
 
     @defer.inlineCallbacks
     def test_statsd_metrics(self):
         test_root = self.useFixture(TempDir()).path
-        clone1 = os.path.join(test_root, 'clone1')
+        clone = os.path.join(test_root, 'clone')
 
         # At this point we have no data sent to statsd
         self.assertEqual({}, self.statsd_client.vals)
 
-        # Clone the empty repo from the backend and commit to it.
-        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone1))
+        # Clone the empty repo
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone))
         yield self.assertCommandSuccess(
-            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
+            (b'git', b'config', b'user.name', b'Test User'), path=clone)
         yield self.assertCommandSuccess(
             (b'git', b'config', b'user.email', b'test@example.com'),
-            path=clone1)
+            path=clone)
         yield self.assertCommandSuccess(
             (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
-            path=clone1)
+            path=clone)
 
         if isinstance(self, TestBackendFunctional):
             repo = '/test'
         else:
             repo = self.internal_name
         self.assertStatsdSuccess(repo, 'git-upload-pack')
-        self.assertStatsdSuccess(repo, 'git-upload-pack')
-        self.assertStatsdSuccess(repo, 'git-upload-pack')
+        self.statsd_client.vals = {}
 
+        # A push all at this point will find no matching refs and
+        # will exit early on the client side.
+        out, err, code = yield self.getProcessOutputAndValue(
+            b'git', (b'push', b'origin', b':'), env=os.environ, path=clone)
+        self.assertIn(b'No refs in common and none specified', err)
+
+        # Push master to the backend
         yield self.assertCommandSuccess(
-            (b'git', b'config', b'user.name', b'Test User'), path=clone1)
-        yield self.assertCommandSuccess(
-            (b'git', b'config', b'user.email', b'test@example.com'),
-            path=clone1)
-        yield self.assertCommandSuccess(
-            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
-            path=clone1)
-        yield self.assertCommandSuccess(
-            (b'git', b'push', b'origin', b'master'), path=clone1)
+            (b'git', b'push', b'origin', b'master'), path=clone)
 
         # At this point we have receive-pack stats
-        if (isinstance(self, TestSmartHTTPFrontendFunctional) or
-           isinstance(self, TestSmartHTTPFrontendWithAuthFunctional) or
-           isinstance(self, TestSmartSSHServiceFunctional)):
+        if isinstance(self, TestBackendFunctional):
+            repo = '/test'
+        else:
             repo = self.internal_name
-            self.assertStatsdSuccess(repo, 'git-receive-pack')
-            self.assertStatsdSuccess(repo, 'git-receive-pack')
-            self.assertStatsdSuccess(repo, 'git-receive-pack')
+        self.assertStatsdSuccess(repo, 'git-receive-pack')
+        self.statsd_client.vals = {}
 
     @defer.inlineCallbacks
     def test_clone_and_push(self):

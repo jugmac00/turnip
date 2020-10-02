@@ -13,7 +13,7 @@ __metaclass__ = type
 
 import json
 import os
-import socket
+import re
 import sys
 import uuid
 
@@ -320,26 +320,28 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                 resource_usage = json.loads(
                     self._resource_usage_buffer.decode('UTF-8'))
 
-                gauge_name = ("host={},repo={},operation={},metric=max_rss"
+                # remove characters from repository name that
+                # can't be used in statsd
+                repository = re.sub('[^0-9a-zA-Z]+', '-',
+                                    self.peer.raw_pathname)
+
+                gauge_name = ("repo={},operation={},metric=max_rss"
                               .format(
-                                  socket.gethostname(),
-                                  self.peer.raw_pathname,
+                                  repository,
                                   self.peer.command))
 
                 self.statsd_client.gauge(gauge_name, resource_usage['max_rss'])
 
-                gauge_name = ("host={},repo={},operation={},metric=system_time"
+                gauge_name = ("repo={},operation={},metric=system_time"
                               .format(
-                                  socket.gethostname(),
-                                  self.peer.raw_pathname,
+                                  repository,
                                   self.peer.command))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['system_time'])
 
-                gauge_name = ("host={},repo={},operation={},metric=user_time"
+                gauge_name = ("repo={},operation={},metric=user_time"
                               .format(
-                                  socket.gethostname(),
-                                  self.peer.raw_pathname,
+                                  repository,
                                   self.peer.command))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['user_time'])

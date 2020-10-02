@@ -11,3 +11,15 @@ options:
     type: int
     default: 15
     description: Timeout for virtinfo requests, in seconds.
+  statsd_host:
+    type: string
+    default: 127.0.0.1
+    description: Host for Telegraf configured with the statsd input.
+  statsd_port:
+    type: int
+    default: 8125
+    description: Port for Telegraf configured with the statsd input.
+  statsd_prefix:
+    type: string
+    default: turnip.test
+    description: Prefix for statsd metrics.
