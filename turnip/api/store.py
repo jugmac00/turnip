@@ -232,7 +232,7 @@ def get_file_mode(path):
         return None
     try:
         return oct(os.stat(path).st_mode)
-    except:
+    except Exception:
         return None
 
 
