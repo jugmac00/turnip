@@ -364,8 +364,15 @@ def init_and_confirm_repo(untranslated_path, repo_path, clone_from=None,
     xmlrpc_proxy = TimeoutServerProxy(
         xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True)
     try:
+        logger.info(
+            "Initializing and confirming repository creation: "
+            "%s; %s; %s; %s; %s", repo_path, clone_from, clone_refs,
+            alternate_repo_paths, is_bare)
         init_repo(
             repo_path, clone_from, clone_refs, alternate_repo_paths, is_bare)
+        logger.debug(
+            "Confirming repository creation: %s; %s",
+            untranslated_path, xmlrpc_auth_params)
         xmlrpc_proxy.confirmRepoCreation(untranslated_path, xmlrpc_auth_params)
     except Exception as e:
         logger.error("Error creating repository at %s: %s", repo_path, e)
@@ -373,6 +380,9 @@ def init_and_confirm_repo(untranslated_path, repo_path, clone_from=None,
             delete_repo(repo_path)
         except IOError as e:
             logger.error("Error deleting repository at %s: %s", repo_path, e)
+        logger.debug(
+            "Aborting repository creation: %s; %s",
+            untranslated_path, xmlrpc_auth_params)
         xmlrpc_proxy.abortRepoCreation(untranslated_path, xmlrpc_auth_params)
 
 
