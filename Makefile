@@ -109,7 +109,7 @@ run-pack: $(ENV)
 
 run-worker: $(ENV)
 	$(CELERY) -A turnip.tasks worker \
-		--loglevel=info \
+		--loglevel=debug \
 		--concurrency=20 \
 		--pool=gevent
 
