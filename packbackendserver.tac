@@ -45,8 +45,8 @@ def getPackBackendServices():
     statsd_prefix = config.get('statsd_prefix')
     if (statsd_host and statsd_port and statsd_prefix):
         statsd_client = statsd.StatsClient(statsd_host,
-        statsd_port,
-        statsd_prefix)
+                                           statsd_port,
+                                           statsd_prefix)
     else:
         statsd_client = None
     pack_backend_service = internet.TCPServer(

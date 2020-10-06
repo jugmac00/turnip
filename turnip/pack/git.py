@@ -319,12 +319,13 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
             try:
                 resource_usage = json.loads(
                     self._resource_usage_buffer.decode('UTF-8'))
-
+            except ValueError:
+                pass
+            else:
                 # remove characters from repository name that
                 # can't be used in statsd
                 repository = re.sub('[^0-9a-zA-Z]+', '-',
                                     self.peer.raw_pathname)
-
                 gauge_name = ("repo={},operation={},metric=max_rss"
                               .format(
                                   repository,
@@ -345,9 +346,6 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                                   self.peer.command))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['user_time'])
-
-            except ValueError:
-                pass
 
     def pauseProducing(self):
         self.transport.pauseProducing()

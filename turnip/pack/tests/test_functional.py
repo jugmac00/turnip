@@ -230,12 +230,7 @@ class FunctionalTestMixin(WithScenarios):
             (b'git', b'push', b'origin', b'master'), path=clone)
 
         # At this point we have receive-pack stats
-        if isinstance(self, TestBackendFunctional):
-            repo = '/test'
-        else:
-            repo = self.internal_name
         self.assertStatsdSuccess(repo, 'git-receive-pack')
-        self.statsd_client.vals = {}
 
     @defer.inlineCallbacks
     def test_clone_and_push(self):

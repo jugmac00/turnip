@@ -24,6 +24,10 @@ from pygit2 import (
     )
 import six
 from testtools import TestCase
+from zope.interface import (
+    implementer,
+    Interface,
+    )
 
 from turnip.pack import helpers
 from turnip.pack.helpers import (
@@ -32,10 +36,7 @@ from turnip.pack.helpers import (
     )
 import turnip.pack.hooks
 from turnip.version_info import version_info
-from zope.interface import (
-    implementer,
-    Interface,
-    )
+
 
 TEST_DATA = b'0123456789abcdef'
 TEST_PKT = b'00140123456789abcdef'
