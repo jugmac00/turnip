@@ -29,7 +29,8 @@ class CeleryWorkerFixture(fixtures.Fixture):
     """
     _worker_proc = None
 
-    def __init__(self, loglevel="error", force_restart=True, env=None):
+    def __init__(self, loglevel="info", logfile=None,
+                 force_restart=True, env=None):
         """
         Build a celery worker for test cases.
 
@@ -42,6 +43,7 @@ class CeleryWorkerFixture(fixtures.Fixture):
         """
         self.force_restart = force_restart
         self.loglevel = loglevel
+        self.logfile = logfile
         self.env = env
 
     def startCeleryWorker(self):
@@ -58,6 +60,8 @@ class CeleryWorkerFixture(fixtures.Fixture):
             '--concurrency=20',
             '--broker=%s' % BROKER_URL,
             '--loglevel=%s' % self.loglevel]
+        if self.logfile:
+            cmd += ["--logfile=%s" % self.logfile]
 
         # Send to the subprocess, as env variables, the same configurations we
         # are currently using.

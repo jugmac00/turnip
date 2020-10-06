@@ -88,7 +88,7 @@ tags:
 	ctags -R turnip
 
 lint: $(ENV)
-	@$(FLAKE8) --exclude=__pycache__,version_info.py turnip
+	@$(FLAKE8) --exclude=__pycache__,version_info.py *.tac turnip
 	$(PYTHON) setup.py check --restructuredtext --strict
 
 pip-check: $(ENV)
@@ -109,7 +109,7 @@ run-pack: $(ENV)
 
 run-worker: $(ENV)
 	$(CELERY) -A turnip.tasks worker \
-		--loglevel=info \
+		--loglevel=debug \
 		--concurrency=20 \
 		--pool=gevent
 

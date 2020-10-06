@@ -18,6 +18,7 @@ import sys
 import uuid
 
 import six
+import traceback
 from twisted.internet import (
     defer,
     error,
@@ -588,7 +589,8 @@ class PackBackendProtocol(PackServerProtocol):
             self.log.info(
                 "Creating repository %s, clone of %s" %
                 (repo_path, clone_path))
-            store.init_repo(six.ensure_str(repo_path), clone_path)
+            store.init_repo(six.ensure_str(repo_path), clone_path,
+                            log=self.log)
             self.log.info(
                 "Confirming with Launchpad repo %s creation." % repo_path)
             yield proxy.callRemote(
@@ -600,8 +602,9 @@ class PackBackendProtocol(PackServerProtocol):
             raise
         except Exception as e:
             t, v, tb = sys.exc_info()
-            self.log.info(
-                "Aborting on Launchpad repo %s creation: %s" % (repo_path, e))
+            self.log.critical(
+                "Aborting on Launchpad repo {path} creation: {error}.\n{tb}",
+                path=repo_path, error=e, tb=''.join(traceback.format_tb(tb)))
             yield proxy.callRemote(
                 "abortRepoCreation", six.ensure_text(pathname),
                 auth_params).addTimeout(xmlrpc_timeout, default_reactor)
