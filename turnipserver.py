@@ -1,4 +1,4 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2020 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -9,6 +9,7 @@ from __future__ import (
 
 import os
 
+import statsd
 from twisted.internet import reactor
 from twisted.web import server
 
@@ -37,6 +38,9 @@ REPO_STORE = config.get('repo_store')
 HOOKRPC_PATH = config.get('hookrpc_path') or REPO_STORE
 VIRTINFO_ENDPOINT = config.get('virtinfo_endpoint')
 VIRTINFO_TIMEOUT = int(config.get('virtinfo_timeout'))
+STATSD_HOST = config.get('statsd_host')
+STATSD_PORT = config.get('statsd_port')
+STATSD_PREFIX = config.get('statsd_prefix')
 
 # turnipserver.py is preserved for convenience in development, services
 # in production are run in separate processes.
@@ -48,11 +52,16 @@ VIRTINFO_TIMEOUT = int(config.get('virtinfo_timeout'))
 hookrpc_handler = HookRPCHandler(VIRTINFO_ENDPOINT, VIRTINFO_TIMEOUT)
 hookrpc_sock_path = os.path.join(
     HOOKRPC_PATH, 'hookrpc_sock_%d' % PACK_BACKEND_PORT)
+if (STATSD_HOST and STATSD_PORT and STATSD_PREFIX):
+    statsd_client = statsd.StatsClient(STATSD_HOST, STATSD_PORT, STATSD_PREFIX)
+else:
+    statsd_client = None
 reactor.listenTCP(
     PACK_BACKEND_PORT,
     PackBackendFactory(REPO_STORE,
                        hookrpc_handler,
-                       hookrpc_sock_path))
+                       hookrpc_sock_path,
+                       statsd_client))
 if os.path.exists(hookrpc_sock_path):
     os.unlink(hookrpc_sock_path)
 reactor.listenUNIX(hookrpc_sock_path, HookRPCServerFactory(hookrpc_handler))
