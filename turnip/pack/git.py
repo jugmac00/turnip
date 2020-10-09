@@ -1,4 +1,4 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2020 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -11,9 +11,14 @@ from __future__ import (
 __metaclass__ = type
 
 
+import json
+import os
+import re
+import sys
 import uuid
 
 import six
+import traceback
 from twisted.internet import (
     defer,
     error,
@@ -44,7 +49,7 @@ from turnip.pack.helpers import (
 ERROR_PREFIX = b'ERR '
 VIRT_ERROR_PREFIX = b'turnip virt error: '
 
-SAFE_PARAMS = frozenset(['host', 'version'])
+SAFE_PARAMS = frozenset([b'host', b'version'])
 
 
 class RequestIDLogger(Logger):
@@ -235,13 +240,15 @@ class PackServerProtocol(PackProxyProtocol):
         return auth_params
 
 
-class GitProcessProtocol(protocol.ProcessProtocol):
+class GitProcessProtocol(protocol.ProcessProtocol, object):
 
     _err_buffer = b''
+    _resource_usage_buffer = b''
 
     def __init__(self, peer):
         self.peer = peer
         self.out_started = False
+        self.statsd_client = self.peer.factory.statsd_client
 
     def connectionMade(self):
         self.peer.setPeer(self)
@@ -249,6 +256,12 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         self.transport.registerProducer(
             UnstoppableProducerWrapper(self.peer.transport), True)
         self.peer.resumeProducing()
+
+    def childDataReceived(self, childFD, data):
+        if childFD == 3:
+            self.resourceUsageReceived(data)
+        else:
+            super(GitProcessProtocol, self).childDataReceived(childFD, data)
 
     def outReceived(self, data):
         self.out_started = True
@@ -258,6 +271,10 @@ class GitProcessProtocol(protocol.ProcessProtocol):
         # Just store it up so we can forward and/or log it when the
         # process is done.
         self._err_buffer += data
+
+    def resourceUsageReceived(self, data):
+        # Just store it up so we can deal with it when the process is done.
+        self._resource_usage_buffer += data
 
     def outConnectionLost(self):
         if self._err_buffer:
@@ -299,6 +316,37 @@ class GitProcessProtocol(protocol.ProcessProtocol):
                 code=code)
             self.peer.sendPacket(ERROR_PREFIX + 'backend exited %d' % code)
         self.peer.processEnded(reason)
+        if self._resource_usage_buffer and self.statsd_client:
+            try:
+                resource_usage = json.loads(
+                    self._resource_usage_buffer.decode('UTF-8'))
+            except ValueError:
+                pass
+            else:
+                # remove characters from repository name that
+                # can't be used in statsd
+                repository = re.sub('[^0-9a-zA-Z]+', '-',
+                                    self.peer.raw_pathname)
+                gauge_name = ("repo={},operation={},metric=max_rss"
+                              .format(
+                                  repository,
+                                  self.peer.command))
+
+                self.statsd_client.gauge(gauge_name, resource_usage['max_rss'])
+
+                gauge_name = ("repo={},operation={},metric=system_time"
+                              .format(
+                                  repository,
+                                  self.peer.command))
+                self.statsd_client.gauge(gauge_name,
+                                         resource_usage['system_time'])
+
+                gauge_name = ("repo={},operation={},metric=user_time"
+                              .format(
+                                  repository,
+                                  self.peer.command))
+                self.statsd_client.gauge(gauge_name,
+                                         resource_usage['user_time'])
 
     def pauseProducing(self):
         self.transport.pauseProducing()
@@ -485,8 +533,9 @@ class PackBackendProtocol(PackServerProtocol):
     def spawnGit(self, subcmd, extra_args, write_operation=False,
                  send_path_as_option=False, auth_params=None,
                  cmd_env=None):
-        cmd = b'git'
-        args = [b'git']
+        cmd = os.path.join(
+            os.path.dirname(__file__), 'git_helper.py').encode('UTF-8')
+        args = [cmd]
         if send_path_as_option:
             args.extend([b'-C', self.path])
         args.append(subcmd)
@@ -507,10 +556,12 @@ class PackBackendProtocol(PackServerProtocol):
 
         self.log.info('Spawning {args}', args=args)
         self.peer = GitProcessProtocol(self)
-        self.spawnProcess(cmd, args, env=env)
+        self.spawnProcess(
+            cmd, args, env=env, childFDs={0: "w", 1: "r", 2: "r", 3: "r"})
 
-    def spawnProcess(self, cmd, args, env=None):
-        default_reactor.spawnProcess(self.peer, cmd, args, env=env)
+    def spawnProcess(self, cmd, args, env=None, childFDs=None):
+        default_reactor.spawnProcess(
+            self.peer, cmd, args, env=env, childFDs=childFDs)
 
     def expectNextCommand(self):
         """Enables this connection to receive the next command."""
@@ -528,25 +579,46 @@ class PackBackendProtocol(PackServerProtocol):
         xmlrpc_endpoint = config.get("virtinfo_endpoint")
         xmlrpc_timeout = int(config.get("virtinfo_timeout"))
         proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
+        repo_path = compose_path(self.factory.root, pathname)
+        if clone_from:
+            clone_path = six.ensure_str(
+                compose_path(self.factory.root, clone_from))
+        else:
+            clone_path = None
         try:
-            repo_path = compose_path(self.factory.root, pathname)
-            if clone_from:
-                clone_path = compose_path(self.factory.root, clone_from)
-            else:
-                clone_path = None
-            store.init_repo(repo_path, clone_path)
+            self.log.info(
+                "Creating repository %s, clone of %s" %
+                (repo_path, clone_path))
+            store.init_repo(six.ensure_str(repo_path), clone_path,
+                            log=self.log)
+            self.log.info(
+                "Confirming with Launchpad repo %s creation." % repo_path)
             yield proxy.callRemote(
                 "confirmRepoCreation", six.ensure_text(pathname),
                 auth_params).addTimeout(xmlrpc_timeout, default_reactor)
         except AlreadyExistsError:
             # Do not abort nor try to delete existing repositories.
+            self.log.info("Repository %s already exists." % repo_path)
             raise
-        except Exception:
+        except Exception as e:
+            t, v, tb = sys.exc_info()
+            self.log.critical(
+                "Aborting on Launchpad repo {path} creation: {error}.\n{tb}",
+                path=repo_path, error=e, tb=''.join(traceback.format_tb(tb)))
             yield proxy.callRemote(
                 "abortRepoCreation", six.ensure_text(pathname),
                 auth_params).addTimeout(xmlrpc_timeout, default_reactor)
-            store.delete_repo(repo_path)
-            raise
+            if os.path.exists(repo_path):
+                self.log.info(
+                    "Deleting local repo creation attempt %s." % repo_path)
+                store.delete_repo(repo_path)
+            # Just using `raise` here could cause an error like "exceptions
+            # must be old-style classes or derived from BaseException,
+            # not NoneType", since proxy.callRemote and Twisted event loop
+            # could clean up the current exception. That's why we store
+            # current exception at the begining of the `except` block and
+            # reraise it here.
+            six.reraise(t, v, tb)
 
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:
@@ -619,10 +691,12 @@ class PackBackendFactory(protocol.Factory):
     def __init__(self,
                  root,
                  hookrpc_handler=None,
-                 hookrpc_sock=None):
+                 hookrpc_sock=None,
+                 statsd_client=None):
         self.root = root
         self.hookrpc_handler = hookrpc_handler
         self.hookrpc_sock = hookrpc_sock
+        self.statsd_client = statsd_client
 
 
 class PackVirtServerProtocol(PackProxyServerProtocol):

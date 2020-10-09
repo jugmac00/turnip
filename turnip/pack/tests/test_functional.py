@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2020 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -13,6 +13,7 @@ import hashlib
 import io
 import os
 import random
+import re
 import shutil
 import stat
 import tempfile
@@ -39,7 +40,9 @@ import six
 from testscenarios.testcase import WithScenarios
 from testtools import TestCase
 from testtools.content import text_content
-from testtools.deferredruntest import AsynchronousDeferredRunTest
+from testtools.deferredruntest import (
+    AsynchronousDeferredRunTestForBrokenTwisted,
+    )
 from testtools.matchers import (
     Equals,
     Is,
@@ -76,12 +79,14 @@ from turnip.pack.tests.fake_servers import (
     FakeAuthServerService,
     FakeVirtInfoService,
     )
+from turnip.pack.tests.test_helpers import MockStatsd
 from turnip.version_info import version_info
 
 
 class FunctionalTestMixin(WithScenarios):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=30)
+    run_tests_with = AsynchronousDeferredRunTestForBrokenTwisted.make_factory(
+        timeout=30)
 
     scenarios = [
         ('v0 protocol', {"protocol_version": b"0"}),
@@ -119,10 +124,12 @@ class FunctionalTestMixin(WithScenarios):
         # get confused on Python 2.
         self.root = tempfile.mkdtemp(prefix=b'turnip-test-root-')
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.statsd_client = MockStatsd()
         self.backend_listener = reactor.listenTCP(
             0,
             PackBackendFactory(
-                self.root, self.hookrpc_handler, self.hookrpc_sock_path))
+                self.root, self.hookrpc_handler, self.hookrpc_sock_path,
+                self.statsd_client))
         self.backend_port = self.backend_listener.getHost().port
         self.addCleanup(self.backend_listener.stopListening)
 
@@ -177,6 +184,53 @@ class FunctionalTestMixin(WithScenarios):
             self.addDetail('stderr', text_content(six.ensure_text(err)))
             self.assertNotEqual(0, code)
         defer.returnValue((out, err))
+
+    def assertStatsdSuccess(self, repo, command):
+        metrics = ['max_rss', 'system_time', 'user_time']
+        repository = re.sub('[^0-9a-zA-Z]+', '-', repo)
+        self.assertThat(self.statsd_client.vals, MatchesDict({
+            u'repo={},operation={},metric={}'.format(
+                repository, command, metric): Not(Is(None))
+            for metric in metrics}))
+
+    @defer.inlineCallbacks
+    def test_statsd_metrics(self):
+        test_root = self.useFixture(TempDir()).path
+        clone = os.path.join(test_root, 'clone')
+
+        # At this point we have no data sent to statsd
+        self.assertEqual({}, self.statsd_client.vals)
+
+        # Clone the empty repo
+        yield self.assertCommandSuccess((b'git', b'clone', self.url, clone))
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.name', b'Test User'), path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'config', b'user.email', b'test@example.com'),
+            path=clone)
+        yield self.assertCommandSuccess(
+            (b'git', b'commit', b'--allow-empty', b'-m', b'Committed test'),
+            path=clone)
+
+        if isinstance(self, TestBackendFunctional):
+            repo = '/test'
+        else:
+            repo = self.internal_name
+        self.assertStatsdSuccess(repo, 'git-upload-pack')
+        self.statsd_client.vals = {}
+
+        # A push all at this point will find no matching refs and
+        # will exit early on the client side.
+        out, err, code = yield self.getProcessOutputAndValue(
+            b'git', (b'push', b'origin', b':'), env=os.environ, path=clone)
+        self.assertIn(b'No refs in common and none specified', err)
+
+        # Push master to the backend
+        yield self.assertCommandSuccess(
+            (b'git', b'push', b'origin', b'master'), path=clone)
+
+        # At this point we have receive-pack stats
+        self.assertStatsdSuccess(repo, 'git-receive-pack')
 
     @defer.inlineCallbacks
     def test_clone_and_push(self):
@@ -613,6 +667,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             0, server.Site(self.authserver))
         self.authserver_port = self.authserver_listener.getHost().port
         self.authserver_url = b'http://localhost:%d/' % self.authserver_port
+        self.addCleanup(self.authserver_listener.stopListening)
 
         # Run a backend server in a repo root containing an empty repo
         # for the path '/test'.
@@ -629,14 +684,9 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
             PackVirtFactory(
                 b'localhost', self.backend_port, self.virtinfo_url, 15))
         self.virt_port = self.virt_listener.getHost().port
+        self.addCleanup(self.virt_listener.stopListening)
         self.virtinfo.ref_permissions = {
             b'refs/heads/master': ['create', 'push']}
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        super(FrontendFunctionalTestMixin, self).tearDown()
-        yield self.virt_listener.stopListening()
-        yield self.authserver_listener.stopListening()
 
     @defer.inlineCallbacks
     def test_read_only(self):
@@ -711,15 +761,11 @@ class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         self.frontend_listener = reactor.listenTCP(
             0, PackFrontendFactory(b'localhost', self.virt_port))
         self.port = self.frontend_listener.getHost().port
+        self.addCleanup(self.frontend_listener.stopListening)
 
         # Always use a writable URL for now.
         self.url = b'git://localhost:%d/+rw/test' % self.port
         self.ro_url = b'git://localhost:%d/test' % self.port
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield super(TestGitFrontendFunctional, self).tearDown()
-        yield self.frontend_listener.stopListening()
 
 
 class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
@@ -744,15 +790,11 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
                 }))
         self.frontend_listener = reactor.listenTCP(0, frontend_site)
         self.port = self.frontend_listener.getHost().port
+        self.addCleanup(self.frontend_listener.stopListening)
 
         # Always use a writable URL for now.
         self.url = b'http://localhost:%d/+rw/test' % self.port
         self.ro_url = b'http://localhost:%d/test' % self.port
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield super(TestSmartHTTPFrontendFunctional, self).tearDown()
-        yield self.frontend_listener.stopListening()
 
     @defer.inlineCallbacks
     def test_root_revision_header(self):

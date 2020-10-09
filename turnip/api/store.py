@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import uuid
+from collections import defaultdict
 
 from contextlib2 import (
     contextmanager,
@@ -120,6 +121,59 @@ def write_alternates(repo_path, alternate_repo_paths):
 object_dir_re = re.compile(r'\A[0-9a-f][0-9a-f]\Z')
 
 
+@app.task
+def fetch_refs(operations):
+    """Copy a set of refs from one git repository to another.
+
+    This is implemented now using git client's "git fetch" command,
+    since it's way easier than trying to copy the refs, commits and objects
+    manually using pygit.
+
+    :param operations: A list of tuples describing the copy operations,
+        in the format (from_root, from_ref, to_root, to_ref). If "to_ref" is
+        None, the target ref will have the same name as the source ref.
+    """
+    # Group copy operations by source/dest repositories pairs.
+    grouped_refs = defaultdict(set)
+    for from_root, from_ref, to_root, to_ref in operations:
+        grouped_refs[(from_root, to_root)].add((from_ref, to_ref))
+
+    # A pair of (cmd, stderr) errors happened during the copy.
+    errors = []
+    for repo_pair, refs_pairs in grouped_refs.items():
+        from_root, to_root = repo_pair
+        cmd = [b'git', b'fetch', b'--no-tags', from_root]
+        cmd += [b"%s:%s" % (a, b if b else a) for a, b in refs_pairs]
+
+        # XXX pappacena: On Python3, this could be replaced with
+        # stdout=subprocess.DEVNULL.
+        with open(os.devnull, 'wb') as devnull:
+            proc = subprocess.Popen(
+                cmd, cwd=to_root,
+                stdout=devnull, stderr=subprocess.PIPE)
+            _, stderr = proc.communicate()
+        if proc.returncode != 0:
+            errors.append(cmd, stderr)
+
+    if errors:
+        details = b"\n ".join(b"%s = %s" % (cmd, err) for cmd, err in errors)
+        raise GitError(b"Error copying refs: %s" % details)
+
+
+@app.task
+def delete_refs(operations):
+    """Remove refs from repositories.
+
+    :param operations: A list of tuples (repo_root, ref_name) to be deleted.
+    """
+    repos = {}
+    for repo_root, ref_name in operations:
+        if repo_root not in repos:
+            repos[repo_root] = Repository(repo_root)
+        repo = repos[repo_root]
+        repo.references[ref_name].delete()
+
+
 def copy_refs(from_root, to_root):
     """Copy refs from one .git directory to another.
 
@@ -173,13 +227,23 @@ def write_packed_refs(root, packable_refs):
                         b'^%s\n' % (peeled_oid.hex.encode('ascii'),))
 
 
-def import_into_subordinate(sub_root, from_root):
+def get_file_mode(path):
+    if not os.path.exists(path):
+        return None
+    try:
+        return oct(os.stat(path).st_mode)
+    except Exception:
+        return None
+
+
+def import_into_subordinate(sub_root, from_root, log=None):
     """Import all of a repo's objects and refs into another.
 
     The refs may clobber existing ones.  Refs that can be packed are
     returned as a dictionary rather than imported immediately, and should be
     written using `write_packed_refs`.
     """
+    log = log if log else logger
     for dirname in os.listdir(os.path.join(from_root, 'objects')):
         # We want to hardlink any children of the loose fanout or pack
         # directories.
@@ -195,7 +259,20 @@ def import_into_subordinate(sub_root, from_root):
             sub_path = os.path.join(sub_root, 'objects', dirname, name)
             if not os.path.isfile(from_path) or os.path.exists(sub_path):
                 continue
-            os.link(from_path, sub_path)
+            try:
+                os.link(from_path, sub_path)
+            except Exception as e:
+                log.critical(
+                    "Error in import_into_subordinate while executing "
+                    "os.link(%s, %s): %s" % (from_path, sub_path, e))
+                log.info(
+                    "File modes: from_path: %s / from_path_dir: %s / "
+                    "sub_path: %s / sub_path_dir: %s" %
+                    (get_file_mode(from_path),
+                     get_file_mode(os.path.dirname(from_path)),
+                     get_file_mode(sub_path),
+                     get_file_mode(os.path.dirname(sub_path))))
+                raise
 
     # Copy over the refs.
     # TODO: This should ensure that we don't overwrite anything. The
@@ -214,11 +291,16 @@ class AlreadyExistsError(GitError):
 
 
 def init_repo(repo_path, clone_from=None, clone_refs=False,
-              alternate_repo_paths=None, is_bare=True):
+              alternate_repo_paths=None, is_bare=True, log=None):
     """Initialise a new git repository or clone from existing."""
     if os.path.exists(repo_path):
         raise AlreadyExistsError(repo_path)
+    # If no logger is provided, use module-level logger.
+    log = log if log else logger
+    log.info("Running init_repository(%s, %s)" % (repo_path, is_bare))
     init_repository(repo_path, is_bare)
+
+    log.info("Running set_repository_creating(%s, True)" % repo_path)
     set_repository_creating(repo_path, True)
 
     if clone_from:
@@ -227,12 +309,19 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         # repo. This lets git-receive-pack expose available commits as
         # extra haves without polluting refs in the real repo.
         sub_path = os.path.join(repo_path, 'turnip-subordinate')
+        log.info("Running init_repository for subordinate %s" % sub_path)
         init_repository(sub_path, True)
+
         packable_refs = {}
         if os.path.exists(os.path.join(clone_from, 'turnip-subordinate')):
             packable_refs.update(import_into_subordinate(
-                sub_path, os.path.join(clone_from, 'turnip-subordinate')))
-        packable_refs.update(import_into_subordinate(sub_path, clone_from))
+                sub_path, os.path.join(clone_from, 'turnip-subordinate'),
+                log=log))
+        packable_refs.update(import_into_subordinate(
+            sub_path, clone_from, log=log))
+
+        log.info("Running write_packed_refs(%s, %s)" %
+                 (sub_path, packable_refs))
         write_packed_refs(sub_path, packable_refs)
 
     new_alternates = []
@@ -240,6 +329,8 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         new_alternates.extend(alternate_repo_paths)
     if clone_from:
         new_alternates.append('../turnip-subordinate')
+
+    log.info("Running write_alternates(%s, %s)" % (repo_path, new_alternates))
     write_alternates(repo_path, new_alternates)
 
     if clone_from and clone_refs:
@@ -247,10 +338,18 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         # can just copy all refs from the origin. Unlike
         # pygit2.clone_repository, this won't set up a remote.
         # TODO: Filter out internal (eg. MP) refs.
+
+        log.info("Running copy_refs(%s, %s)" % (clone_from, repo_path))
         packable_refs = copy_refs(clone_from, repo_path)
+
+        log.info("Running write_packed_refs(%s, %s)" %
+                 (repo_path, packable_refs))
         write_packed_refs(repo_path, packable_refs)
 
+    log.info("Running ensure_config(%s)" % repo_path)
     ensure_config(repo_path)  # set repository configuration defaults
+
+    log.info("Running set_repository_creating(%s, False)" % repo_path)
     set_repository_creating(repo_path, False)
 
 
@@ -265,8 +364,15 @@ def init_and_confirm_repo(untranslated_path, repo_path, clone_from=None,
     xmlrpc_proxy = TimeoutServerProxy(
         xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True)
     try:
+        logger.info(
+            "Initializing and confirming repository creation: "
+            "%s; %s; %s; %s; %s", repo_path, clone_from, clone_refs,
+            alternate_repo_paths, is_bare)
         init_repo(
             repo_path, clone_from, clone_refs, alternate_repo_paths, is_bare)
+        logger.debug(
+            "Confirming repository creation: %s; %s",
+            untranslated_path, xmlrpc_auth_params)
         xmlrpc_proxy.confirmRepoCreation(untranslated_path, xmlrpc_auth_params)
     except Exception as e:
         logger.error("Error creating repository at %s: %s", repo_path, e)
@@ -274,6 +380,9 @@ def init_and_confirm_repo(untranslated_path, repo_path, clone_from=None,
             delete_repo(repo_path)
         except IOError as e:
             logger.error("Error deleting repository at %s: %s", repo_path, e)
+        logger.debug(
+            "Aborting repository creation: %s; %s",
+            untranslated_path, xmlrpc_auth_params)
         xmlrpc_proxy.abortRepoCreation(untranslated_path, xmlrpc_auth_params)
 
 

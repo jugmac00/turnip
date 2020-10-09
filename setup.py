@@ -28,6 +28,7 @@ requires = [
     'pygit2>=0.27.4,<0.28.0',
     'python-openid2',
     'PyYAML',
+    'statsd',
     'Twisted[conch]',
     'waitress',
     'zope.interface',

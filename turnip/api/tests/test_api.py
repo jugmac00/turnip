@@ -8,6 +8,7 @@ from __future__ import print_function, unicode_literals
 import base64
 from datetime import timedelta, datetime
 import os
+import re
 import subprocess
 from textwrap import dedent
 import time
@@ -1046,6 +1047,43 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
         self.assertEqual([mock.call(
             mock.ANY, new_repo_path, {"user": "+launchpad-services"})],
             self.virtinfo.xmlrpc_confirmRepoCreation.call_args_list)
+
+    def assertContainsLog(self, pattern, log_lines):
+        for line in log_lines:
+            if re.match(pattern, line):
+                return
+        self.fail("'%s' is not in any log line" % pattern)
+
+    def test_celery_log_messages(self):
+        logdir = self.useFixture(TempDir()).path
+        logfile = os.path.join(logdir, "celery.log")
+        self.useFixture(CeleryWorkerFixture(logfile=logfile, loglevel="debug"))
+
+        self.virtinfo.xmlrpc_confirmRepoCreation = mock.Mock(return_value=None)
+        self.virtinfo.xmlrpc_abortRepoCreation = mock.Mock(return_value=None)
+
+        factory = RepoFactory(self.repo_store, num_commits=2)
+        factory.build()
+        new_repo_path = uuid.uuid1().hex
+        self.app.post_json('/repo', {
+            'async': True,
+            'repo_path': new_repo_path,
+            'clone_from': self.repo_path,
+            'clone_refs': True})
+
+        self.assertRepositoryCreatedAsynchronously(new_repo_path)
+
+        with open(logfile, 'r') as fd:
+            log_lines = fd.read().split('\n')
+        self.assertContainsLog(
+            ".*INFO.*Received task: turnip.api.store.init_and_confirm_repo.*",
+            log_lines)
+        self.assertContainsLog(
+            ".*INFO.*Initializing and confirming repository creation:.*",
+            log_lines)
+        self.assertContainsLog(
+            ".*DEBUG.*Confirming repository creation:.*",
+            log_lines)
 
 
 if __name__ == '__main__':
