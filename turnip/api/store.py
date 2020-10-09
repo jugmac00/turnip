@@ -227,13 +227,23 @@ def write_packed_refs(root, packable_refs):
                         b'^%s\n' % (peeled_oid.hex.encode('ascii'),))
 
 
-def import_into_subordinate(sub_root, from_root):
+def get_file_mode(path):
+    if not os.path.exists(path):
+        return None
+    try:
+        return oct(os.stat(path).st_mode)
+    except Exception:
+        return None
+
+
+def import_into_subordinate(sub_root, from_root, log=None):
     """Import all of a repo's objects and refs into another.
 
     The refs may clobber existing ones.  Refs that can be packed are
     returned as a dictionary rather than imported immediately, and should be
     written using `write_packed_refs`.
     """
+    log = log if log else logger
     for dirname in os.listdir(os.path.join(from_root, 'objects')):
         # We want to hardlink any children of the loose fanout or pack
         # directories.
@@ -249,7 +259,20 @@ def import_into_subordinate(sub_root, from_root):
             sub_path = os.path.join(sub_root, 'objects', dirname, name)
             if not os.path.isfile(from_path) or os.path.exists(sub_path):
                 continue
-            os.link(from_path, sub_path)
+            try:
+                os.link(from_path, sub_path)
+            except Exception as e:
+                log.critical(
+                    "Error in import_into_subordinate while executing "
+                    "os.link(%s, %s): %s" % (from_path, sub_path, e))
+                log.info(
+                    "File modes: from_path: %s / from_path_dir: %s / "
+                    "sub_path: %s / sub_path_dir: %s" %
+                    (get_file_mode(from_path),
+                     get_file_mode(os.path.dirname(from_path)),
+                     get_file_mode(sub_path),
+                     get_file_mode(os.path.dirname(sub_path))))
+                raise
 
     # Copy over the refs.
     # TODO: This should ensure that we don't overwrite anything. The
@@ -292,8 +315,10 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         packable_refs = {}
         if os.path.exists(os.path.join(clone_from, 'turnip-subordinate')):
             packable_refs.update(import_into_subordinate(
-                sub_path, os.path.join(clone_from, 'turnip-subordinate')))
-        packable_refs.update(import_into_subordinate(sub_path, clone_from))
+                sub_path, os.path.join(clone_from, 'turnip-subordinate'),
+                log=log))
+        packable_refs.update(import_into_subordinate(
+            sub_path, clone_from, log=log))
 
         log.info("Running write_packed_refs(%s, %s)" %
                  (sub_path, packable_refs))
@@ -339,8 +364,15 @@ def init_and_confirm_repo(untranslated_path, repo_path, clone_from=None,
     xmlrpc_proxy = TimeoutServerProxy(
         xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True)
     try:
+        logger.info(
+            "Initializing and confirming repository creation: "
+            "%s; %s; %s; %s; %s", repo_path, clone_from, clone_refs,
+            alternate_repo_paths, is_bare)
         init_repo(
             repo_path, clone_from, clone_refs, alternate_repo_paths, is_bare)
+        logger.debug(
+            "Confirming repository creation: %s; %s",
+            untranslated_path, xmlrpc_auth_params)
         xmlrpc_proxy.confirmRepoCreation(untranslated_path, xmlrpc_auth_params)
     except Exception as e:
         logger.error("Error creating repository at %s: %s", repo_path, e)
@@ -348,6 +380,9 @@ def init_and_confirm_repo(untranslated_path, repo_path, clone_from=None,
             delete_repo(repo_path)
         except IOError as e:
             logger.error("Error deleting repository at %s: %s", repo_path, e)
+        logger.debug(
+            "Aborting repository creation: %s; %s",
+            untranslated_path, xmlrpc_auth_params)
         xmlrpc_proxy.abortRepoCreation(untranslated_path, xmlrpc_auth_params)
 
 
