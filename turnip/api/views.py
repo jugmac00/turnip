@@ -9,6 +9,7 @@ from cornice.resource import resource
 from cornice.util import extract_json_data
 from pygit2 import GitError
 import pyramid.httpexceptions as exc
+from pyramid.response import Response
 
 from turnip.config import config
 from turnip.api import store
@@ -162,6 +163,65 @@ class RepackAPI(BaseAPI):
         return
 
 
+@resource(path='/repo/{name}/refs-copy')
+class RefCopyAPI(BaseAPI):
+    """Provides HTTP API for git references copy operations."""
+
+    def __init__(self, request, context=None):
+        super(RefCopyAPI, self).__init__()
+        self.request = request
+
+    def _validate_refs(self, repo_store, repo_name, refs_or_commits):
+        """Checks if a given list of ref names or commits ID exists in
+        repo. If not, raises 404 exception.
+
+        Note that the API copy runs async, in a celery job. So,
+        this validation does not guarantee that the copy operation will
+        actually be done since someone could delete the ref_or_commit
+        between the check and the actual execution of the copy task.
+        """
+        for ref_or_commit in refs_or_commits:
+            # Checks if it's a commit.
+            try:
+                store.get_commit(repo_store, repo_name, ref_or_commit)
+                return
+            except GitError:
+                pass
+            # Checks if it's a ref name.
+            try:
+                store.get_ref(repo_store, repo_name, ref_or_commit)
+                return
+            except KeyError:
+                self.request.errors.add(
+                    'body', 'operations',
+                    'Ref %s does not exist.' % ref_or_commit)
+
+        if len(self.request.errors):
+            self.request.errors.status = 404
+
+    @validate_path
+    def post(self, repo_store, repo_name):
+        orig_path = os.path.join(repo_store, repo_name)
+        copy_refs_args = []
+        operations = self.request.json.get('operations', [])
+        self._validate_refs(
+            repo_store, repo_name, [i["from"] for i in operations])
+        if len(self.request.errors):
+            return
+
+        for operation in operations:
+            source = operation["from"]
+            dest = operation["to"]
+            dest_repo = dest.get('repo')
+            dest_ref_name = dest.get('ref')
+            dest_path = os.path.join(repo_store, dest_repo)
+            copy_refs_args.append(
+                (orig_path, source, dest_path, dest_ref_name))
+
+        store.fetch_refs.apply_async(args=(copy_refs_args, ))
+        return Response(status=202)
+
+
 @resource(collection_path='/repo/{name}/refs',
           path='/repo/{name}/refs/{ref:.*}')
 class RefAPI(BaseAPI):
@@ -187,6 +247,21 @@ class RefAPI(BaseAPI):
             return store.get_ref(repo_store, repo_name, ref)
         except (KeyError, GitError):
             return exc.HTTPNotFound()
+
+    @validate_path
+    def delete(self, repo_store, repo_name):
+        ref = 'refs/' + self.request.matchdict['ref']
+        # Make sure the ref actually exists. Otherwise, raise a 404.
+        try:
+            store.get_ref(repo_store, repo_name, ref)
+        except (KeyError, GitError):
+            self.request.errors.add(
+                'body', 'operations', 'Ref %s does not exist.' % ref)
+            self.request.errors.status = 404
+            return
+        repo_path = os.path.join(repo_store, repo_name)
+        store.delete_refs([(repo_path, ref)])
+        return Response(status=200)
 
 
 @resource(path='/repo/{name}/compare/{commits}')
