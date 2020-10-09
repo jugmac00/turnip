@@ -1043,10 +1043,14 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
         start = datetime.now()
         while datetime.now() <= (start + timeout):
             self._doReactorIteration()
-            resp = self.app.get('/repo/{}'.format(repo_path),
-                                expect_errors=True)
-            if resp.status_code == 200 and resp.json['is_available']:
-                return
+            try:
+                resp = self.app.get('/repo/{}'.format(repo_path),
+                                    expect_errors=True)
+                if resp.status_code == 200 and resp.json['is_available']:
+                    return
+            except Exception:
+                # If we have any unexpected error, wait a bit and retry.
+                pass
             time.sleep(0.1)
         self.fail(
             "Repository %s was not created after %s secs"
