@@ -213,20 +213,6 @@ class SmartSSHAvatar(LaunchpadAvatar):
         # Disable SFTP.
         self.subsystemLookup = {}
 
-    def getSession(self):
-        """Adapt a SmartSSHAvatar to a SmartSSHSession object.
-
-        We need to keep track of the avatar's current session due to an
-        internal implementation detail of ISessionSetEnv. If we don't keep
-        track of the current session, Twisted will adapt the avatar to
-        ISession and ISessionSetEnv in different moments, which causes
-        SmartSSHSession.env to be cleared (and we end up losing the env
-        variables set). See components.registerAdapter() call below.
-        """
-        if self.current_session is None:
-            self.current_session = SmartSSHSession(self)
-        return self.current_session
-
 
 @implementer(IRealm)
 class SmartSSHRealm:
@@ -261,5 +247,4 @@ class SmartSSHService(SSHService):
 
 
 components.registerAdapter(
-    lambda avatar: avatar.getSession(), SmartSSHAvatar,
-    ISession, ISessionSetEnv)
+    SmartSSHSession, SmartSSHAvatar, ISession, ISessionSetEnv)
