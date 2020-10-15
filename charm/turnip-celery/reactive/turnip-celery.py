@@ -82,7 +82,10 @@ def nrpe_available():
     config = hookenv.config()
     nagios.add_check(
         ['/usr/lib/nagios/plugins/check_procs', '-c', '1:128',
-         '-C', 'celery', '-a', '-A turnip.tasks worker'],
+         # We need some double-quoting here because
+         # NrpeExternalMasterProvides.add_check just joins the argument list
+         # with spaces rather than doing appropriate shell quoting.
+         '-C', 'celery', '-a', "'-A turnip.tasks worker'"],
         name='check_celery',
         description='Git celery check',
         context=config['nagios_context'])
