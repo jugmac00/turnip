@@ -84,8 +84,11 @@ def nrpe_available():
         ['/usr/lib/nagios/plugins/check_procs', '-c', '1:128',
          # We need some double-quoting here because
          # NrpeExternalMasterProvides.add_check just joins the argument list
-         # with spaces rather than doing appropriate shell quoting.
-         '-C', 'celery', '-a', "'-A turnip.tasks worker'"],
+         # with spaces rather than doing appropriate shell quoting.  Also
+         # note that ['-C', 'celery'] would be unsafe because the command
+         # name seems to be either celery or python2 depending on exact
+         # details of the process lifecycle.
+         '--ereg-argument-array', "'celery.*-A turnip.tasks worker'"],
         name='check_celery',
         description='Git celery check',
         context=config['nagios_context'])
