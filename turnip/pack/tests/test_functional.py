@@ -189,7 +189,7 @@ class FunctionalTestMixin(WithScenarios):
         metrics = ['max_rss', 'system_time', 'user_time']
         repository = re.sub('[^0-9a-zA-Z]+', '-', repo)
         self.assertThat(self.statsd_client.vals, MatchesDict({
-            u'operation={},repo={},metric={}'.format(
+            u'git,operation={},repo={},metric={}'.format(
                 command, repository, metric): Not(Is(None))
             for metric in metrics}))
 
