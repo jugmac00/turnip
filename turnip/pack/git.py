@@ -327,24 +327,24 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                 # can't be used in statsd
                 repository = re.sub('[^0-9a-zA-Z]+', '-',
                                     self.peer.raw_pathname)
-                gauge_name = ("repo={},operation={},metric=max_rss"
+                gauge_name = ("git,operation={},repo={},metric=max_rss"
                               .format(
-                                  repository,
-                                  self.peer.command))
+                                  self.peer.command,
+                                  repository))
 
                 self.statsd_client.gauge(gauge_name, resource_usage['max_rss'])
 
-                gauge_name = ("repo={},operation={},metric=system_time"
+                gauge_name = ("git,operation={},repo={},metric=system_time"
                               .format(
-                                  repository,
-                                  self.peer.command))
+                                  self.peer.command,
+                                  repository))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['system_time'])
 
-                gauge_name = ("repo={},operation={},metric=user_time"
+                gauge_name = ("git,operation={},repo={},metric=user_time"
                               .format(
-                                  repository,
-                                  self.peer.command))
+                                  self.peer.command,
+                                  repository))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['user_time'])
 
