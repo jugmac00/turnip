@@ -106,6 +106,7 @@ class FunctionalTestMixin(WithScenarios):
         self.virtinfo.ref_permissions = {
             b'refs/heads/master': ['create', 'push']}
         config.defaults['virtinfo_endpoint'] = self.virtinfo_url
+        config.defaults['statsd_environment'] = 'local'
 
     def startHookRPC(self):
         self.hookrpc_handler = HookRPCHandler(self.virtinfo_url, 15)
@@ -189,8 +190,10 @@ class FunctionalTestMixin(WithScenarios):
         metrics = ['max_rss', 'system_time', 'user_time']
         repository = re.sub('[^0-9a-zA-Z]+', '-', repo)
         self.assertThat(self.statsd_client.vals, MatchesDict({
-            u'git,operation={},repo={},metric={}'.format(
-                command, repository, metric): Not(Is(None))
+            u'statsd,operation={},repo={},env={},metric={}'
+            .format(
+                command, repository,
+                config.get('statsd_environment'), metric): Not(Is(None))
             for metric in metrics}))
 
     @defer.inlineCallbacks

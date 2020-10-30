@@ -41,6 +41,7 @@ VIRTINFO_TIMEOUT = int(config.get('virtinfo_timeout'))
 STATSD_HOST = config.get('statsd_host')
 STATSD_PORT = config.get('statsd_port')
 STATSD_PREFIX = config.get('statsd_prefix')
+STATSD_ENVIRONMENT = config.get('statsd_environment')
 
 # turnipserver.py is preserved for convenience in development, services
 # in production are run in separate processes.
