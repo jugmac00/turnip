@@ -329,7 +329,7 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                                     self.peer.raw_pathname)
                 environment = config.get("statsd_environment")
                 gauge_name = (
-                    "statsd,operation={},repo={},env={},metric=max_rss"
+                    "git,operation={},repo={},env={},metric=max_rss"
                     .format(
                         self.peer.command,
                         repository,
@@ -338,7 +338,7 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                 self.statsd_client.gauge(gauge_name, resource_usage['max_rss'])
 
                 gauge_name = (
-                    "statsd,operation={},repo={},env={},metric=system_time"
+                    "git,operation={},repo={},env={},metric=system_time"
                     .format(
                         self.peer.command,
                         repository,
@@ -347,7 +347,7 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                                          resource_usage['system_time'])
 
                 gauge_name = (
-                    "statsd,operation={},repo={},env={},metric=user_time"
+                    "git,operation={},repo={},env={},metric=user_time"
                     .format(
                         self.peer.command,
                         repository,
