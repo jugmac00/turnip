@@ -330,7 +330,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
 
         self.assertEqual(6, len(repo.references.objects))
         self.assertEqual(200, resp.status_code)
-        self.assertEqual('', resp.body)
+        self.assertEqual(b'', resp.body)
 
     def test_delete_non_existing_ref(self):
         celery_fixture = CeleryWorkerFixture()
@@ -378,11 +378,11 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         body = {
             "operations": [
                 {
-                    b"from": b"refs/heads/branch-4",
-                    b"to": {b"repo": b'repo2', b"ref": b"refs/merge/123/head"}
+                    "from": "refs/heads/branch-4",
+                    "to": {"repo": 'repo2', "ref": "refs/merge/123/head"}
                 }, {
-                    b"from": b"refs/heads/branch-4",
-                    b"to": {b"repo": b'repo3', b"ref": b"refs/merge/987/head"}
+                    "from": "refs/heads/branch-4",
+                    "to": {"repo": 'repo3', "ref": "refs/merge/987/head"}
                 }]}
         resp = self.app.post_json(quote(url), body)
         self.assertEqual(202, resp.status_code)
@@ -390,13 +390,13 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         def branchCreated():
             repo2_refs = [i.name for i in repo2.references.objects]
             repo3_refs = [i.name for i in repo3.references.objects]
-            return (b'refs/merge/123/head' in repo2_refs and
-                    b'refs/merge/987/head' in repo3_refs)
+            return ('refs/merge/123/head' in repo2_refs and
+                    'refs/merge/987/head' in repo3_refs)
 
         celery_fixture.waitUntil(5, branchCreated)
         self.assertEqual(4, len(repo2.references.objects))
         self.assertEqual(202, resp.status_code)
-        self.assertEqual('', resp.body)
+        self.assertEqual(b'', resp.body)
 
     def test_copy_non_existing_ref(self):
         celery_fixture = CeleryWorkerFixture()
@@ -409,11 +409,11 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
 
         body = {
             "operations": [{
-                b"from": b"refs/heads/nope",
-                b"to": {b"repo": b'repo2', b"ref": b"refs/merge/123/head"}
+                "from": "refs/heads/nope",
+                "to": {"repo": 'repo2', "ref": "refs/merge/123/head"}
             }, {
-                b"from": b"refs/heads/no-ref",
-                b"to": {b"repo": b'repo2', b"ref": b"refs/merge/123/head"}
+                "from": "refs/heads/no-ref",
+                "to": {"repo": 'repo2', "ref": "refs/merge/123/head"}
             }]}
 
         url = '/repo/repo1/refs-copy'

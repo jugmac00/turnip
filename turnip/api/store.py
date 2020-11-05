@@ -28,6 +28,7 @@ from pygit2 import (
     Oid,
     Repository,
     )
+import six
 
 from turnip.config import config
 from turnip.helpers import TimeoutServerProxy
@@ -143,7 +144,10 @@ def fetch_refs(operations):
     for repo_pair, refs_pairs in grouped_refs.items():
         from_root, to_root = repo_pair
         cmd = [b'git', b'fetch', b'--no-tags', from_root]
-        cmd += [b"%s:%s" % (a, b if b else a) for a, b in refs_pairs]
+        for src, dst in refs_pairs:
+            src = six.ensure_binary(src)
+            dst = six.ensure_binary(dst if dst else src)
+            cmd.append(b"%s:%s" % (src, dst))
 
         # XXX pappacena: On Python3, this could be replaced with
         # stdout=subprocess.DEVNULL.
@@ -153,11 +157,11 @@ def fetch_refs(operations):
                 stdout=devnull, stderr=subprocess.PIPE)
             _, stderr = proc.communicate()
         if proc.returncode != 0:
-            errors.append(cmd, stderr)
+            errors.append((cmd, stderr))
 
     if errors:
-        details = b"\n ".join(b"%s = %s" % (cmd, err) for cmd, err in errors)
-        raise GitError(b"Error copying refs: %s" % details)
+        details = "\n ".join("%s = %s" % (cmd, err) for cmd, err in errors)
+        raise GitError("Error copying refs: %s" % details)
 
 
 @app.task
