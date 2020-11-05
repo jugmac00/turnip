@@ -581,16 +581,14 @@ class PackBackendProtocol(PackServerProtocol):
         proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
         repo_path = compose_path(self.factory.root, pathname)
         if clone_from:
-            clone_path = six.ensure_str(
-                compose_path(self.factory.root, clone_from))
+            clone_path = compose_path(self.factory.root, clone_from)
         else:
             clone_path = None
         try:
             self.log.info(
                 "Creating repository %s, clone of %s" %
                 (repo_path, clone_path))
-            store.init_repo(six.ensure_str(repo_path), clone_path,
-                            log=self.log)
+            store.init_repo(repo_path, clone_path, log=self.log)
             self.log.info(
                 "Confirming with Launchpad repo %s creation." % repo_path)
             yield proxy.callRemote(
