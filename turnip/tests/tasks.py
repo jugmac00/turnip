@@ -92,7 +92,7 @@ class CeleryWorkerFixture(fixtures.Fixture):
             time.sleep(0.2)
         raise AttributeError(
             "%s(*%s, **%s) never returned True after %s seconds" %
-            (callable.func_name, args, kwargs, seconds))
+            (callable.__name__, args, kwargs, seconds))
 
     def _setUp(self):
         self.startCeleryWorker()
