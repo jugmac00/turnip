@@ -26,4 +26,4 @@ options:
   statsd_environment:
     type: string
     default: local
-    description: 'env' label to set for statsd metrics.
+    description: "'env' label to set for statsd metrics."
