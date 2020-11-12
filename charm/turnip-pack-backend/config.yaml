@@ -21,5 +21,9 @@ options:
     description: Port for Telegraf configured with the statsd input.
   statsd_prefix:
     type: string
-    default: turnip.test
+    default: turnip
     description: Prefix for statsd metrics.
+  statsd_environment:
+    type: string
+    default: local
+    description: 'env' label to set for statsd metrics.

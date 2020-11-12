@@ -327,24 +327,31 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                 # can't be used in statsd
                 repository = re.sub('[^0-9a-zA-Z]+', '-',
                                     self.peer.raw_pathname)
-                gauge_name = ("git,operation={},repo={},metric=max_rss"
-                              .format(
-                                  self.peer.command,
-                                  repository))
+                environment = config.get("statsd_environment")
+                gauge_name = (
+                    "git,operation={},repo={},env={},metric=max_rss"
+                    .format(
+                        self.peer.command,
+                        repository,
+                        environment))
 
                 self.statsd_client.gauge(gauge_name, resource_usage['max_rss'])
 
-                gauge_name = ("git,operation={},repo={},metric=system_time"
-                              .format(
-                                  self.peer.command,
-                                  repository))
+                gauge_name = (
+                    "git,operation={},repo={},env={},metric=system_time"
+                    .format(
+                        self.peer.command,
+                        repository,
+                        environment))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['system_time'])
 
-                gauge_name = ("git,operation={},repo={},metric=user_time"
-                              .format(
-                                  self.peer.command,
-                                  repository))
+                gauge_name = (
+                    "git,operation={},repo={},env={},metric=user_time"
+                    .format(
+                        self.peer.command,
+                        repository,
+                        environment))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['user_time'])
 

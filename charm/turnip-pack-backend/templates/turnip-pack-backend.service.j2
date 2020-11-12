@@ -19,6 +19,7 @@ Environment=VIRTINFO_TIMEOUT={{ virtinfo_timeout }}
 Environment=STATSD_HOST={{ statsd_host }}
 Environment=STATSD_PORT={{ statsd_port }}
 Environment=STATSD_PREFIX={{ statsd_prefix }}
+Environment=STATSD_ENVIRONMENT={{ statsd_environment }}
 ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-backend.log --python=packbackendserver.tac
 ExecReload=/bin/kill -s HUP $MAINPID
 LimitNOFILE=1048576
