@@ -369,8 +369,8 @@ class InitTestCase(TestCase):
         orig = self.orig_factory.repo
         master_tip = orig.references[b'refs/heads/master'].target.hex
 
-        orig_branch_name = b'new-branch'
-        orig_ref_name = b'refs/heads/new-branch'
+        orig_branch_name = 'new-branch'
+        orig_ref_name = 'refs/heads/new-branch'
         orig.create_branch(orig_branch_name, orig[master_tip])
         orig_commit_oid = self.orig_factory.add_commit(
             b'foobar file content', 'foobar.txt', parents=[master_tip],
@@ -383,7 +383,7 @@ class InitTestCase(TestCase):
         dest = pygit2.Repository(dest_path)
         self.assertEqual([], dest.references.objects)
 
-        dest_ref_name = b'refs/merge/123'
+        dest_ref_name = 'refs/merge/123'
         store.fetch_refs.apply_async(args=([
             (orig_path, orig_commit_oid.hex, dest_path, dest_ref_name)], ))
         celery_fixture.waitUntil(5, lambda: len(dest.references.objects) == 1)
@@ -430,8 +430,8 @@ class InitTestCase(TestCase):
         orig = self.orig_factory.repo
 
         master_tip = orig.references[b'refs/heads/master'].target.hex
-        new_branch_name = b'new-branch'
-        new_ref_name = b'refs/heads/new-branch'
+        new_branch_name = 'new-branch'
+        new_ref_name = 'refs/heads/new-branch'
         orig.create_branch(new_branch_name, orig[master_tip])
         self.orig_factory.add_commit(
             b'foobar file content', 'foobar.txt', parents=[master_tip],
