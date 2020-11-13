@@ -325,8 +325,9 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
             else:
                 # remove characters from repository name that
                 # can't be used in statsd
-                repository = re.sub('[^0-9a-zA-Z]+', '-',
-                                    self.peer.raw_pathname)
+                repository = re.sub(
+                    '[^0-9a-zA-Z]+', '-',
+                    six.ensure_text(self.peer.raw_pathname))
                 environment = config.get("statsd_environment")
                 gauge_name = (
                     "git,operation={},repo={},env={},metric=max_rss"
