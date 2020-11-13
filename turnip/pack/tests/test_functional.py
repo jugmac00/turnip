@@ -532,7 +532,7 @@ class FunctionalTestMixin(WithScenarios):
         yield self.assertCommandSuccess(
             (b'git', b'config', b'user.email', b'test@example.com'),
             path=clone1)
-        with open(os.path.join(clone1, 'bigfile'), 'w') as bigfile:
+        with open(os.path.join(clone1, 'bigfile'), 'wb') as bigfile:
             # Use random contents to defeat compression.
             bigfile.write(bytearray(
                 random.getrandbits(8) for _ in range(1024 * 1024)))
