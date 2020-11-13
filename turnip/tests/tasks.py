@@ -9,6 +9,7 @@ import sys
 import time
 
 import fixtures
+import six
 
 from turnip.config import config
 from turnip.tasks import app
@@ -67,7 +68,12 @@ class CeleryWorkerFixture(fixtures.Fixture):
         # are currently using.
         proc_env = {}
         for k in config.defaults:
-            proc_env[k.upper()] = str(config.get(k))
+            value = config.get(k)
+            if isinstance(value, six.binary_type):
+                value = value.decode("utf-8")
+            else:
+                value = six.text_type(value)
+            proc_env[k.upper()] = value
         proc_env.update(self.env or {})
 
         CeleryWorkerFixture._worker_proc = subprocess.Popen(cmd, env=proc_env)
