@@ -328,31 +328,23 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                 repository = re.sub(
                     '[^0-9a-zA-Z]+', '-',
                     six.ensure_text(self.peer.raw_pathname))
+                command = six.ensure_text(self.peer.command)
                 environment = config.get("statsd_environment")
                 gauge_name = (
                     "git,operation={},repo={},env={},metric=max_rss"
-                    .format(
-                        self.peer.command,
-                        repository,
-                        environment))
+                    .format(command, repository, environment))
 
                 self.statsd_client.gauge(gauge_name, resource_usage['max_rss'])
 
                 gauge_name = (
                     "git,operation={},repo={},env={},metric=system_time"
-                    .format(
-                        self.peer.command,
-                        repository,
-                        environment))
+                    .format(command, repository, environment))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['system_time'])
 
                 gauge_name = (
                     "git,operation={},repo={},env={},metric=user_time"
-                    .format(
-                        self.peer.command,
-                        repository,
-                        environment))
+                    .format(command, repository, environment))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['user_time'])
 
