@@ -123,7 +123,7 @@ class FunctionalTestMixin(WithScenarios):
     def startPackBackend(self):
         # XXX cjwatson 2018-11-20: Use bytes so that shutil.rmtree doesn't
         # get confused on Python 2.
-        self.root = tempfile.mkdtemp(prefix=b'turnip-test-root-')
+        self.root = tempfile.mkdtemp(prefix='turnip-test-root-')
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
         self.statsd_client = MockStatsd()
         self.backend_listener = reactor.listenTCP(
@@ -188,7 +188,7 @@ class FunctionalTestMixin(WithScenarios):
 
     def assertStatsdSuccess(self, repo, command):
         metrics = ['max_rss', 'system_time', 'user_time']
-        repository = re.sub('[^0-9a-zA-Z]+', '-', repo)
+        repository = re.sub('[^0-9a-zA-Z]+', '-', six.ensure_str(repo))
         self.assertThat(self.statsd_client.vals, MatchesDict({
             u'git,operation={},repo={},env={},metric={}'
             .format(
@@ -955,6 +955,7 @@ class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
             stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         os.chmod(git_ssh, new_mode)
         self.useFixture(EnvironmentVariable("GIT_SSH", git_ssh))
+        self.useFixture(EnvironmentVariable("GIT_SSH_VARIANT", "ssh"))
 
         self.authserver.addSSHKey("example", public_key)
 
@@ -965,12 +966,16 @@ class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
             os.path.join(self.data_dir, "ssh-host-key"), private_host_key)
         os.chmod(private_host_key, stat.S_IRUSR | stat.S_IWUSR)
         public_host_key = os.path.join(self.data_dir, "ssh-host-key.pub")
+
+        # This is odd, but Twisted seems to behave differently on each
+        # python version.
+        strport = 'tcp:0' if six.PY3 else b'tcp:0'
         self.service = SmartSSHService(
             b'localhost', self.virt_port, self.authserver_url,
             private_key_path=private_host_key, public_key_path=public_host_key,
             main_log="turnip", access_log="turnip.access",
             access_log_path=os.path.join(self.root, "access.log"),
-            strport=b'tcp:0', moduli_path="/etc/ssh/moduli")
+            strport=strport, moduli_path="/etc/ssh/moduli")
         self.service.startService()
         self.addCleanup(self.service.stopService)
         socket = self.service.service._waitingForPort.result.socket
