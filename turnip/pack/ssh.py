@@ -125,7 +125,7 @@ class SmartSSHSession(DoNothingSession):
     """SSH session allowing only Git smart SSH requests."""
 
     allowed_services = frozenset((
-        b'git-upload-pack', b'git-receive-pack', b'turnip-set-symbolic-ref'))
+        'git-upload-pack', 'git-receive-pack', 'turnip-set-symbolic-ref'))
 
     def __init__(self, *args, **kwargs):
         super(SmartSSHSession, self).__init__(*args, **kwargs)
@@ -170,6 +170,7 @@ class SmartSSHSession(DoNothingSession):
 
     def execCommand(self, protocol, command):
         """See `ISession`."""
+        command = six.ensure_text(command)
         words = shlex.split(command)
         if len(words) > 1 and words[0] == "git":
             # Accept "git foo" as if the caller said "git-foo".  (This
