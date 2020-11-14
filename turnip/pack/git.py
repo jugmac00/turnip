@@ -328,31 +328,23 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                 repository = re.sub(
                     '[^0-9a-zA-Z]+', '-',
                     six.ensure_text(self.peer.raw_pathname))
+                command = six.ensure_text(self.peer.command)
                 environment = config.get("statsd_environment")
                 gauge_name = (
                     "git,operation={},repo={},env={},metric=max_rss"
-                    .format(
-                        self.peer.command,
-                        repository,
-                        environment))
+                    .format(command, repository, environment))
 
                 self.statsd_client.gauge(gauge_name, resource_usage['max_rss'])
 
                 gauge_name = (
                     "git,operation={},repo={},env={},metric=system_time"
-                    .format(
-                        self.peer.command,
-                        repository,
-                        environment))
+                    .format(command, repository, environment))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['system_time'])
 
                 gauge_name = (
                     "git,operation={},repo={},env={},metric=user_time"
-                    .format(
-                        self.peer.command,
-                        repository,
-                        environment))
+                    .format(command, repository, environment))
                 self.statsd_client.gauge(gauge_name,
                                          resource_usage['user_time'])
 
@@ -554,7 +546,7 @@ class PackBackendProtocol(PackServerProtocol):
         if write_operation and self.factory.hookrpc_handler:
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.
-            ensure_config(self.path)
+            ensure_config(six.ensure_str(self.path))
             self.hookrpc_key = str(uuid.uuid4())
             self.factory.hookrpc_handler.registerKey(
                 self.hookrpc_key, self.raw_pathname, auth_params)
@@ -587,9 +579,10 @@ class PackBackendProtocol(PackServerProtocol):
         xmlrpc_endpoint = config.get("virtinfo_endpoint")
         xmlrpc_timeout = int(config.get("virtinfo_timeout"))
         proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
-        repo_path = compose_path(self.factory.root, pathname)
+        repo_path = six.ensure_str(compose_path(self.factory.root, pathname))
         if clone_from:
-            clone_path = compose_path(self.factory.root, clone_from)
+            clone_path = six.ensure_str(
+                compose_path(self.factory.root, clone_from))
         else:
             clone_path = None
         try:
