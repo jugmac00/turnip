@@ -554,7 +554,7 @@ class PackBackendProtocol(PackServerProtocol):
         if write_operation and self.factory.hookrpc_handler:
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.
-            ensure_config(self.path)
+            ensure_config(six.ensure_str(self.path))
             self.hookrpc_key = str(uuid.uuid4())
             self.factory.hookrpc_handler.registerKey(
                 self.hookrpc_key, self.raw_pathname, auth_params)
@@ -587,9 +587,10 @@ class PackBackendProtocol(PackServerProtocol):
         xmlrpc_endpoint = config.get("virtinfo_endpoint")
         xmlrpc_timeout = int(config.get("virtinfo_timeout"))
         proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
-        repo_path = compose_path(self.factory.root, pathname)
+        repo_path = six.ensure_str(compose_path(self.factory.root, pathname))
         if clone_from:
-            clone_path = compose_path(self.factory.root, clone_from)
+            clone_path = six.ensure_str(
+                compose_path(self.factory.root, clone_from))
         else:
             clone_path = None
         try:
