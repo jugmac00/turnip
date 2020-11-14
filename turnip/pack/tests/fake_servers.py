@@ -82,9 +82,10 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.abort_repo_creation_call_args = []
 
     def getInternalPath(self, pathname):
-        if pathname.startswith('/+rw'):
+        pathname = six.ensure_binary(pathname)
+        if pathname.startswith(b'/+rw'):
             pathname = pathname[4:]
-        return hashlib.sha256(six.ensure_binary(pathname)).hexdigest()
+        return hashlib.sha256(pathname).hexdigest()
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
         if self.require_auth and 'user' not in auth_params:

@@ -123,7 +123,7 @@ class FunctionalTestMixin(WithScenarios):
     def startPackBackend(self):
         # XXX cjwatson 2018-11-20: Use bytes so that shutil.rmtree doesn't
         # get confused on Python 2.
-        self.root = tempfile.mkdtemp(prefix='turnip-test-root-')
+        self.root = tempfile.mkdtemp(prefix=b'turnip-test-root-')
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
         self.statsd_client = MockStatsd()
         self.backend_listener = reactor.listenTCP(
@@ -934,9 +934,10 @@ class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
     def setUp(self):
         yield super(TestSmartSSHServiceFunctional, self).setUp()
 
-        config = os.path.join(self.root, "ssh-config")
-        known_hosts = os.path.join(self.root, "known_hosts")
-        private_key = os.path.join(self.root, "ssh-key")
+        root = six.ensure_text(self.root)
+        config = os.path.join(root, "ssh-config")
+        known_hosts = os.path.join(root, "known_hosts")
+        private_key = os.path.join(root, "ssh-key")
         shutil.copy2(os.path.join(self.data_dir, "ssh-key"), private_key)
         os.chmod(private_key, stat.S_IRUSR | stat.S_IWUSR)
         public_key = os.path.join(self.data_dir, "ssh-key.pub")
@@ -946,7 +947,7 @@ class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
             print("StrictHostKeyChecking no", file=config_file)
             print("User example", file=config_file)
             print("UserKnownHostsFile %s" % known_hosts, file=config_file)
-        git_ssh = os.path.join(self.root, "ssh-wrapper")
+        git_ssh = os.path.join(root, "ssh-wrapper")
         with open(git_ssh, "w") as git_ssh_file:
             print('#! /bin/sh', file=git_ssh_file)
             print('ssh -F %s "$@"' % config, file=git_ssh_file)
@@ -961,21 +962,18 @@ class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
 
         # We run a service connecting to the backend and authserver servers
         # started by the mixin.
-        private_host_key = os.path.join(self.root, "ssh-host-key")
+        private_host_key = os.path.join(root, "ssh-host-key")
         shutil.copy2(
             os.path.join(self.data_dir, "ssh-host-key"), private_host_key)
         os.chmod(private_host_key, stat.S_IRUSR | stat.S_IWUSR)
         public_host_key = os.path.join(self.data_dir, "ssh-host-key.pub")
 
-        # This is odd, but Twisted seems to behave differently on each
-        # python version.
-        strport = 'tcp:0' if six.PY3 else b'tcp:0'
         self.service = SmartSSHService(
             b'localhost', self.virt_port, self.authserver_url,
             private_key_path=private_host_key, public_key_path=public_host_key,
             main_log="turnip", access_log="turnip.access",
-            access_log_path=os.path.join(self.root, "access.log"),
-            strport=strport, moduli_path="/etc/ssh/moduli")
+            access_log_path=os.path.join(root, "access.log"),
+            strport=six.ensure_str('tcp:0'), moduli_path="/etc/ssh/moduli")
         self.service.startService()
         self.addCleanup(self.service.stopService)
         socket = self.service.service._waitingForPort.result.socket
