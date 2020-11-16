@@ -30,7 +30,7 @@ importlib_metadata==1.7.0
 incremental==17.5.0
 ipaddress==1.0.23
 kombu==4.6.11
-lazr.sshserver==0.1.8
+lazr.sshserver==0.1.11
 linecache2==1.0.0
 lxml==4.5.2
 m2r==0.1.14
