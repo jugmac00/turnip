@@ -374,7 +374,7 @@ class TestUpdateHook(TestCase):
     def patched_ancestor_check(self, old, new):
         # Avoid a subprocess call to execute on a git repository
         # that we haven't created.
-        if old == 'old':
+        if old == b'old':
             return False
         return True
 
@@ -387,11 +387,11 @@ class TestUpdateHook(TestCase):
     def test_fast_forward(self):
         # If the old sha is a merge ancestor of the new
         self.assertEqual(
-            [], hook.match_update_rules({}, ['ref', 'somehex', 'new']))
+            [], hook.match_update_rules({}, [b'ref', b'somehex', b'new']))
 
     def test_rules_fall_through(self):
         # The default is to deny
-        output = hook.match_update_rules({}, ['ref', 'old', 'new'])
+        output = hook.match_update_rules({}, [b'ref', b'old', b'new'])
         self.assertEqual(
             [b'You do not have permission to force-push to ref.'], output)
 
@@ -399,14 +399,14 @@ class TestUpdateHook(TestCase):
         # No matches means deny by default
         output = hook.match_update_rules(
             {'notamatch': []},
-            [b'ref', 'old', 'new'])
+            [b'ref', b'old', b'new'])
         self.assertEqual(
             [b'You do not have permission to force-push to ref.'], output)
 
     def test_no_matching_non_utf8_ref(self):
         # An unmatched non-UTF-8 ref is denied.
         output = hook.match_update_rules(
-            {}, [b'refs/heads/\x80', 'old', 'new'])
+            {}, [b'refs/heads/\x80', b'old', b'new'])
         self.assertEqual(
             [b'You do not have permission to force-push to refs/heads/\x80.'],
             output)
@@ -414,7 +414,7 @@ class TestUpdateHook(TestCase):
     def test_no_matching_utf8_ref(self):
         # An unmatched UTF-8 ref is denied.
         output = hook.match_update_rules(
-            {}, [u'refs/heads/géag'.encode('UTF-8'), 'old', 'new'])
+            {}, [u'refs/heads/géag'.encode('UTF-8'), b'old', b'new'])
         self.assertEqual(
             [b'You do not have permission to force-push to '
              b'refs/heads/g\xc3\xa9ag.'],
@@ -423,8 +423,8 @@ class TestUpdateHook(TestCase):
     def test_matching_ref(self):
         # Permission given to force-push
         output = hook.match_update_rules(
-            {'ref': ['force_push']},
-            ['ref', 'old', 'new'])
+            {b'ref': ['force_push']},
+            [b'ref', b'old', b'new'])
         self.assertEqual([], output)
 
     def test_matching_non_utf8_ref(self):
@@ -444,8 +444,8 @@ class TestUpdateHook(TestCase):
     def test_no_permission(self):
         # User does not have permission to force-push
         output = hook.match_update_rules(
-            {'ref': ['create']},
-            ['ref', 'old', 'new'])
+            {b'ref': ['create']},
+            [b'ref', b'old', b'new'])
         self.assertEqual(
             [b'You do not have permission to force-push to ref.'], output)
 
@@ -463,35 +463,37 @@ class TestDeterminePermissions(TestCase):
     def test_no_match_fallthrough(self):
         # No matching rule is deny by default
         output = hook.determine_permissions_outcome(
-            'old', 'ref', {})
+            b'old', b'ref', {})
         self.assertEqual(b"You do not have permission to push to ref.", output)
 
     def test_match_no_permissions(self):
         output = hook.determine_permissions_outcome(
-            'old', 'ref', {'ref': []})
+            b'old', b'ref', {'ref': []})
         self.assertEqual(b"You do not have permission to push to ref.", output)
 
     def test_match_with_create(self):
         output = hook.determine_permissions_outcome(
-            pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['create']})
+            six.ensure_binary(pygit2.GIT_OID_HEX_ZERO),
+            b'ref', {b'ref': ['create']})
         self.assertIsNone(output)
 
     def test_match_no_create_perms(self):
         output = hook.determine_permissions_outcome(
-            pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': []})
+            six.ensure_binary(pygit2.GIT_OID_HEX_ZERO), b'ref', {b'ref': []})
         self.assertEqual(b"You do not have permission to create ref.", output)
 
     def test_push(self):
         output = hook.determine_permissions_outcome(
-            'old', 'ref', {'ref': ['push']})
+            b'old', b'ref', {b'ref': ['push']})
         self.assertIsNone(output)
 
     def test_force_push(self):
         output = hook.determine_permissions_outcome(
-            'old', 'ref', {'ref': ['force_push']})
+            b'old', b'ref', {b'ref': ['force_push']})
         self.assertIsNone(output)
 
     def test_force_push_does_not_imply_create(self):
         output = hook.determine_permissions_outcome(
-            pygit2.GIT_OID_HEX_ZERO, 'ref', {'ref': ['force_push']})
+            six.ensure_binary(pygit2.GIT_OID_HEX_ZERO),
+            b'ref', {b'ref': ['force_push']})
         self.assertEqual(b"You do not have permission to create ref.", output)
