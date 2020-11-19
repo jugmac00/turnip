@@ -37,7 +37,7 @@ def check_ancestor(old, new):
         return False
     # https://git-scm.com/docs/git-merge-base#_discussion
     return_code = subprocess.call(
-        ['git', 'merge-base', '--is-ancestor', old, new])
+        [b'git', b'merge-base', b'--is-ancestor', old, new])
     return return_code == 0
 
 
