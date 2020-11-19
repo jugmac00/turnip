@@ -7,4 +7,5 @@ libssl-dev
 libxml2-dev
 libxslt1-dev
 python-dev
+python3-dev
 virtualenv
