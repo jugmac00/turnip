@@ -101,11 +101,21 @@ check: pip-check test lint check-python3-partial
 # regressions.
 check-python3-partial:
 	$(MAKE) build VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
+	# XXX: Tests not passing on python3 yet:
+	# turnip.pack.tests.test_functional.TestSmartHTTPFrontendFunctional
+	# turnip.pack.tests.test_functional.TestSmartHTTPFrontendWithAuthFunctional
 	$(PY3_ENV)/bin/python -m unittest \
+		turnip.api.tests.test_api \
+		turnip.api.tests.test_helpers \
+		turnip.api.tests.test_store \
+		turnip.pack.tests.test_git \
 		turnip.pack.tests.test_helpers \
 		turnip.pack.tests.test_hookrpc \
+		turnip.pack.tests.test_hooks \
 		turnip.pack.tests.test_http \
 		turnip.pack.tests.test_ssh \
+		turnip.pack.tests.test_functional.TestBackendFunctional \
+		turnip.pack.tests.test_functional.TestGitFrontendFunctional \
 		turnip.pack.tests.test_functional.TestSmartSSHServiceFunctional
 
 check-python3:

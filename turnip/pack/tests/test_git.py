@@ -228,7 +228,7 @@ class TestPackBackendProtocol(TestCase):
 
         full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
         self.assertEqual(
-            [mock.call(full_path, None, log=mock.ANY)],
+            [mock.call(six.ensure_str(full_path), None, log=mock.ANY)],
             store.init_repo.call_args_list)
         self.assertEqual([], store.delete_repo.call_args_list)
 
@@ -258,10 +258,11 @@ class TestPackBackendProtocol(TestCase):
 
         full_path = os.path.join(six.ensure_binary(self.root), b'foo.git')
         self.assertEqual(
-            [mock.call(full_path, None, log=mock.ANY)],
+            [mock.call(six.ensure_str(full_path), None, log=mock.ANY)],
             store.init_repo.call_args_list)
         self.assertEqual(
-            [mock.call(full_path, )], store.delete_repo.call_args_list)
+            [mock.call(six.ensure_str(full_path), )],
+            store.delete_repo.call_args_list)
 
         auth_params = self.proto.createAuthParams(params)
         self.assertEqual([('foo.git', )],
