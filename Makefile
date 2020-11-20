@@ -94,7 +94,19 @@ lint: $(ENV)
 pip-check: $(ENV)
 	$(PIP) check
 
-check: pip-check test lint
+check: pip-check test lint check-python3-partial
+
+# This rule should be removed once all tests are running in python3.
+# Meanwhile, let's keep this list up-to-date and make sure we won't have
+# regressions.
+check-python3-partial:
+	$(MAKE) build VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
+	$(PY3_ENV)/bin/python -m unittest \
+		turnip.pack.tests.test_helpers \
+		turnip.pack.tests.test_hookrpc \
+		turnip.pack.tests.test_http \
+		turnip.pack.tests.test_ssh \
+		turnip.pack.tests.test_functional.TestSmartSSHServiceFunctional
 
 check-python3:
 	$(MAKE) check VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
