@@ -760,8 +760,8 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
         the repository if it doesn't exist.
         """
         creation_params = translated_path.get("creation_params")
-        is_stateless_rpc = params.get('turnip-stateless-rpc')
-        is_advertise_ref = params.get('turnip-advertise-refs')
+        is_stateless_rpc = params.get(b'turnip-stateless-rpc')
+        is_advertise_ref = params.get(b'turnip-advertise-refs')
         is_write = permission == 'write'
         should_create = not is_stateless_rpc or (is_advertise_ref and is_write)
         if creation_params and should_create:
