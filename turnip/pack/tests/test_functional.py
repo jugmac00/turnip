@@ -805,7 +805,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
             b'HEAD', b'http://localhost:%d/' % self.port)
         self.assertEqual(302, response.code)
         self.assertEqual(
-            [version_info['revision_id']],
+            [six.ensure_binary(version_info['revision_id'])],
             response.headers.getRawHeaders(b'X-Turnip-Revision'))
 
     def make_set_symbolic_ref_request(self, line):

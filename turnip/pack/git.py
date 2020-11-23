@@ -506,8 +506,8 @@ class PackBackendProtocol(PackServerProtocol):
 
         cmd_env = {}
         write_operation = False
-        version = params.get(b'version', 0)
-        cmd_env["GIT_PROTOCOL"] = 'version=%s' % version
+        version = params.get(b'version', b'0')
+        cmd_env["GIT_PROTOCOL"] = 'version=%s' % six.ensure_text(version)
         if version == b'2':
             params.pop(b'turnip-advertise-refs', None)
         if command == b'git-upload-pack':

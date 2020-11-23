@@ -84,7 +84,7 @@ def fail_request(request, message, code=http.INTERNAL_SERVER_ERROR):
 
 def get_protocol_version_from_request(request):
     version_header = request.requestHeaders.getRawHeaders(
-        'git-protocol', [b'version=0'])[0]
+        b'git-protocol', [b'version=0'])[0]
     try:
         return six.ensure_binary(version_header).split(b'version=', 1)[1]
     except IndexError:
@@ -762,8 +762,8 @@ class SmartHTTPFrontendResource(resource.Resource):
     @staticmethod
     def _isGitRequest(request):
         if request.path.endswith(b'/info/refs'):
-            service = request.args.get('service', [])
-            if service and service[0].startswith('git-'):
+            service = request.args.get(b'service', [])
+            if service and service[0].startswith(b'git-'):
                 return True
         content_type = request.getHeader(b'Content-Type')
         if content_type is None:
