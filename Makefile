@@ -102,7 +102,6 @@ check: pip-check test lint check-python3-partial
 check-python3-partial:
 	$(MAKE) build VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
 	# XXX: Tests not passing on python3 yet:
-	# turnip.pack.tests.test_functional.TestSmartHTTPFrontendFunctional
 	# turnip.pack.tests.test_functional.TestSmartHTTPFrontendWithAuthFunctional
 	$(PY3_ENV)/bin/python -m unittest \
 		turnip.api.tests.test_api \
@@ -116,7 +115,8 @@ check-python3-partial:
 		turnip.pack.tests.test_ssh \
 		turnip.pack.tests.test_functional.TestBackendFunctional \
 		turnip.pack.tests.test_functional.TestGitFrontendFunctional \
-		turnip.pack.tests.test_functional.TestSmartSSHServiceFunctional
+		turnip.pack.tests.test_functional.TestSmartSSHServiceFunctional \
+		turnip.pack.tests.test_functional.TestSmartHTTPFrontendFunctional
 
 check-python3:
 	$(MAKE) check VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
