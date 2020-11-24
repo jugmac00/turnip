@@ -887,16 +887,16 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
         yield self.assertCommandSuccess((b'git', b'clone', self.ro_url, clone))
         expected_requests = 1 if self.protocol_version in (b'0', b'1') else 2
         self.assertEqual(
-            [(b'test-user', b'test-password')] * expected_requests,
+            [('test-user', 'test-password')] * expected_requests,
             self.virtinfo.authentications)
         self.assertEqual(expected_requests, len(self.virtinfo.translations))
         for translation in self.virtinfo.translations:
             self.assertThat(translation, MatchesListwise([
-                Equals(b'/test'), Equals(b'read'),
+                Equals('/test'), Equals('read'),
                 MatchesDict({
-                    b'can-authenticate': Is(True),
-                    b'request-id': Not(Is(None)),
-                    b'user': Equals(b'test-user')})
+                    'can-authenticate': Is(True),
+                    'request-id': Not(Is(None)),
+                    'user': Equals('test-user')})
                 ]))
 
     @defer.inlineCallbacks
@@ -919,9 +919,9 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
                 Equals(self.internal_name),
                 Equals([b'refs/heads/master']),
                 MatchesDict({
-                    b'can-authenticate': Is(True),
-                    b'request-id': Not(Is(None)),
-                    b'user': Equals(b'test-user'),
+                    'can-authenticate': Is(True),
+                    'request-id': Not(Is(None)),
+                    'user': Equals('test-user'),
                     })])]))
 
 

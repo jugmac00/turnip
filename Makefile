@@ -70,8 +70,16 @@ bootstrap-test:
 	-sudo rabbitmqctl add_vhost turnip-test-vhost
 	-sudo rabbitmqctl set_permissions -p "turnip-test-vhost" "guest" ".*" ".*" ".*"
 
-test: $(ENV) bootstrap-test
+run-test: $(ENV) bootstrap-test
 	$(PYTHON) -m unittest discover $(ARGS) turnip
+
+test: test-python2 test-python3
+
+test-python2:
+	$(MAKE) run-test VENV_ARGS="-p python2"
+
+test-python3:
+	$(MAKE) run-test VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
 
 clean:
 	find turnip -name '*.py[co]' -exec rm '{}' \;
@@ -94,34 +102,7 @@ lint: $(ENV)
 pip-check: $(ENV)
 	$(PIP) check
 
-check: pip-check test lint check-python3-partial
-
-# This rule should be removed once all tests are running in python3.
-# Meanwhile, let's keep this list up-to-date and make sure we won't have
-# regressions.
-check-python3-partial:
-	$(MAKE) build VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
-	# XXX: Tests not passing on python3 yet:
-	# turnip.pack.tests.test_functional.TestSmartHTTPFrontendWithAuthFunctional
-	$(PY3_ENV)/bin/python -m unittest \
-		turnip.api.tests.test_api \
-		turnip.api.tests.test_helpers \
-		turnip.api.tests.test_store \
-		turnip.pack.tests.test_git \
-		turnip.pack.tests.test_helpers \
-		turnip.pack.tests.test_hookrpc \
-		turnip.pack.tests.test_hooks \
-		turnip.pack.tests.test_http \
-		turnip.pack.tests.test_ssh \
-		turnip.pack.tests.test_functional.TestBackendFunctional \
-		turnip.pack.tests.test_functional.TestGitFrontendFunctional \
-		turnip.pack.tests.test_functional.TestSmartSSHServiceFunctional \
-		turnip.pack.tests.test_functional.TestSmartHTTPFrontendFunctional
-
-check-python3:
-	$(MAKE) check VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
-
-check-python-compat: check check-python3
+check: pip-check test lint
 
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
