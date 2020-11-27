@@ -446,3 +446,45 @@ class InitTestCase(TestCase):
         self.assertEqual(before_refs_len - 1, len(orig.references.objects))
         self.assertNotIn(
             new_branch_name, [i.name for i in orig.references.objects])
+
+    def getLooseObjects(self, path):
+        curdir = os.getcwd()
+
+        os.chdir(path)
+        objects = subprocess.check_output(['git', 'count-objects'])
+        if (int(objects[0:(objects.find(' objects'))]) == 0):
+            os.chdir(curdir)
+            return True
+        else:
+            os.chdir(curdir)
+            return False
+
+    def test_repack(self):
+        celery_fixture = CeleryWorkerFixture()
+        self.useFixture(celery_fixture)
+
+        curdir = os.getcwd()
+        gc_path = os.path.join(self.repo_store, 'test_gc/')
+        gc_factory = RepoFactory(
+            gc_path, num_branches=3, num_commits=30, num_tags=3)
+        os.mkdir(os.path.join(gc_path, 'worktree'))
+        gc_factory.build()
+        os.chdir(os.path.join(gc_path, 'worktree'))
+        repo_config = pygit2.Repository(gc_path).config
+        repo_config['core.bare'] = False
+        repo_config['core.worktree'] = os.path.join(gc_path, 'worktree')
+        assert 'core.worktree' in repo_config
+        assert repo_config['core.worktree']
+
+        repo_path = os.path.join(gc_path, 'worktree')
+        objects = subprocess.check_output(['git', 'count-objects'])
+        self.assertGreater(int(objects[0:(objects.find(' objects'))]), 0)
+        kwargs = dict(repo_path=repo_path)
+
+        #store.repack(repo_path)
+        store.repack.apply_async((repo_path, ))
+
+        celery_fixture.waitUntil(
+            2, lambda: self.getLooseObjects(repo_path))
+
+        os.chdir(curdir)
