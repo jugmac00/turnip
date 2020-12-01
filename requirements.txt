@@ -14,7 +14,7 @@ contextlib2==0.6.0.post1
 cornice==3.6.1
 cryptography==3.0
 docutils==0.14
-enum34==1.1.10
+enum34==1.1.10; python_version < "3.4"
 envdir==0.7
 extras==1.0.0
 fixtures==3.0.0
