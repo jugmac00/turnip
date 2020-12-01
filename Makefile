@@ -2,7 +2,7 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 ENV := $(CURDIR)/env
-PY3_ENV := $(CURDIR)/py3env
+PY2_ENV := $(CURDIR)/py2env
 PIP_CACHE = $(CURDIR)/pip-cache
 
 PYTHON := $(ENV)/bin/python
@@ -11,6 +11,7 @@ FLAKE8 := $(ENV)/bin/flake8
 CELERY := $(ENV)/bin/celery
 PIP := $(ENV)/bin/pip
 VIRTUALENV := virtualenv
+VENV_ARGS := -p python3
 
 DEPENDENCIES_URL := https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
 PIP_SOURCE_DIR := dependencies
@@ -73,17 +74,17 @@ bootstrap-test:
 run-test: $(ENV) bootstrap-test
 	$(PYTHON) -m unittest discover $(ARGS) turnip
 
-test: test-python2 test-python3
-
-test-python2:
-	$(MAKE) run-test VENV_ARGS="-p python2"
+test: test-python3 test-python2
 
 test-python3:
-	$(MAKE) run-test VENV_ARGS="-p python3" ENV="$(PY3_ENV)"
+	$(MAKE) run-test VENV_ARGS="-p python3"
+
+test-python2:
+	$(MAKE) run-test VENV_ARGS="-p python2" ENV="$(PY2_ENV)"
 
 clean:
 	find turnip -name '*.py[co]' -exec rm '{}' \;
-	rm -rf $(ENV) $(PY3_ENV) $(PIP_CACHE)
+	rm -rf $(ENV) $(PY2_ENV) $(PIP_CACHE)
 	rm -f turnip/version_info.py
 
 dist:
