@@ -471,14 +471,16 @@ def delete_repo(repo_path):
         repo_path = repo_path.encode('UTF-8')
     shutil.rmtree(repo_path)
 
+
 @app.task
 def repack(repo_path):
     """Repack a repository with git-repack."""
     logger = tasks_logger
-
     logger.info(
         "Asynchronous repack triggered for repository: "
-            "%s", repo_path)
+        "%s", repo_path)
+
+    ensure_config(repo_path)
 
     repack_args = ['git', 'repack', '-Ad']
 

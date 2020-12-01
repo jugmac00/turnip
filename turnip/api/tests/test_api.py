@@ -32,7 +32,6 @@ from webtest import TestApp
 
 from turnip import api
 from turnip.api.tests.test_helpers import (
-    chdir,
     get_revlist,
     open_repo,
     RepoFactory,
@@ -833,9 +832,8 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         self.assertEqual(5, len(resp.json))
         self.assertNotIn(excluded_commit, resp.json)
 
-    def test_A_repo_repack_verify_pack(self):
+    def test_repo_repack(self):
         """Ensure commit exists in pack."""
-        factory = RepoFactory(self.repo_store)
         resp = self.app.post_json('/repo/{}/repack'.format(self.repo_path))
         self.assertEqual(200, resp.status_code)
 

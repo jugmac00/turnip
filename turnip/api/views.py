@@ -157,6 +157,7 @@ class RepackAPI(BaseAPI):
 
         return Response(status=200)
 
+
 @resource(path='/repo/{name}/refs-copy')
 class RefCopyAPI(BaseAPI):
     """Provides HTTP API for git references copy operations."""
