@@ -731,7 +731,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'master'), path=clone1)
         self.assertEqual(
-            [self.internal_name], self.virtinfo.push_notifications)
+            [six.ensure_text(self.internal_name)],
+            self.virtinfo.push_notifications)
 
     @defer.inlineCallbacks
     def test_unicode_fault(self):
@@ -848,7 +849,8 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/new-head', head_target)
         self.assertEqual(
-            [self.internal_name], self.virtinfo.push_notifications)
+            [six.ensure_text(self.internal_name)],
+            self.virtinfo.push_notifications)
 
     @defer.inlineCallbacks
     def test_turnip_set_symbolic_ref_error(self):
@@ -916,7 +918,7 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
             (b'git', b'push', b'origin', b'master'), path=clone)
         self.assertThat(self.virtinfo.ref_permissions_checks, MatchesListwise([
             MatchesListwise([
-                Equals(self.internal_name),
+                Equals(six.ensure_text(self.internal_name)),
                 Equals([b'refs/heads/master']),
                 MatchesDict({
                     'can-authenticate': Is(True),

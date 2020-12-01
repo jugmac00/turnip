@@ -23,6 +23,7 @@ from __future__ import (
 import base64
 import json
 
+import six
 from six.moves import xmlrpc_client
 from twisted.internet import (
     defer,
@@ -130,7 +131,7 @@ class HookRPCHandler(object):
         self.auth_params = {}
         self.ref_paths = {}
         self.ref_permissions = {}
-        self.virtinfo_url = virtinfo_url
+        self.virtinfo_url = six.ensure_binary(virtinfo_url)
         self.virtinfo_timeout = virtinfo_timeout
         self.reactor = reactor or default_reactor
 
@@ -171,7 +172,7 @@ class HookRPCHandler(object):
             try:
                 result = yield proxy.callRemote(
                     'checkRefPermissions',
-                    ref_path,
+                    six.ensure_str(ref_path),
                     [xmlrpc_client.Binary(path) for path in missing],
                     auth_params).addTimeout(
                         self.virtinfo_timeout, self.reactor)
@@ -230,7 +231,7 @@ class HookRPCHandler(object):
     @defer.inlineCallbacks
     def notify(self, path):
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        yield proxy.callRemote('notify', path).addTimeout(
+        yield proxy.callRemote('notify', six.ensure_str(path)).addTimeout(
             self.virtinfo_timeout, self.reactor)
 
     @defer.inlineCallbacks
