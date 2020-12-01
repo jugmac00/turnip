@@ -79,7 +79,7 @@ smarthttp_site = server.Site(SmartHTTPFrontendResource(config))
 reactor.listenTCP(int(config.get('smart_http_port')), smarthttp_site)
 smartssh_service = SmartSSHService(
     PACK_VIRT_HOST, PACK_VIRT_PORT,
-    six.ensure_binary(config.get('authentication_endpoint')),
+    config.get('authentication_endpoint'),
     private_key_path=config.get('private_ssh_key_path'),
     public_key_path=config.get('public_ssh_key_path'),
     main_log='turnip', access_log=os.path.join(LOG_PATH, 'turnip.access'),

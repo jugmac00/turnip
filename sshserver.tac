@@ -27,7 +27,7 @@ def getSmartSSHService():
 
     return SmartSSHService(
         config.get('pack_virt_host'), int(config.get('pack_virt_port')),
-        six.ensure_binary(config.get('authentication_endpoint')),
+        config.get('authentication_endpoint'),
         private_key_path=config.get('private_ssh_key_path'),
         public_key_path=config.get('public_ssh_key_path'),
         # XXX cjwatson 2015-04-25: Should we just send access log
