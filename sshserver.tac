@@ -12,6 +12,7 @@ from __future__ import (
 
 import os
 
+import six
 from twisted.application import service
 from twisted.scripts.twistd import ServerOptions
 
@@ -33,7 +34,8 @@ def getSmartSSHService():
         # information to the main log?  Requires lazr.sshserver changes.
         main_log='turnip', access_log=os.path.join(log_path, 'turnip.access'),
         access_log_path=os.path.join(log_path, 'turnip-access.log'),
-        strport=b'tcp:{}'.format(int(config.get('smart_ssh_port'))),
+        strport=six.ensure_str(
+            'tcp:{}'.format(int(config.get('smart_ssh_port')))),
         moduli_path=config.get('moduli_path'))
 
 

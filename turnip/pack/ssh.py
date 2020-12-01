@@ -241,7 +241,8 @@ class SmartSSHService(SSHService):
     def __init__(self, backend_host, backend_port, authentication_endpoint,
                  *args, **kwargs):
         SSHService.__init__(
-            self, portal=self._makePortal(authentication_endpoint),
+            self, portal=self._makePortal(
+                six.ensure_binary(authentication_endpoint)),
             *args, **kwargs)
         self.backend_host = backend_host
         self.backend_port = backend_port
