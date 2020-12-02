@@ -57,7 +57,7 @@ class HookProcessProtocol(protocol.ProcessProtocol):
 class MockHookRPCHandler(hookrpc.HookRPCHandler):
 
     def __init__(self):
-        super(MockHookRPCHandler, self).__init__(None, 15)
+        super(MockHookRPCHandler, self).__init__(b'http://localhost', 15)
         self.notifications = []
         self.ref_permissions = {}
 

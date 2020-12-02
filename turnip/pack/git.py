@@ -576,7 +576,7 @@ class PackBackendProtocol(PackServerProtocol):
         :param pathname: Repository's translated path.
         :param auth_params: Authorization info.
         """
-        xmlrpc_endpoint = config.get("virtinfo_endpoint")
+        xmlrpc_endpoint = six.ensure_binary(config.get("virtinfo_endpoint"))
         xmlrpc_timeout = int(config.get("virtinfo_timeout"))
         proxy = xmlrpc.Proxy(xmlrpc_endpoint, allowNone=True)
         repo_path = six.ensure_str(compose_path(self.factory.root, pathname))
@@ -778,7 +778,7 @@ class PackVirtFactory(protocol.Factory):
                  virtinfo_timeout, reactor=None):
         self.backend_host = backend_host
         self.backend_port = backend_port
-        self.virtinfo_endpoint = virtinfo_endpoint
+        self.virtinfo_endpoint = six.ensure_binary(virtinfo_endpoint)
         self.virtinfo_timeout = virtinfo_timeout
         self.reactor = reactor or default_reactor
 
