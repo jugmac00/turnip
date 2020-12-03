@@ -10,7 +10,6 @@ from __future__ import (
 import os.path
 import re
 import subprocess
-import sys
 import uuid
 
 from fixtures import (
@@ -448,15 +447,11 @@ class InitTestCase(TestCase):
         self.assertNotIn(
             new_branch_name, [i.name for i in orig.references.objects])
 
-    def zeroLooseObjects(self, path):
+    def hasZeroLooseObjects(self, path):
         curdir = os.getcwd()
         os.chdir(path)
-        PY3K = sys.version_info >= (3, 0)
-        if PY3K:
-            objects = subprocess.check_output(['git', 'count-objects'],
-                                              encoding='UTF-8')
-        else:
-            objects = subprocess.check_output(['git', 'count-objects'])
+        objects = subprocess.check_output(['git', 'count-objects'],
+                                          universal_newlines=True)
         if (int(objects[0:(objects.find(' objects'))]) == 0):
             os.chdir(curdir)
             return True
@@ -471,12 +466,12 @@ class InitTestCase(TestCase):
         self.makeOrig()
         orig_path = self.orig_path
 
-        # Frist assert we have loose objects for this repo
-        self.assertFalse(self.zeroLooseObjects(orig_path))
+        # First assert we have loose objects for this repo
+        self.assertFalse(self.hasZeroLooseObjects(orig_path))
 
         # Trigger the repack job
         store.repack.apply_async((orig_path, ))
 
         # Assert we have 0 loose objects after repack job ran
         celery_fixture.waitUntil(
-            2, lambda: self.zeroLooseObjects(orig_path))
+            5, lambda: self.hasZeroLooseObjects(orig_path))

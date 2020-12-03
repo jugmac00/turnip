@@ -3,7 +3,6 @@
 
 import os
 import re
-from subprocess import CalledProcessError
 
 from cornice.resource import resource
 from cornice.util import extract_json_data
@@ -144,17 +143,8 @@ class RepackAPI(BaseAPI):
     @validate_path
     def post(self, repo_store, repo_name):
         repo_path = os.path.join(repo_store, repo_name)
-
-        try:
-            kwargs = dict(repo_path=repo_path)
-            store.repack.apply_async(kwargs=kwargs)
-        except (CalledProcessError):
-            self.request.errors.add(
-                'The server has either erred or is incapable of performing '
-                'the requested operation.')
-            self.request.errors.status = 500
-            return
-
+        kwargs = dict(repo_path=repo_path)
+        store.repack.apply_async(kwargs=kwargs)
         return Response(status=200)
 
 
