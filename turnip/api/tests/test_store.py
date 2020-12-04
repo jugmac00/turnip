@@ -446,3 +446,32 @@ class InitTestCase(TestCase):
         self.assertEqual(before_refs_len - 1, len(orig.references.objects))
         self.assertNotIn(
             new_branch_name, [i.name for i in orig.references.objects])
+
+    def hasZeroLooseObjects(self, path):
+        curdir = os.getcwd()
+        os.chdir(path)
+        objects = subprocess.check_output(['git', 'count-objects'],
+                                          universal_newlines=True)
+        if (int(objects[0:(objects.find(' objects'))]) == 0):
+            os.chdir(curdir)
+            return True
+        else:
+            os.chdir(curdir)
+            return False
+
+    def test_repack(self):
+        celery_fixture = CeleryWorkerFixture()
+        self.useFixture(celery_fixture)
+
+        self.makeOrig()
+        orig_path = self.orig_path
+
+        # First assert we have loose objects for this repo
+        self.assertFalse(self.hasZeroLooseObjects(orig_path))
+
+        # Trigger the repack job
+        store.repack.apply_async((orig_path, ))
+
+        # Assert we have 0 loose objects after repack job ran
+        celery_fixture.waitUntil(
+            5, lambda: self.hasZeroLooseObjects(orig_path))
