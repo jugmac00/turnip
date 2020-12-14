@@ -52,6 +52,24 @@ VIRT_ERROR_PREFIX = b'turnip virt error: '
 SAFE_PARAMS = frozenset([b'host', b'version'])
 
 
+class six_dict(dict):
+    """
+    A python2/python3 compatibility layer around dict.
+
+    Don't use it extensively: this is just a temporary workaround for a
+    python3 incompatibility on Twisted. There should be an upstream fix for
+    that soon (see https://twistedmatrix.com/trac/ticket/9933).
+    """
+    def itervalues(self):
+        return super(six_dict, self).values()
+
+    def iterkeys(self):
+        return super(six_dict, self).keys()
+
+    def __repr__(self):
+        return "<six_dict %s>" % super(six_dict, self).__repr__()
+
+
 class RequestIDLogger(Logger):
 
     def emit(self, level, format=None, **kwargs):
@@ -562,6 +580,9 @@ class PackBackendProtocol(PackServerProtocol):
     def spawnProcess(self, cmd, args, env=None, childFDs=None):
         default_reactor.spawnProcess(
             self.peer, cmd, args, env=env, childFDs=childFDs)
+        # XXX pappacena 2020-12-14: Workaround py3 incompatibility in
+        # Twisted Process (see https://twistedmatrix.com/trac/ticket/9933)
+        self.peer.transport.pipes = six_dict(self.peer.transport.pipes)
 
     def expectNextCommand(self):
         """Enables this connection to receive the next command."""
