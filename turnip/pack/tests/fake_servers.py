@@ -126,6 +126,10 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         if self.merge_proposal_url_fault is not None:
             raise self.merge_proposal_url_fault
         else:
+            # Launchpad fails if these parameters are binary. So, replicate
+            # this behavior with a couple of asserts.
+            assert isinstance(path, six.string_types)
+            assert isinstance(branch, six.string_types)
             return self.merge_proposal_url
 
     def xmlrpc_confirmRepoCreation(self, pathname, auth_params):

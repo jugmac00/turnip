@@ -252,9 +252,9 @@ class HookRPCHandler(object):
     @defer.inlineCallbacks
     def getMergeProposalURL(self, proto, args):
         log_context = HookRPCLogContext(self.auth_params[args['key']])
-        path = self.ref_paths[args['key']]
+        path = six.ensure_text(self.ref_paths[args['key']])
         auth_params = self.auth_params[args['key']]
-        branch = args['branch']
+        branch = six.ensure_text(args['branch'])
         log_context.log.info(
             "getMergeProposalURL request received: ref_path={path}", path=path)
         mp_url = None
