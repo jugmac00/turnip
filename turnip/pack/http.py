@@ -416,7 +416,7 @@ class RobotsResource(static.Data):
         """).encode('US-ASCII')
 
     def __init__(self):
-        static.Data.__init__(self, self.robots_txt, b'text/plain')
+        static.Data.__init__(self, self.robots_txt, 'text/plain')
 
 
 class CGitScriptResource(twcgi.CGIScript):
@@ -440,7 +440,9 @@ class CGitScriptResource(twcgi.CGIScript):
         self.cgit_config = tempfile.NamedTemporaryFile(
             mode='w+', prefix='turnip-cgit-')
         os.chmod(self.cgit_config.name, 0o644)
-        fmt = {'repo_url': self.repo_url, 'repo_path': self.repo_path}
+        fmt = {
+            'repo_url': six.ensure_text(self.repo_url),
+            'repo_path': six.ensure_text(self.repo_path)}
         if self.root.site_name is not None:
             prefixes = " ".join(
                 "{}://{}".format(scheme, self.root.site_name)
@@ -470,6 +472,7 @@ class CGitScriptResource(twcgi.CGIScript):
         env["CGIT_CONFIG"] = self.cgit_config.name
         env["PATH_INFO"] = "/%s%s" % (self.repo_url, self.trailing)
         env["SCRIPT_NAME"] = "/"
+        env['QUERY_STRING'] = six.ensure_text(env['QUERY_STRING'])
         twcgi.CGIScript.runProcess(self, env, request, *args, **kwargs)
 
 
@@ -617,7 +620,7 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         if 'path' not in translated:
             return fail_request(
                 request, 'translatePath response did not include path')
-        repo_url = request.path.rstrip('/')
+        repo_url = six.ensure_text(request.path.rstrip(b'/'))
         # cgit simply parses configuration values up to the end of a line
         # following the first '=', so almost anything is safe, but
         # double-check that there are no newlines to confuse things.
@@ -625,7 +628,8 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
             return fail_request(
                 request, 'repository URL may not contain newlines')
         try:
-            repo_path = compose_path(self.root.repo_store, translated['path'])
+            repo_path = compose_path(
+                self.root.repo_store, six.ensure_binary(translated['path']))
         except ValueError as e:
             return fail_request(request, str(e))
         trailing = translated.get('trailing')
@@ -638,9 +642,12 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
                     'translatePath returned inconsistent response: '
                     '"%s" does not end with "%s"' % (repo_url, trailing))
             repo_url = repo_url[:-len(trailing)]
-        repo_url = repo_url.strip('/')
+        repo_url = six.ensure_text(repo_url.strip('/'))
         cgit_resource = CGitScriptResource(
             self.root, repo_url, repo_path, trailing, translated['private'])
+        # XXX pappacena 2020-12-15: CGIScript.render assumes postpath items
+        # are str, and fail if any item is bytes.
+        request.postpath = [six.ensure_text(i) for i in request.postpath]
         request.render(cgit_resource)
 
     def _translatePathErrback(self, failure, request, session):
@@ -680,7 +687,7 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         identity_url = session.get('identity_url', self.anonymous_id)
         proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint, allowNone=True)
         d = proxy.callRemote(
-            'translatePath', request.path, b'read',
+            'translatePath', six.ensure_text(request.path), 'read',
             {'uid': identity_url, 'can-authenticate': True})
         d.addTimeout(self.root.virtinfo_timeout, self.root.reactor)
         d.addCallback(self._translatePathCallback, request)
@@ -714,7 +721,8 @@ class SmartHTTPFrontendResource(resource.Resource):
         resource.Resource.__init__(self)
         self.backend_host = config.get("pack_virt_host")
         self.backend_port = int(config.get("pack_virt_port"))
-        self.virtinfo_endpoint = config.get("virtinfo_endpoint")
+        self.virtinfo_endpoint = six.ensure_binary(
+            config.get("virtinfo_endpoint"))
         self.virtinfo_timeout = int(config.get("virtinfo_timeout"))
         self.reactor = reactor or default_reactor
         # XXX cjwatson 2015-03-30: Knowing about the store path here
@@ -745,9 +753,9 @@ class SmartHTTPFrontendResource(resource.Resource):
             with open(os.path.join(stdir, 'private.css'), 'rb') as f:
                 private_css = css + b'\n' + f.read()
             static_resource.putChild(
-                b'cgit-public.css', static.Data(css, b'text/css'))
+                b'cgit-public.css', static.Data(css, 'text/css'))
             static_resource.putChild(
-                b'cgit-private.css', static.Data(private_css, b'text/css'))
+                b'cgit-private.css', static.Data(private_css, 'text/css'))
             self.putChild(b'static', static_resource)
             favicon = os.path.join(stdir, 'launchpad.png')
             self.putChild(b'favicon.ico', static.File(favicon))

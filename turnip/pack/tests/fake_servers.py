@@ -105,6 +105,9 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             else:
                 clone_from = None
             retval["creation_params"] = {"clone_from": clone_from}
+        retval['private'] = False
+        retval['trailing'] = ''
+        retval["writable"] = writable
         return retval
 
     def xmlrpc_authenticateWithPassword(self, username, password):

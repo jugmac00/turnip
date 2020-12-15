@@ -8,7 +8,9 @@ from __future__ import (
     )
 
 from io import BytesIO
+import os
 
+from fixtures import TempDir
 import six
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
@@ -18,9 +20,12 @@ from twisted.internet import (
     task,
     testing,
     )
+from twisted.internet.address import IPv4Address
 from twisted.web import server
 from twisted.web.test import requesthelper
 
+from turnip.api import store
+from turnip.config import config
 from turnip.pack import (
     helpers,
     http,
@@ -35,6 +40,10 @@ from turnip.version_info import version_info
 class LessDummyRequest(requesthelper.DummyRequest):
 
     startedWriting = 0
+
+    def __init__(self, *args, **kwargs):
+        super(LessDummyRequest, self).__init__(*args, **kwargs)
+        self.content = BytesIO()
 
     @property
     def value(self):
@@ -55,6 +64,9 @@ class LessDummyRequest(requesthelper.DummyRequest):
 
     def getPassword(self):
         return None
+
+    def getClientAddress(self):
+        return IPv4Address('TCP', '127.0.0.1', '80')
 
 
 class AuthenticatedLessDummyRequest(LessDummyRequest):
@@ -85,10 +97,13 @@ class FakeRoot(object):
     allowed_services = frozenset((
         b'git-upload-pack', b'git-receive-pack', b'turnip-set-symbolic-ref'))
 
-    def __init__(self):
+    def __init__(self, repo_store=None):
         self.backend_transport = None
         self.client_factory = None
         self.backend_connected = defer.Deferred()
+        self.repo_store = repo_store
+        self.cgit_exec_path = config.get("cgit_exec_path")
+        self.site_name = 'turnip'
 
     def authenticateWithPassword(self, user, password):
         """Pretends to talk to Launchpad XML-RPC service to authenticate the user.
@@ -293,9 +308,10 @@ class TestHTTPAuthRootResource(TestCase):
 
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
-    def test_translatePath_timeout(self):
-        root = FakeRoot()
-        virtinfo = FakeVirtInfoService(allowNone=True)
+    def setUp(self):
+        super(TestHTTPAuthRootResource, self).setUp()
+        self.root = root = FakeRoot(self.useFixture(TempDir()).path)
+        self.virtinfo = virtinfo = FakeVirtInfoService(allowNone=True)
         virtinfo_listener = default_reactor.listenTCP(0, server.Site(virtinfo))
         virtinfo_port = virtinfo_listener.getHost().port
         virtinfo_url = b'http://localhost:%d/' % virtinfo_port
@@ -304,6 +320,9 @@ class TestHTTPAuthRootResource(TestCase):
         root.virtinfo_timeout = 15
         root.reactor = task.Clock()
         root.cgit_secret = None
+
+    def test_translatePath_timeout(self):
+        root = self.root
         request = LessDummyRequest([''])
         request.method = b'GET'
         request.path = b'/example'
@@ -314,6 +333,19 @@ class TestHTTPAuthRootResource(TestCase):
         self.assertTrue(d.called)
         self.assertEqual(504, request.responseCode)
         self.assertEqual(b'Path translation timed out.', request.value)
+
+    @defer.inlineCallbacks
+    def test_render_root_repo(self):
+        root = self.root
+        request = LessDummyRequest([''])
+        store.init_repo(os.path.join(
+            root.repo_store, self.virtinfo.getInternalPath('/example')))
+        request.method = b'GET'
+        request.path = b'/example'
+        request.uri = b'http://dummy/example'
+        yield render_resource(http.HTTPAuthRootResource(root), request)
+        response_content = b''.join(request.written)
+        self.assertIn(b"Repository seems to be empty", response_content)
 
 
 class TestProtocolVersion(TestCase):
