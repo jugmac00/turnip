@@ -101,7 +101,7 @@ class FunctionalTestMixin(WithScenarios):
         self.virtinfo_listener = reactor.listenTCP(
             0, server.Site(self.virtinfo))
         self.virtinfo_port = self.virtinfo_listener.getHost().port
-        self.virtinfo_url = b'http://localhost:%d/' % self.virtinfo_port
+        self.virtinfo_url = 'http://localhost:%d/' % self.virtinfo_port
         self.addCleanup(self.virtinfo_listener.stopListening)
         self.virtinfo.ref_permissions = {
             b'refs/heads/master': ['create', 'push']}
