@@ -321,6 +321,28 @@ class TestHTTPAuthRootResource(TestCase):
         root.reactor = task.Clock()
         root.cgit_secret = None
 
+    def test__beginLogin(self):
+        root = self.root
+        root.openid_provider_root = 'https://testopenid.test/'
+        request = LessDummyRequest([''])
+        request.method = b'GET'
+        request.path = b'/example'
+        session = {}
+        openid_request = mock.Mock()
+        openid_request.redirectURL.return_value = 'http://redirected.test'
+
+        # Quite a lot of things are mocked here, mainly because we only want
+        # to make sure that we redirect to OpenID correctly.
+        resource = http.HTTPAuthRootResource(root)
+        resource._makeConsumer = mock.Mock()
+        resource._makeConsumer.return_value.begin.return_value = openid_request
+
+        resource._beginLogin(request, session)
+        self.assertEqual(302, request.responseCode)
+        self.assertEqual(
+            [b'http://redirected.test'],
+            request.responseHeaders.getRawHeaders(b'location'))
+
     def test_translatePath_timeout(self):
         root = self.root
         request = LessDummyRequest([''])
