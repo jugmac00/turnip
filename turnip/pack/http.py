@@ -604,15 +604,16 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         that we can then redirect them again to the page they were looking
         at, with a cookie that gives us the identity URL and username.
         """
+        base_url = 'https://%s' % compat.nativeString(
+            request.getRequestHostname())
+        back_to = six.ensure_binary(base_url) + request.uri
+        realm = base_url + '/'
+        return_to = base_url + '/+login/?' + urlencode({'back_to': back_to})
+
         openid_request = self._makeConsumer(session).begin(
             self.root.openid_provider_root)
         openid_request.addExtension(SRegRequest(required=['nickname']))
-        base_url = 'https://%s' % compat.nativeString(
-            request.getRequestHostname())
-        back_to = base_url + request.uri
-        target = openid_request.redirectURL(
-            base_url + '/',
-            base_url + '/+login/?' + urlencode({'back_to': back_to}))
+        target = openid_request.redirectURL(realm, return_to)
         request.redirect(target.encode('UTF-8'))
         request.finish()
 
