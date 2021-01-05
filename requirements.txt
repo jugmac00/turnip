@@ -38,7 +38,7 @@ mccabe==0.3
 mistune==0.8.3
 mock==3.0.5; python_version < "3"
 pathlib2==2.3.5
-Paste==2.0.2
+Paste==3.5.0
 PasteDeploy==2.1.0
 pbr==5.4.5
 pep8==1.5.7
