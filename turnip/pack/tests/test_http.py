@@ -8,10 +8,13 @@ from __future__ import (
     )
 
 from io import BytesIO
+import json
 import os
 
 from fixtures import TempDir
 import six
+from openid.consumer import consumer
+from paste.auth.cookie import encode as encode_cookie
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (
@@ -31,7 +34,10 @@ from turnip.pack import (
     http,
     )
 from turnip.pack.helpers import encode_packet
-from turnip.pack.http import get_protocol_version_from_request
+from turnip.pack.http import (
+    get_protocol_version_from_request,
+    HTTPAuthLoginResource,
+    )
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
 from turnip.tests.compat import mock
 from turnip.version_info import version_info
@@ -44,6 +50,7 @@ class LessDummyRequest(requesthelper.DummyRequest):
     def __init__(self, *args, **kwargs):
         super(LessDummyRequest, self).__init__(*args, **kwargs)
         self.content = BytesIO()
+        self.cookies = {}
 
     @property
     def value(self):
@@ -67,6 +74,9 @@ class LessDummyRequest(requesthelper.DummyRequest):
 
     def getClientAddress(self):
         return IPv4Address('TCP', '127.0.0.1', '80')
+
+    def getCookie(self, name):
+        return self.cookies.get(name)
 
 
 class AuthenticatedLessDummyRequest(LessDummyRequest):
@@ -302,6 +312,69 @@ class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
             b'001bI am git protocol data.'
             b'And I am raw, since we got a good packet to start with.',
             self.request.value)
+
+
+class TestHTTPAuthLoginResource(TestCase):
+    """Unit tests for login resource."""
+    def setUp(self):
+        super(TestHTTPAuthLoginResource, self).setUp()
+        self.root = FakeRoot(self.useFixture(TempDir()).path)
+        self.root.cgit_secret = b'dont-tell-anyone shuuu'
+
+    def getResourceInstance(self, mock_response):
+        resource = HTTPAuthLoginResource(self.root)
+        resource._makeConsumer = mock.Mock()
+        resource._makeConsumer.return_value.complete.return_value = (
+            mock_response)
+        return resource
+
+    def test_render_GET_success(self):
+        response = mock.Mock()
+        response.status = consumer.SUCCESS
+        response.identity_url = 'http://lp.test/XopAlqp'
+        response.getSignedNS.return_value = {
+            'nickname': 'pappacena', 'country': 'BR'
+        }
+
+        request = LessDummyRequest([''])
+        request.method = b'GET'
+        request.path = b'/example'
+        request.args = {
+            b'openid.return_to': [b'https://return.to.test'],
+            b'back_to': [b'https://return.to.test']
+        }
+
+        resource = self.getResourceInstance(response)
+        self.assertEqual(b'', resource.render_GET(request))
+        encoded_cookie = resource.signer.sign(encode_cookie(json.dumps({
+            'identity_url': response.identity_url,
+            'user': 'pappacena'
+        })))
+        expected_cookie = b'TURNIP_COOKIE=%s; Path=/; secure;' % encoded_cookie
+        self.assertEqual({
+            b'Set-Cookie': [expected_cookie],
+            b'Location': [b'https://return.to.test']
+        }, dict(request.responseHeaders.getAllRawHeaders()))
+
+    def test_getSession(self):
+        response = mock.Mock()
+        request = LessDummyRequest([''])
+        request.method = b'GET'
+        request.path = b'/example'
+        request.args = {
+            b'openid.return_to': [b'https://return.to.test'],
+            b'back_to': [b'https://return.to.test']
+        }
+
+        resource = self.getResourceInstance(response)
+        cookie_data = {
+            'identity_url': 'http://localhost',
+            'user': 'pappacena'}
+        cookie_content = resource.signer.sign(
+            encode_cookie(json.dumps(cookie_data)))
+        request.cookies[resource.cookie_name] = cookie_content
+
+        self.assertEqual(cookie_data, resource._getSession(request))
 
 
 class TestHTTPAuthRootResource(TestCase):
