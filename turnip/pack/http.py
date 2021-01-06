@@ -7,6 +7,7 @@ from __future__ import (
     unicode_literals,
     )
 
+import base64
 import io
 import json
 import os.path
@@ -24,12 +25,14 @@ from openid.extensions.sreg import (
     SRegRequest,
     SRegResponse,
     )
+import paste.auth.cookie
 from paste.auth.cookie import (
     AuthCookieSigner,
     decode as decode_cookie,
     encode as encode_cookie,
     )
 import six
+import time
 from twisted.internet import (
     defer,
     error,
@@ -476,18 +479,53 @@ class CGitScriptResource(twcgi.CGIScript):
         twcgi.CGIScript.runProcess(self, env, request, *args, **kwargs)
 
 
+class TurnipAuthCookieSigner(AuthCookieSigner):
+    def auth(self, cookie):
+        """
+        Authenticate the cooke using the signature, verify that it
+        has not expired; and return the cookie's content.
+
+        This was moved from the original AuthCookieSigner to make it python3
+        compatible, since paste.auth.* is marked to be deprecated according to
+        https://pythonpaste.readthedocs.io/en/latest/future.html#to-deprecate.
+        """
+        _signature_size = paste.auth.cookie._signature_size
+        _header_size = paste.auth.cookie._header_size
+        sha1 = paste.auth.cookie.sha1
+        hmac = paste.auth.cookie.hmac
+        make_time = paste.auth.cookie.make_time
+        decode = base64.decodestring(
+            cookie.replace(b"_", b"/").replace(b"~", b"="))
+        signature = decode[:_signature_size]
+        expires = decode[_signature_size:_header_size]
+        content = decode[_header_size:]
+        if signature == hmac.new(self.secret, content, sha1).digest():
+            if int(expires) > int(make_time(time.time())):
+                return content
+            else:
+                # This is the normal case of an expired cookie; just
+                # don't bother doing anything here.
+                pass
+        else:
+            # This case can happen if the server is restarted with a
+            # different secret; or if the user's IP address changed
+            # due to a proxy.  However, it could also be a break-in
+            # attempt -- so should it be reported?
+            pass
+
+
 class BaseHTTPAuthResource(resource.Resource):
     """Base HTTP resource for OpenID authentication handling."""
 
     session_var = 'turnip.session'
-    cookie_name = 'TURNIP_COOKIE'
+    cookie_name = b'TURNIP_COOKIE'
     anonymous_id = '+launchpad-anonymous'
 
     def __init__(self, root):
         resource.Resource.__init__(self)
         self.root = root
         if root.cgit_secret is not None:
-            self.signer = AuthCookieSigner(root.cgit_secret)
+            self.signer = TurnipAuthCookieSigner(root.cgit_secret)
         else:
             self.signer = None
 
@@ -497,14 +535,14 @@ class BaseHTTPAuthResource(resource.Resource):
             if cookie is not None:
                 content = self.signer.auth(cookie)
                 if content:
-                    return json.loads(decode_cookie(content))
+                    return json.loads(decode_cookie(six.ensure_text(content)))
         return {}
 
     def _putSession(self, request, session):
         if self.signer is not None:
             content = self.signer.sign(encode_cookie(json.dumps(session)))
-            cookie = '%s=%s; Path=/; secure;' % (self.cookie_name, content)
-            request.setHeader(b'Set-Cookie', cookie.encode('UTF-8'))
+            cookie = b'%s=%s; Path=/; secure;' % (self.cookie_name, content)
+            request.setHeader(b'Set-Cookie', cookie)
 
     def _setErrorCode(self, request, code=http.INTERNAL_SERVER_ERROR):
         request.setResponseCode(code)
@@ -534,7 +572,8 @@ class HTTPAuthLoginResource(BaseHTTPAuthResource):
         wrong.
         """
         session = self._getSession(request)
-        query = {k: v[-1] for k, v in request.args.items()}
+        query = {six.ensure_text(k): six.ensure_text(v[-1])
+                 for k, v in request.args.items()}
         response = self._makeConsumer(session).complete(
             query, query['openid.return_to'])
         if response.status == consumer.SUCCESS:
@@ -551,7 +590,7 @@ class HTTPAuthLoginResource(BaseHTTPAuthResource):
                 session['identity_url'] = response.identity_url
                 session['user'] = sreg_info['nickname']
                 self._putSession(request, session)
-                request.redirect(query['back_to'])
+                request.redirect(six.ensure_binary(query['back_to']))
                 return b''
         elif response.status == consumer.FAILURE:
             log.msg('OpenID response: FAILURE: %s' % response.message)
