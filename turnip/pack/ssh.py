@@ -121,6 +121,7 @@ class SSHPackClientFactory(protocol.ClientFactory):
         self.deferred.errback(reason)
 
 
+@implementer(ISession, ISessionSetEnv)
 class SmartSSHSession(DoNothingSession):
     """SSH session allowing only Git smart SSH requests."""
 

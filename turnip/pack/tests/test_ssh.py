@@ -8,12 +8,18 @@ from __future__ import (
     )
 
 from testtools import TestCase
+from twisted.conch.interfaces import ISession, ISessionSetEnv
 
 from turnip.pack.ssh import SmartSSHSession
 
 
 class TestSSHSessionProtocolVersion(TestCase):
     """Tests that SSH session gets protocol version from env variable."""
+    def test_implements_env_interfaces(self):
+        session = SmartSSHSession(None)
+        self.assertTrue(ISession.providedBy(session))
+        self.assertTrue(ISessionSetEnv.providedBy(session))
+
     def test_getProtocolVersion_default_zero(self):
         session = SmartSSHSession(None)
         self.assertEqual(b'0', session.getProtocolVersion())
