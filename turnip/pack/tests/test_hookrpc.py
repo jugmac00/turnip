@@ -328,7 +328,15 @@ class TestHookRPCHandler(TestCase):
     def test_notifyPush(self):
         with self.registeredKey('/translated') as key:
             yield self.hookrpc_handler.notifyPush(None, {'key': key})
-        self.assertEqual(['/translated'], self.virtinfo.push_notifications)
+
+        # notify will now return in this format:
+        # [('/translated', '1035 objects, 2298 kilobytes', 2)]
+        # with the numbers being different of course for each
+        # repository state
+        self.assertEquals('/translated',
+                          self.virtinfo.push_notifications[0][0])
+        self.assertEquals(1035, self.virtinfo.push_notifications[0][1])
+        self.assertEquals(3, self.virtinfo.push_notifications[0][2])
 
     def test_notifyPush_timeout(self):
         clock = task.Clock()

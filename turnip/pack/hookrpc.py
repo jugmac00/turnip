@@ -1,4 +1,4 @@
-# Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2021 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """RPC server for Git hooks.
@@ -23,8 +23,10 @@ from __future__ import (
 import base64
 import json
 
+import os
 import six
 from six.moves import xmlrpc_client
+import subprocess
 from twisted.internet import (
     defer,
     protocol,
@@ -229,20 +231,40 @@ class HookRPCHandler(object):
              for ref in paths})
 
     @defer.inlineCallbacks
-    def notify(self, path):
+    def notify(self, path, loose_object_count, pack_count, auth_params):
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        yield proxy.callRemote('notify', six.ensure_str(path)).addTimeout(
+        yield proxy.callRemote('notify', six.ensure_str(path),
+                               loose_object_count, pack_count,
+                               auth_params).addTimeout(
             self.virtinfo_timeout, self.reactor)
+
+    def loose_object_count(self, path):
+        count = subprocess.check_output(
+            ['git', 'count-objects']).rstrip(b'\n').decode("utf-8")
+        return int(count[0:(count.find(' objects'))])
+
+    def pack_count(self):
+        path = './.git/objects/pack'
+        packs = len([name for name in os.listdir(path) if (
+            name.endswith('.idx') and
+            os.path.isfile(os.path.join(path, name))
+            )])
+        return packs
 
     @defer.inlineCallbacks
     def notifyPush(self, proto, args):
         """Notify the virtinfo service about a push."""
         log_context = HookRPCLogContext(self.auth_params[args['key']])
         path = self.ref_paths[args['key']]
+        auth_params = self.auth_params[args['key']]
         log_context.log.info(
             "notifyPush request received: ref_path={path}", path=path)
         try:
-            yield self.notify(path)
+            # get the number of loose objects and packs
+            loose_object_count = self.loose_object_count(path)
+            pack_count = self.pack_count()
+            yield self.notify(path, loose_object_count,
+                              pack_count, auth_params)
         except defer.TimeoutError:
             log_context.log.info(
                 "notifyPush timed out: ref_path={path}", path=path)

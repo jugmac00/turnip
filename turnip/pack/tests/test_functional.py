@@ -731,8 +731,8 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'master'), path=clone1)
         self.assertEqual(
-            [six.ensure_text(self.internal_name)],
-            self.virtinfo.push_notifications)
+            six.ensure_text(self.internal_name),
+            self.virtinfo.push_notifications[0][0])
 
     @defer.inlineCallbacks
     def test_unicode_fault(self):
@@ -849,8 +849,8 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/new-head', head_target)
         self.assertEqual(
-            [six.ensure_text(self.internal_name)],
-            self.virtinfo.push_notifications)
+            six.ensure_text(self.internal_name),
+            self.virtinfo.push_notifications[0][0])
 
     @defer.inlineCallbacks
     def test_turnip_set_symbolic_ref_error(self):

@@ -658,8 +658,13 @@ class PackBackendProtocol(PackServerProtocol):
         if self.command == b'turnip-set-symbolic-ref':
             if reason.check(error.ProcessDone):
                 try:
+                    loose_object_count = (
+                        self.factory.hookrpc_handler.loose_object_count(
+                            'path'))
+                    pack_count = self.factory.hookrpc_handler.pack_count()
                     yield self.factory.hookrpc_handler.notify(
-                        self.raw_pathname)
+                        self.raw_pathname, loose_object_count, pack_count,
+                        self.factory.hookrpc_handler.auth_params)
                     self.sendPacket(b'ACK %s\n' % self.symbolic_ref_name)
                 except Exception as e:
                     message = str(e)
