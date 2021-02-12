@@ -233,23 +233,24 @@ class HookRPCHandler(object):
     @defer.inlineCallbacks
     def notify(self, path, loose_object_count, pack_count, auth_params):
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
+        statistics = dict([("loose_object_count", loose_object_count),
+        ("pack_count", pack_count)])
         yield proxy.callRemote('notify', six.ensure_str(path),
-                               loose_object_count, pack_count,
+                               statistics,
                                auth_params).addTimeout(
             self.virtinfo_timeout, self.reactor)
 
-    def loose_object_count(self, path):
+    def repack_data(self, path):
+        # curdir = os.getcwd()
+        # os.chdir(path)
         count = subprocess.check_output(
-            ['git', 'count-objects']).rstrip(b'\n').decode("utf-8")
-        return int(count[0:(count.find(' objects'))])
+            ['git', 'count-objects', '-v']).decode("utf-8")
 
-    def pack_count(self):
-        path = './.git/objects/pack'
-        packs = len([name for name in os.listdir(path) if (
-            name.endswith('.idx') and
-            os.path.isfile(os.path.join(path, name))
-            )])
-        return packs
+        packs = int(count[count.find('packs: ')+len('packs: '):count.find('packs: ')+len('packs: ')+1])
+        objects = int(count[count.find('\n')-1:count.find('\n')])
+
+        # os.chdir(curdir)
+        return objects, packs
 
     @defer.inlineCallbacks
     def notifyPush(self, proto, args):
@@ -261,8 +262,7 @@ class HookRPCHandler(object):
             "notifyPush request received: ref_path={path}", path=path)
         try:
             # get the number of loose objects and packs
-            loose_object_count = self.loose_object_count(path)
-            pack_count = self.pack_count()
+            loose_object_count, pack_count = self.repack_data(path)
             yield self.notify(path, loose_object_count,
                               pack_count, auth_params)
         except defer.TimeoutError:
