@@ -189,6 +189,15 @@ def send_mp_url(received_line):
                 stdout.write(b'      %s\n' % six.ensure_binary(mp_url, "UTF8"))
                 stdout.write(b'      \n')
 
+
+def repack_data():
+    count = subprocess.check_output(
+        ['git', 'count-objects', '-v']).decode("utf-8")
+    packs = int(count[count.find('packs: ')+len('packs: '):
+                count.find('packs: ')+len('packs: ')+1])
+    objects = int(count[count.find('\n')-1:count.find('\n')])
+    return objects, packs
+
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key
     # from the environment.
@@ -212,7 +221,12 @@ if __name__ == '__main__':
         # Details of the changes aren't currently included.
         lines = stdin.readlines()
         if lines:
-            rpc_invoke(sock, 'notify_push', {'key': rpc_key})
+            loose_object_count, pack_count = repack_data()
+            rpc_invoke(sock,
+                       'notify_push',
+                       {'key': rpc_key,
+                        'loose_object_count': loose_object_count,
+                        'pack_count': pack_count})
         if len(lines) == 1:
             send_mp_url(lines[0])
         sys.exit(0)

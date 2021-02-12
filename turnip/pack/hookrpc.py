@@ -23,10 +23,8 @@ from __future__ import (
 import base64
 import json
 
-import os
 import six
 from six.moves import xmlrpc_client
-import subprocess
 from twisted.internet import (
     defer,
     protocol,
@@ -234,23 +232,11 @@ class HookRPCHandler(object):
     def notify(self, path, loose_object_count, pack_count, auth_params):
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
         statistics = dict([("loose_object_count", loose_object_count),
-        ("pack_count", pack_count)])
+                           ("pack_count", pack_count)])
         yield proxy.callRemote('notify', six.ensure_str(path),
                                statistics,
                                auth_params).addTimeout(
             self.virtinfo_timeout, self.reactor)
-
-    def repack_data(self, path):
-        # curdir = os.getcwd()
-        # os.chdir(path)
-        count = subprocess.check_output(
-            ['git', 'count-objects', '-v']).decode("utf-8")
-
-        packs = int(count[count.find('packs: ')+len('packs: '):count.find('packs: ')+len('packs: ')+1])
-        objects = int(count[count.find('\n')-1:count.find('\n')])
-
-        # os.chdir(curdir)
-        return objects, packs
 
     @defer.inlineCallbacks
     def notifyPush(self, proto, args):
@@ -258,11 +244,11 @@ class HookRPCHandler(object):
         log_context = HookRPCLogContext(self.auth_params[args['key']])
         path = self.ref_paths[args['key']]
         auth_params = self.auth_params[args['key']]
+        loose_object_count = args['loose_object_count']
+        pack_count = args['pack_count']
         log_context.log.info(
             "notifyPush request received: ref_path={path}", path=path)
         try:
-            # get the number of loose objects and packs
-            loose_object_count, pack_count = self.repack_data(path)
             yield self.notify(path, loose_object_count,
                               pack_count, auth_params)
         except defer.TimeoutError:

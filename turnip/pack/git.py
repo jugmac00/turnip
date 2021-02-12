@@ -18,6 +18,7 @@ import sys
 import uuid
 
 import six
+import subprocess
 import traceback
 from twisted.internet import (
     defer,
@@ -652,15 +653,24 @@ class PackBackendProtocol(PackServerProtocol):
 
         PackServerProtocol.packetReceived(self, data)
 
+    def repack_data(self, path):
+        print(path)
+        count = subprocess.check_output(
+            ['git', 'count-objects', '-v'], cwd=path).decode("utf-8")
+        packs = int((
+            count[count.find('packs: ')+len('packs: '):
+                    count.find('packs: ')+len('packs: ')+1]))
+        objects = int(count[count.find('\n')-1:count.find('\n')])
+        return objects, packs
+
     @defer.inlineCallbacks
     def processEnded(self, reason):
         message = None
         if self.command == b'turnip-set-symbolic-ref':
             if reason.check(error.ProcessDone):
                 try:
-                    loose_object_count, pack_count= (
-                        self.factory.hookrpc_handler.repack_data(
-                            self.path))
+                    loose_object_count, pack_count = self.repack_data(
+                        self.path.decode('utf-8'))
                     yield self.factory.hookrpc_handler.notify(
                         self.raw_pathname, loose_object_count, pack_count,
                         self.factory.hookrpc_handler.auth_params)

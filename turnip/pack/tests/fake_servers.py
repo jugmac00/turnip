@@ -112,7 +112,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         return {'user': username}
 
     def xmlrpc_notify(self, path, statistics, auth_params):
-        self.push_notifications.append((path, statistics, 
+        self.push_notifications.append((path, statistics,
                                         auth_params))
 
     def xmlrpc_checkRefPermissions(self, path, ref_paths, auth_params):
