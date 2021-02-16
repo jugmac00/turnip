@@ -653,14 +653,13 @@ class PackBackendProtocol(PackServerProtocol):
 
         PackServerProtocol.packetReceived(self, data)
 
-    def repack_data(self, path):
-        print(path)
-        count = subprocess.check_output(
-            ['git', 'count-objects', '-v'], cwd=path).decode("utf-8")
-        packs = int((
-            count[count.find('packs: ')+len('packs: '):
-                    count.find('packs: ')+len('packs: ')+1]))
-        objects = int(count[count.find('\n')-1:count.find('\n')])
+    def repack_data():
+        output = subprocess.check_output(
+            ['git', 'count-objects', '-v']).decode("utf-8")
+        packs = int(output[output.find('packs: ')+len('packs: '):
+                    output.find('packs: ')+len('packs: ')+1])
+        objects = int(output[output.find('output: ')+len('output: '):
+                      output.find('\n')])
         return objects, packs
 
     @defer.inlineCallbacks

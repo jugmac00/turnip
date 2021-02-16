@@ -329,7 +329,7 @@ class TestHookRPCHandler(TestCase):
         with self.registeredKey('/translated') as key:
             yield self.hookrpc_handler.notifyPush(
                 None,
-                {'key': key, 'loose_object_count': 9, 'pack_count': 7})
+                {'key': key, 'loose_object_count': 19, 'pack_count': 7})
 
         # notify will now return in this format:
         # [('/translated', '1035 objects, 2298 kilobytes', 2)]
@@ -338,7 +338,7 @@ class TestHookRPCHandler(TestCase):
         self.assertEquals('/translated',
                           self.virtinfo.push_notifications[0][0])
         self.assertEquals(
-            9,
+            19,
             self.virtinfo.push_notifications[0][1].get(
                 'loose_object_count'))
         self.assertEquals(

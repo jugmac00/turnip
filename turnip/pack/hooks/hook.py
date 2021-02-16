@@ -191,11 +191,12 @@ def send_mp_url(received_line):
 
 
 def repack_data():
-    count = subprocess.check_output(
+    output = subprocess.check_output(
         ['git', 'count-objects', '-v']).decode("utf-8")
-    packs = int(count[count.find('packs: ')+len('packs: '):
-                count.find('packs: ')+len('packs: ')+1])
-    objects = int(count[count.find('\n')-1:count.find('\n')])
+    packs = int(output[output.find('packs: ')+len('packs: '):
+                output.find('packs: ')+len('packs: ')+1])
+    objects = int(output[output.find('output: ')+len('output: '):
+                  output.find('\n')])
     return objects, packs
 
 if __name__ == '__main__':
