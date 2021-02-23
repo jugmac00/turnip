@@ -851,6 +851,12 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         self.assertEqual(
             six.ensure_text(self.internal_name),
             self.virtinfo.push_notifications[0][0])
+        self.assertNotEqual(
+            0,
+            self.virtinfo.push_notifications[0][1].get('pack_count'))
+        self.assertNotEqual(
+            0,
+            self.virtinfo.push_notifications[0][1].get('loose_object_count'))
 
     @defer.inlineCallbacks
     def test_turnip_set_symbolic_ref_error(self):

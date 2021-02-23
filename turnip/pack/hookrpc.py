@@ -231,8 +231,8 @@ class HookRPCHandler(object):
     @defer.inlineCallbacks
     def notify(self, path, loose_object_count, pack_count, auth_params):
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        statistics = dict([("loose_object_count", loose_object_count),
-                           ("pack_count", pack_count)])
+        statistics = dict({("loose_object_count", loose_object_count),
+                           ("pack_count", pack_count)})
         yield proxy.callRemote('notify', six.ensure_str(path),
                                statistics,
                                auth_params).addTimeout(

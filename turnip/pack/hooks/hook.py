@@ -19,6 +19,7 @@ import sys
 import six
 
 from turnip.compat.files import fd_buffer
+from turnip.pack.helpers import repack_data
 
 # XXX twom 2018-10-23 This should be a pygit2 import, but
 # that currently causes CFFI warnings to be returned to the client.
@@ -188,16 +189,6 @@ def send_mp_url(received_line):
                     b" visiting:\n" % pushed_branch)
                 stdout.write(b'      %s\n' % six.ensure_binary(mp_url, "UTF8"))
                 stdout.write(b'      \n')
-
-
-def repack_data():
-    output = subprocess.check_output(
-        ['git', 'count-objects', '-v']).decode("utf-8")
-    packs = int(output[output.find('packs: ')+len('packs: '):
-                output.find('packs: ')+len('packs: ')+1])
-    objects = int(output[output.find('output: ')+len('output: '):
-                  output.find('\n')])
-    return objects, packs
 
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key

@@ -18,7 +18,6 @@ import sys
 import uuid
 
 import six
-import subprocess
 import traceback
 from twisted.internet import (
     defer,
@@ -43,6 +42,7 @@ from turnip.pack.helpers import (
     ensure_config,
     ensure_hooks,
     INCOMPLETE_PKT,
+    repack_data,
     translate_xmlrpc_fault,
     )
 
@@ -653,23 +653,13 @@ class PackBackendProtocol(PackServerProtocol):
 
         PackServerProtocol.packetReceived(self, data)
 
-    def repack_data():
-        output = subprocess.check_output(
-            ['git', 'count-objects', '-v']).decode("utf-8")
-        packs = int(output[output.find('packs: ')+len('packs: '):
-                    output.find('packs: ')+len('packs: ')+1])
-        objects = int(output[output.find('output: ')+len('output: '):
-                      output.find('\n')])
-        return objects, packs
-
     @defer.inlineCallbacks
     def processEnded(self, reason):
         message = None
         if self.command == b'turnip-set-symbolic-ref':
             if reason.check(error.ProcessDone):
                 try:
-                    loose_object_count, pack_count = self.repack_data(
-                        self.path.decode('utf-8'))
+                    loose_object_count, pack_count = repack_data()
                     yield self.factory.hookrpc_handler.notify(
                         self.raw_pathname, loose_object_count, pack_count,
                         self.factory.hookrpc_handler.auth_params)

@@ -335,13 +335,13 @@ class TestHookRPCHandler(TestCase):
         # [('/translated', '1035 objects, 2298 kilobytes', 2)]
         # with the numbers being different of course for each
         # repository state
-        self.assertEquals('/translated',
-                          self.virtinfo.push_notifications[0][0])
-        self.assertEquals(
+        self.assertEqual('/translated',
+                         self.virtinfo.push_notifications[0][0])
+        self.assertEqual(
             19,
             self.virtinfo.push_notifications[0][1].get(
                 'loose_object_count'))
-        self.assertEquals(
+        self.assertEqual(
             7,
             self.virtinfo.push_notifications[0][1].get(
                 'pack_count'))
