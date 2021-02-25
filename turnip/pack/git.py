@@ -42,7 +42,7 @@ from turnip.pack.helpers import (
     ensure_config,
     ensure_hooks,
     INCOMPLETE_PKT,
-    repack_data,
+    get_repack_data,
     translate_xmlrpc_fault,
     )
 
@@ -659,7 +659,7 @@ class PackBackendProtocol(PackServerProtocol):
         if self.command == b'turnip-set-symbolic-ref':
             if reason.check(error.ProcessDone):
                 try:
-                    loose_object_count, pack_count = repack_data()
+                    loose_object_count, pack_count = get_repack_data()
                     yield self.factory.hookrpc_handler.notify(
                         self.raw_pathname, loose_object_count, pack_count,
                         self.factory.hookrpc_handler.auth_params)

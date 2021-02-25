@@ -16,10 +16,13 @@ import sys
 import tempfile
 from textwrap import dedent
 import time
+import uuid
 
 from fixtures import TempDir
 from pygit2 import (
     Config,
+    GIT_FILEMODE_BLOB,
+    IndexEntry,
     init_repository,
     )
 import six
@@ -33,6 +36,7 @@ from turnip.pack import helpers
 from turnip.pack.helpers import (
     encode_packet,
     get_capabilities_advertisement,
+    get_repack_data,
     )
 import turnip.pack.hooks
 from turnip.version_info import version_info
@@ -414,3 +418,32 @@ class MockStatsd():
 
     def get_client(self):
         return self
+
+
+class TestGetRepackData(TestCase):
+    """Test get repack indicators for repository."""
+
+    def setUp(self):
+        super(TestGetRepackData, self).setUp()
+        self.repo_dir = self.useFixture(TempDir()).path
+        self.repo = init_repository(self.repo_dir, bare=False)
+
+    def test_get_repack_data(self):
+        curdir = os.getcwd()
+        os.chdir(self.repo_dir)
+        # create a test file
+        blob_content = (
+            b'commit ' + 'file content'.encode('ascii') + b' - '
+            + uuid.uuid1().hex.encode('ascii'))
+        test_file = 'test.txt'
+        # stage the changes
+        self.repo.index.add(IndexEntry(
+            test_file, self.repo.create_blob(blob_content),
+            GIT_FILEMODE_BLOB))
+        self.repo.index.write_tree()
+
+        objects, packs = get_repack_data()
+        os.chdir(curdir)
+
+        self.assertIsNotNone(objects)
+        self.assertIsNotNone(packs)

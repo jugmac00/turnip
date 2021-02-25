@@ -244,8 +244,8 @@ class HookRPCHandler(object):
         log_context = HookRPCLogContext(self.auth_params[args['key']])
         path = self.ref_paths[args['key']]
         auth_params = self.auth_params[args['key']]
-        loose_object_count = args['loose_object_count']
-        pack_count = args['pack_count']
+        loose_object_count = args.get('loose_object_count')
+        pack_count = args.get('pack_count')
         log_context.log.info(
             "notifyPush request received: ref_path={path}", path=path)
         try:

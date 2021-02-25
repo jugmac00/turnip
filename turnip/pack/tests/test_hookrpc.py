@@ -332,7 +332,7 @@ class TestHookRPCHandler(TestCase):
                 {'key': key, 'loose_object_count': 19, 'pack_count': 7})
 
         # notify will now return in this format:
-        # [('/translated', '1035 objects, 2298 kilobytes', 2)]
+        # ('/translated', {'loose_object_count': 19, 'pack_count': 7}, {})
         # with the numbers being different of course for each
         # repository state
         self.assertEqual('/translated',
