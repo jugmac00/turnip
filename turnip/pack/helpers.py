@@ -12,6 +12,7 @@ import enum
 import hashlib
 import os.path
 import re
+import subprocess
 import stat
 import sys
 from tempfile import (
@@ -202,6 +203,18 @@ def ensure_hooks(repo_root):
             except OSError:
                 # May have raced with another invocation.
                 pass
+
+
+def get_repack_data():
+    output = subprocess.check_output(
+        ['git', 'count-objects', '-v'], universal_newlines=True)
+    if not output:
+        return None, None
+    match = re.search(r'^packs: (.*)', output, flags=re.M)
+    packs = int(match.group(1)) if match else None
+    match = re.search(r'^count: (.*)', output, flags=re.M)
+    objects = int(match.group(1)) if match else None
+    return objects, packs
 
 
 @enum.unique

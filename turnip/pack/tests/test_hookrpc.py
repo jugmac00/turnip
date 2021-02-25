@@ -327,15 +327,33 @@ class TestHookRPCHandler(TestCase):
     @defer.inlineCallbacks
     def test_notifyPush(self):
         with self.registeredKey('/translated') as key:
-            yield self.hookrpc_handler.notifyPush(None, {'key': key})
-        self.assertEqual(['/translated'], self.virtinfo.push_notifications)
+            yield self.hookrpc_handler.notifyPush(
+                None,
+                {'key': key, 'loose_object_count': 19, 'pack_count': 7})
+
+        # notify will now return in this format:
+        # ('/translated', {'loose_object_count': 19, 'pack_count': 7}, {})
+        # with the numbers being different of course for each
+        # repository state
+        self.assertEqual('/translated',
+                         self.virtinfo.push_notifications[0][0])
+        self.assertEqual(
+            19,
+            self.virtinfo.push_notifications[0][1].get(
+                'loose_object_count'))
+        self.assertEqual(
+            7,
+            self.virtinfo.push_notifications[0][1].get(
+                'pack_count'))
 
     def test_notifyPush_timeout(self):
         clock = task.Clock()
         self.hookrpc_handler = hookrpc.HookRPCHandler(
             self.virtinfo_url, 15, reactor=clock)
         with self.registeredKey('/translated') as key:
-            d = self.hookrpc_handler.notifyPush(None, {'key': key})
+            d = self.hookrpc_handler.notifyPush(
+                None,
+                {'key': key, 'loose_object_count': 9, 'pack_count': 7})
             clock.advance(1)
             self.assertFalse(d.called)
             clock.advance(15)

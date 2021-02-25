@@ -19,6 +19,7 @@ import sys
 import six
 
 from turnip.compat.files import fd_buffer
+from turnip.pack.helpers import get_repack_data
 
 # XXX twom 2018-10-23 This should be a pygit2 import, but
 # that currently causes CFFI warnings to be returned to the client.
@@ -212,7 +213,12 @@ if __name__ == '__main__':
         # Details of the changes aren't currently included.
         lines = stdin.readlines()
         if lines:
-            rpc_invoke(sock, 'notify_push', {'key': rpc_key})
+            loose_object_count, pack_count = get_repack_data()
+            rpc_invoke(sock,
+                       'notify_push',
+                       {'key': rpc_key,
+                        'loose_object_count': loose_object_count,
+                        'pack_count': pack_count})
         if len(lines) == 1:
             send_mp_url(lines[0])
         sys.exit(0)

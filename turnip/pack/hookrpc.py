@@ -1,4 +1,4 @@
-# Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2021 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 """RPC server for Git hooks.
@@ -229,9 +229,13 @@ class HookRPCHandler(object):
              for ref in paths})
 
     @defer.inlineCallbacks
-    def notify(self, path):
+    def notify(self, path, loose_object_count, pack_count, auth_params):
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        yield proxy.callRemote('notify', six.ensure_str(path)).addTimeout(
+        statistics = dict({("loose_object_count", loose_object_count),
+                           ("pack_count", pack_count)})
+        yield proxy.callRemote('notify', six.ensure_str(path),
+                               statistics,
+                               auth_params).addTimeout(
             self.virtinfo_timeout, self.reactor)
 
     @defer.inlineCallbacks
@@ -239,10 +243,14 @@ class HookRPCHandler(object):
         """Notify the virtinfo service about a push."""
         log_context = HookRPCLogContext(self.auth_params[args['key']])
         path = self.ref_paths[args['key']]
+        auth_params = self.auth_params[args['key']]
+        loose_object_count = args.get('loose_object_count')
+        pack_count = args.get('pack_count')
         log_context.log.info(
             "notifyPush request received: ref_path={path}", path=path)
         try:
-            yield self.notify(path)
+            yield self.notify(path, loose_object_count,
+                              pack_count, auth_params)
         except defer.TimeoutError:
             log_context.log.info(
                 "notifyPush timed out: ref_path={path}", path=path)
