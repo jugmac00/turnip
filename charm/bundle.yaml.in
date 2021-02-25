@@ -29,14 +29,14 @@ applications:
     charm: cs:rabbitmq-server
     num_units: 1
   turnip-pack-backend:
-    charm: ./dist/builds/turnip-pack-backend
+    charm: ./dist/turnip-pack-backend
     num_units: 1
     options:
       build_label: "%BUILD_LABEL%"
     resources:
       turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-pack-virt:
-    charm: ./dist/builds/turnip-pack-virt
+    charm: ./dist/turnip-pack-virt
     num_units: 1
     to: [turnip-pack-backend]
     options:
@@ -44,7 +44,7 @@ applications:
     resources:
       turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-pack-frontend-git:
-    charm: ./dist/builds/turnip-pack-frontend-git
+    charm: ./dist/turnip-pack-frontend-git
     num_units: 1
     to: [turnip-pack-backend]
     options:
@@ -52,7 +52,7 @@ applications:
     resources:
       turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-pack-frontend-ssh:
-    charm: ./dist/builds/turnip-pack-frontend-ssh
+    charm: ./dist/turnip-pack-frontend-ssh
     num_units: 1
     to: [turnip-pack-backend]
     options:
@@ -62,7 +62,7 @@ applications:
     resources:
       turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-pack-frontend-http:
-    charm: ./dist/builds/turnip-pack-frontend-http
+    charm: ./dist/turnip-pack-frontend-http
     num_units: 1
     to: [turnip-pack-backend]
     options:
@@ -70,7 +70,7 @@ applications:
     resources:
       turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-api:
-    charm: ./dist/builds/turnip-api
+    charm: ./dist/turnip-api
     num_units: 1
     to: [turnip-pack-backend]
     options:
@@ -78,7 +78,7 @@ applications:
     resources:
       turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-celery:
-    charm: ./dist/builds/turnip-celery
+    charm: ./dist/turnip-celery
     num_units: 1
     to: [turnip-pack-backend]
     options:
