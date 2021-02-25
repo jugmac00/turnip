@@ -61,7 +61,7 @@ dist/.built-%: $(CHARM_DEPS) | $(BUILDDIR)
 
 clean-%:
 	@echo "Cleaning $*..."
-	@rm -rf dist/.built-$* dist/builds/$* $(PUBLISHDIR)/$*
+	@rm -rf dist/.built-$* dist/$* $(PUBLISHDIR)/$*
 
 tmp/git.launchpad.test.crt: | $(TMPDIR)
 	openssl req -new -nodes -keyout tmp/git.launchpad.test.key \
@@ -102,7 +102,7 @@ clean:
 lint: build
 	@echo "Linting charms..."
 	@set -e; for charm in $(CHARMS); do \
-		charm proof dist/builds/$$charm; \
+		charm proof dist/$$charm; \
 	done
 	@echo "Linting python sources..."
 	@flake8 layer $(CHARMS)
@@ -116,7 +116,7 @@ publish: build lint | $(PUBLISHDIR)
 				$(PUBLISHDIR)/$$charm; \
 		fi; \
 		rsync -a -m --ignore-times --exclude .git --delete \
-			dist/builds/$$charm/ $(PUBLISHDIR)/$$charm/; \
+			dist/$$charm/ $(PUBLISHDIR)/$$charm/; \
 		git -C $(PUBLISHDIR)/$$charm add .; \
 		if [ "$$(git -C $(PUBLISHDIR)/$$charm status --porcelain || \
 			 echo status failed)" ]; then \
