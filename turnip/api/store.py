@@ -484,10 +484,17 @@ def repack(repo_path):
 
     repack_args = ['git', 'repack', '-Adq']
 
-    subprocess.check_call(
-        repack_args, cwd=repo_path,
-        stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-
+    try:
+        subprocess.check_call(
+            repack_args, cwd=repo_path,
+            stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        logger.info(
+            "Repack completed for repository: "
+            "%s", repo_path)
+    except subprocess.CalledProcessError:
+        logger.info(
+            "Repack failed for repository: "
+            "%s", repo_path)
 
 def get_refs(repo_store, repo_name, exclude_prefixes=None):
     """Return all refs for a git repository."""
