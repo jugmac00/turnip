@@ -16,10 +16,17 @@ VENV_ARGS := -p python3
 DEPENDENCIES_URL := https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
 PIP_SOURCE_DIR := dependencies
 
-PIP_ARGS ?= --quiet
+# virtualenv and pip fail if setlocale fails, so force a valid locale.
+PIP_ENV := LC_ALL=C.UTF-8
+# "make PIP_QUIET=0" causes pip to be verbose.
+PIP_QUIET := 1
+PIP_ENV += PIP_QUIET=$(PIP_QUIET)
+PIP_FIND_LINKS := file://$(PIP_CACHE)/
 ifneq ($(PIP_SOURCE_DIR),)
-override PIP_ARGS += --no-index --find-links=file://$(shell readlink -f $(PIP_SOURCE_DIR))/
+PIP_ENV += PIP_NO_INDEX=1
+PIP_FIND_LINKS += file://$(shell readlink -f $(PIP_SOURCE_DIR))/
 endif
+PIP_ENV += PIP_FIND_LINKS="$(PIP_FIND_LINKS)"
 
 # Create archives in labelled directories (e.g.
 # <rev-id>/$(PROJECT_NAME).tar.gz)
@@ -60,9 +67,9 @@ endif
 	(echo '[easy_install]'; \
 	 echo 'find_links = file://$(realpath $(PIP_SOURCE_DIR))/') \
 		>$(ENV)/.pydistutils.cfg
-	$(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
-	$(PIP) install $(PIP_ARGS) -r bootstrap-requirements.txt
-	$(PIP) install $(PIP_ARGS) -c requirements.txt \
+	$(PIP_ENV) $(VIRTUALENV) $(VENV_ARGS) --never-download $(ENV)
+	$(PIP_ENV) $(PIP) install -r bootstrap-requirements.txt
+	$(PIP_ENV) $(PIP) install -c requirements.txt \
 		-e '.[test,deploy]'
 
 bootstrap-test: PATH := /usr/sbin:/sbin:$(PATH)
@@ -131,7 +138,7 @@ stop:
 
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
-	$(PIP) install $(PIP_ARGS) -d $(PIP_CACHE) \
+	$(PIP_ENV) $(PIP) install -d $(PIP_CACHE) \
 		-r bootstrap-requirements.txt \
 		-r requirements.txt
 
