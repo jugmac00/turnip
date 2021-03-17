@@ -482,7 +482,7 @@ def repack(repo_path):
 
     ensure_config(repo_path)
 
-    repack_args = ['git', 'repack', '-Adq']
+    repack_args = ['git', 'repack', '-Adql']
 
     subprocess.check_call(
         repack_args, cwd=repo_path,
