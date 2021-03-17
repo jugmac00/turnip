@@ -491,11 +491,11 @@ def repack(repo_path):
         logger.info(
             "Repack completed for repository: "
             "%s", repo_path)
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         logger.info(
             "Repack failed for repository: "
             "%s", repo_path)
-        raise e
+        raise
 
 
 def get_refs(repo_store, repo_name, exclude_prefixes=None):
