@@ -205,9 +205,9 @@ def ensure_hooks(repo_root):
                 pass
 
 
-def get_repack_data():
+def get_repack_data(path=None):
     output = subprocess.check_output(
-        ['git', 'count-objects', '-v'], universal_newlines=True)
+        ['git', 'count-objects', '-v'], cwd=path, universal_newlines=True)
     if not output:
         return None, None
     match = re.search(r'^packs: (.*)', output, flags=re.M)
