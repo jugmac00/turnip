@@ -874,6 +874,26 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/master', head_target)
 
+    @defer.inlineCallbacks
+    def test_turnip_set_symbolic_ref_subprocess_error(self):
+        repo = os.path.join(self.root, self.internal_name)
+        head_target = yield self.get_symbolic_ref(repo, b'HEAD')
+        self.assertEqual(b'refs/heads/master', head_target)
+        response = yield self.make_set_symbolic_ref_request(
+            b'HEAD outside-refs')
+        # This is a little weird since an error occurred, but it's
+        # consistent with other HTTP pack protocol responses.
+        self.assertEqual(200, response.code)
+        body = yield client.readBody(response)
+        payload, body = helpers.decode_packet(body)
+        self.assertEqual(
+            b'ERR fatal: Refusing to point HEAD outside of refs/\n\n', payload)
+        self.assertEqual(
+            (b'ERR git symbolic-ref exited with status 128\n', b''),
+            helpers.decode_packet(body))
+        head_target = yield self.get_symbolic_ref(repo, b'HEAD')
+        self.assertEqual(b'refs/heads/master', head_target)
+
 
 class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
 
