@@ -18,7 +18,10 @@ from textwrap import dedent
 import time
 import uuid
 
-from fixtures import TempDir
+from fixtures import (
+    MockPatch,
+    TempDir,
+    )
 from pygit2 import (
     Config,
     GIT_FILEMODE_BLOB,
@@ -431,6 +434,7 @@ class TestGetRepackData(TestCase):
     def test_get_repack_data(self):
         curdir = os.getcwd()
         os.chdir(self.repo_dir)
+        self.addCleanup(os.chdir, curdir)
         # create a test file
         blob_content = (
             b'commit ' + 'file content'.encode('ascii') + b' - '
@@ -442,8 +446,36 @@ class TestGetRepackData(TestCase):
             GIT_FILEMODE_BLOB))
         self.repo.index.write_tree()
 
-        objects, packs = get_repack_data()
-        os.chdir(curdir)
+        with MockPatch(
+                'subprocess.check_output',
+                wraps=subprocess.check_output) as spy:
+            objects, packs = get_repack_data()
+            spy.mock.assert_called_once_with(
+                ['git', 'count-objects', '-v'],
+                cwd=None, universal_newlines=True)
+
+        self.assertIsNotNone(objects)
+        self.assertIsNotNone(packs)
+
+    def test_get_repack_data_with_path(self):
+        # create a test file
+        blob_content = (
+            b'commit ' + 'file content'.encode('ascii') + b' - '
+            + uuid.uuid1().hex.encode('ascii'))
+        test_file = 'test.txt'
+        # stage the changes
+        self.repo.index.add(IndexEntry(
+            test_file, self.repo.create_blob(blob_content),
+            GIT_FILEMODE_BLOB))
+        self.repo.index.write_tree()
+
+        with MockPatch(
+                'subprocess.check_output',
+                wraps=subprocess.check_output) as spy:
+            objects, packs = get_repack_data(self.repo_dir)
+            spy.mock.assert_called_once_with(
+                ['git', 'count-objects', '-v'],
+                cwd=self.repo_dir, universal_newlines=True)
 
         self.assertIsNotNone(objects)
         self.assertIsNotNone(packs)
