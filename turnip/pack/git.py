@@ -694,7 +694,7 @@ class PackBackendProtocol(PackServerProtocol):
         if message is None:
             self.transport.loseConnection()
         else:
-            self.die(message)
+            self.die(message.encode('UTF-8'))
 
     def readConnectionLost(self):
         # Forward the closed stdin down the stack.
