@@ -475,3 +475,20 @@ class InitTestCase(TestCase):
         # Assert we have 0 loose objects after repack job ran
         celery_fixture.waitUntil(
             5, lambda: self.hasZeroLooseObjects(orig_path))
+
+    def test_gc(self):
+        celery_fixture = CeleryWorkerFixture()
+        self.useFixture(celery_fixture)
+
+        self.makeOrig()
+        orig_path = self.orig_path
+
+        # First assert we have loose objects for this repo
+        self.assertFalse(self.hasZeroLooseObjects(orig_path))
+
+        # Trigger the GC job
+        store.gc.apply_async((orig_path, ))
+
+        # Assert we have 0 loose objects after a gc job ran
+        celery_fixture.waitUntil(
+            5, lambda: self.hasZeroLooseObjects(orig_path))

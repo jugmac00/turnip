@@ -148,6 +148,22 @@ class RepackAPI(BaseAPI):
         return Response(status=200)
 
 
+@resource(path='/repo/{name}/gc')
+class GitGCAPI(BaseAPI):
+    """Provides HTTP API for running gc for repository."""
+
+    def __init__(self, request, context=None):
+        super(GitGCAPI, self).__init__()
+        self.request = request
+
+    @validate_path
+    def post(self, repo_store, repo_name):
+        repo_path = os.path.join(repo_store, repo_name)
+        kwargs = dict(repo_path=repo_path)
+        store.gc.apply_async(kwargs=kwargs)
+        return Response(status=200)
+
+
 @resource(path='/repo/{name}/refs-copy')
 class RefCopyAPI(BaseAPI):
     """Provides HTTP API for git references copy operations."""

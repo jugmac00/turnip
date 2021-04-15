@@ -837,6 +837,10 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         resp = self.app.post_json('/repo/{}/repack'.format(self.repo_path))
         self.assertEqual(200, resp.status_code)
 
+    def test_repo_gc(self):
+        resp = self.app.post_json('/repo/{}/gc'.format(self.repo_path))
+        self.assertEqual(200, resp.status_code)
+
     def test_repo_detect_merges_missing_target(self):
         """A non-existent target OID returns HTTP 404."""
         factory = RepoFactory(self.repo_store)
