@@ -149,11 +149,11 @@ class RepackAPI(BaseAPI):
 
 
 @resource(path='/repo/{name}/gc')
-class GitGCAPI(BaseAPI):
+class GarbageCollectAPI(BaseAPI):
     """Provides HTTP API for running gc for repository."""
 
     def __init__(self, request, context=None):
-        super(GitGCAPI, self).__init__()
+        super(GarbageCollectAPI, self).__init__()
         self.request = request
 
     @validate_path
