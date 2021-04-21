@@ -498,6 +498,32 @@ def repack(repo_path):
         raise
 
 
+@app.task
+def gc(repo_path):
+    """Run as git gc for repository."""
+    logger = tasks_logger
+    logger.info(
+        "Asynchronous GC run triggered for repository: "
+        "%s", repo_path)
+
+    ensure_config(repo_path)
+
+    gc_args = ['git', 'gc']
+
+    try:
+        subprocess.check_call(
+            gc_args, cwd=repo_path,
+            stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        logger.info(
+            "GC completed for repository: "
+            "%s", repo_path)
+    except subprocess.CalledProcessError:
+        logger.info(
+            "GC failed for repository: "
+            "%s", repo_path)
+        raise
+
+
 def get_refs(repo_store, repo_name, exclude_prefixes=None):
     """Return all refs for a git repository."""
     with open_repo(repo_store, repo_name) as repo:
