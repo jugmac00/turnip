@@ -839,7 +839,8 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         resp = self.app.post_json('/repo/{}/repack'.format(self.repo_path))
         self.assertEqual(200, resp.status_code)
         # test for nonexistent repositories
-        resp = self.app.post_json('/repo/nonexistent/repack', expect_errors=True)
+        resp = self.app.post_json('/repo/nonexistent/repack',
+                                  expect_errors=True)
         self.assertEqual(404, resp.status_code)
 
     def test_repo_gc(self):
