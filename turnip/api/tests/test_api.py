@@ -834,12 +834,22 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
 
     def test_repo_repack(self):
         """Ensure commit exists in pack."""
+        factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
+        factory.build()
         resp = self.app.post_json('/repo/{}/repack'.format(self.repo_path))
         self.assertEqual(200, resp.status_code)
+        # test for nonexistent repositories
+        resp = self.app.post_json('/repo/nonexistent/repack', expect_errors=True)
+        self.assertEqual(404, resp.status_code)
 
     def test_repo_gc(self):
+        factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
+        factory.build()
         resp = self.app.post_json('/repo/{}/gc'.format(self.repo_path))
         self.assertEqual(200, resp.status_code)
+        # test for nonexistent repositories
+        resp = self.app.post_json('/repo/nonexistent/gc', expect_errors=True)
+        self.assertEqual(404, resp.status_code)
 
     def test_repo_detect_merges_missing_target(self):
         """A non-existent target OID returns HTTP 404."""
