@@ -143,7 +143,6 @@ class RepackAPI(BaseAPI):
     @validate_path
     def post(self, repo_store, repo_name):
         repo_path = os.path.join(repo_store, repo_name)
-        repo_path = os.path.join(repo_store, repo_name)
         if not os.path.exists(repo_path):
             self.request.errors.add(
                 'body', 'name', 'repository does not exist')
@@ -163,7 +162,6 @@ class GarbageCollectAPI(BaseAPI):
 
     @validate_path
     def post(self, repo_store, repo_name):
-        repo_path = os.path.join(repo_store, repo_name)
         repo_path = os.path.join(repo_store, repo_name)
         if not os.path.exists(repo_path):
             self.request.errors.add(
