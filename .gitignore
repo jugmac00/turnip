@@ -7,7 +7,6 @@ download-cache
 eggs
 env
 py3env
-py2env
 pip-cache
 *.egg*
 *.egg-info
