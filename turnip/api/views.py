@@ -12,6 +12,7 @@ from pyramid.response import Response
 
 from turnip.config import config
 from turnip.api import store
+from turnip.pack.helpers import get_repack_data
 
 
 def is_valid_path(repo_store, repo_path):
@@ -150,6 +151,16 @@ class RepackAPI(BaseAPI):
         kwargs = dict(repo_path=repo_path)
         store.repack.apply_async(kwargs=kwargs)
         return Response(status=200)
+
+    @validate_path
+    def get(self, repo_store, repo_name):
+        repo_path = os.path.join(repo_store, repo_name)
+        if not os.path.exists(repo_path):
+            self.request.errors.add(
+                'body', 'name', 'repository does not exist')
+            raise exc.HTTPNotFound()
+        kwargs = dict(repo_path=repo_path)
+        return get_repack_data(repo_path)
 
 
 @resource(path='/repo/{name}/gc')
