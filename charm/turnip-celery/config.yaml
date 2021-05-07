@@ -11,3 +11,7 @@ options:
     type: int
     default: 15
     description: Timeout for virtinfo requests, in seconds.
+  prefetch_multiplier:
+    type: int
+    default: 1
+    description: Celery prefetch multiplier for each worker.
