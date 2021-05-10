@@ -113,7 +113,8 @@ run-worker: $(ENV)
 	$(CELERY) -A turnip.tasks worker \
 		--loglevel=debug \
 		--concurrency=20 \
-		--pool=gevent
+		--pool=gevent \
+		--queue=repacks,celery
 
 run:
 	make run-api &\

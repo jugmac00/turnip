@@ -16,7 +16,7 @@ Environment=TURNIP_LOG_DIR={{ logs_dir }}
 Environment=CELERY_BROKER={{ celery_broker }}
 Environment=VIRTINFO_ENDPOINT={{ virtinfo_endpoint }}
 Environment=VIRTINFO_TIMEOUT={{ virtinfo_timeout }}
-ExecStart={{ venv_dir }}/bin/celery -A turnip.tasks worker --logfile={{ logs_dir }}/turnip-celery.log --loglevel=DEBUG --pool=gevent --prefetch-multiplier={{ prefetch_multiplier }}
+ExecStart={{ venv_dir }}/bin/celery -A turnip.tasks worker --logfile={{ logs_dir }}/turnip-celery.log --loglevel=DEBUG --pool=gevent --prefetch-multiplier={{ prefetch_multiplier }} --queue={{ celery_queues }}
 ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID
 LimitNOFILE=1048576
