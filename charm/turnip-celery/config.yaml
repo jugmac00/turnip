@@ -18,4 +18,4 @@ options:
   celery_queues:
     type: string
     default: repacks,celery
-    description: Celery queues
+    description: Celery queues, comma-separated and enumerated without spaces.
