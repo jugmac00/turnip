@@ -15,3 +15,7 @@ options:
     type: int
     default: 1
     description: Celery prefetch multiplier for each worker.
+  celery_queues:
+    type: string
+    default: repacks,celery
+    description: Celery queues, comma-separated and enumerated without spaces.
