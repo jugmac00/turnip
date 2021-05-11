@@ -149,7 +149,7 @@ class RepackAPI(BaseAPI):
                 'body', 'name', 'repository does not exist')
             raise exc.HTTPNotFound()
         kwargs = dict(repo_path=repo_path)
-        store.repack.apply_async(kwargs=kwargs)
+        store.repack.apply_async(queue='repacks', kwargs=kwargs)
         return Response(status=200)
 
     @validate_path

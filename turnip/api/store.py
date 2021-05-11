@@ -473,7 +473,7 @@ def delete_repo(repo_path):
     shutil.rmtree(repo_path)
 
 
-@app.task
+@app.task(queue='repacks')
 def repack(repo_path):
     """Repack a repository with git-repack."""
     logger = tasks_logger

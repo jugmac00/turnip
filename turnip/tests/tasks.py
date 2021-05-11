@@ -60,7 +60,8 @@ class CeleryWorkerFixture(fixtures.Fixture):
             '--pool=gevent',
             '--concurrency=20',
             '--broker=%s' % BROKER_URL,
-            '--loglevel=%s' % self.loglevel]
+            '--loglevel=%s' % self.loglevel,
+            '--queue=repacks,celery']
         if self.logfile:
             cmd += ["--logfile=%s" % self.logfile]
 
