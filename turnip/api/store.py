@@ -34,7 +34,6 @@ from turnip.config import config
 from turnip.helpers import TimeoutServerProxy
 from turnip.pack.helpers import ensure_config, get_repack_data
 from turnip.tasks import app, logger as tasks_logger
-from twisted.web import xmlrpc
 
 logger = logging.getLogger(__name__)
 
@@ -474,7 +473,7 @@ def delete_repo(repo_path):
 
 
 @app.task(queue='repacks')
-def repack(repo_path):
+def repack(repo_path, repo_id):
     """Repack a repository with git-repack."""
     logger = tasks_logger
     logger.info(
@@ -492,16 +491,15 @@ def repack(repo_path):
         logger.info(
             "Repack completed for repository: "
             "%s", repo_path)
-        try:
-            xmlrpc_endpoint = config.get("virtinfo_endpoint")
-            xmlrpc_timeout = float(config.get("virtinfo_timeout"))
-            xmlrpc_auth_params = {"user": "+launchpad-services"}
-            xmlrpc_proxy = TimeoutServerProxy(
-                xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True)        
-            xmlrpc_proxy.updateRepackStats(repo_path, xmlrpc_auth_params)
-        except xmlrpc.Fault as e:
-            logger.info("Failed to signal LP to update its repack stats for "
-            "this repository %s after repack completed.", repo_path)
+        loose_object_count, pack_count = get_repack_data(path=repo_path)
+        xmlrpc_endpoint = config.get("virtinfo_endpoint")
+        xmlrpc_timeout = float(config.get("virtinfo_timeout"))
+        xmlrpc_proxy = TimeoutServerProxy(
+            xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True)
+        xmlrpc_proxy.updateRepackStats(
+            {'loose_object_count': loose_object_count,
+             'pack_count': pack_count}, repo_id)
+
     except subprocess.CalledProcessError:
         logger.info(
             "Repack failed for repository: "
