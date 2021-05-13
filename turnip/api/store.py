@@ -29,6 +29,7 @@ from pygit2 import (
     Repository,
     )
 import six
+from twisted.web import xmlrpc
 
 from turnip.config import config
 from turnip.helpers import TimeoutServerProxy
@@ -473,7 +474,7 @@ def delete_repo(repo_path):
 
 
 @app.task(queue='repacks')
-def repack(repo_path, repo_id):
+def repack(repo_path):
     """Repack a repository with git-repack."""
     logger = tasks_logger
     logger.info(
@@ -491,15 +492,23 @@ def repack(repo_path, repo_id):
         logger.info(
             "Repack completed for repository: "
             "%s", repo_path)
-        loose_object_count, pack_count = get_repack_data(path=repo_path)
-        xmlrpc_endpoint = config.get("virtinfo_endpoint")
-        xmlrpc_timeout = float(config.get("virtinfo_timeout"))
-        xmlrpc_proxy = TimeoutServerProxy(
-            xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True)
-        xmlrpc_proxy.updateRepackStats(
-            {'loose_object_count': loose_object_count,
-             'pack_count': pack_count}, repo_id)
-
+        try:
+            repo_name = os.path.basename(repo_path)
+            loose_object_count, pack_count = get_repack_data(path=repo_path)
+            xmlrpc_endpoint = config.get("virtinfo_endpoint")
+            xmlrpc_timeout = float(config.get("virtinfo_timeout"))
+            xmlrpc_proxy = TimeoutServerProxy(
+                xmlrpc_endpoint,
+                timeout=xmlrpc_timeout,
+                allow_none=True)
+            xmlrpc_proxy.updateRepackStats(
+                repo_name,
+                {'loose_object_count': loose_object_count,
+                 'pack_count': pack_count})
+        except xmlrpc.Fault:
+            logger.info("Failed to signal LP to update its repack stats for "
+                        "this repository %s after repack completed.",
+                        repo_path)
     except subprocess.CalledProcessError:
         logger.info(
             "Repack failed for repository: "

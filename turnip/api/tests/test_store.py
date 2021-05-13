@@ -471,7 +471,7 @@ class InitTestCase(TestCase):
 
         # Trigger the repack job
         store.repack.apply_async(queue='repacks',
-                                 kwargs={'repo_path': orig_path, 'repo_id': 3})
+                                 kwargs={'repo_path': orig_path})
 
         # Assert we have 0 loose objects after repack job ran
         celery_fixture.waitUntil(

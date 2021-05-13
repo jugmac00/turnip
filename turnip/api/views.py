@@ -147,7 +147,7 @@ class RepackAPI(BaseAPI):
             self.request.errors.add(
                 'body', 'name', 'repository does not exist')
             raise exc.HTTPNotFound()
-        kwargs = dict(repo_path=repo_path, repo_id=repo_name)
+        kwargs = dict(repo_path=repo_path)
         store.repack.apply_async(queue='repacks', kwargs=kwargs)
         return Response(status=200)
 
