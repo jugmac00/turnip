@@ -110,7 +110,7 @@ run-pack: $(ENV)
 	$(PYTHON) turnipserver.py
 
 run-worker: $(ENV)
-	$(CELERY) -A turnip.tasks worker \
+	$(CELERY) -A turnip.tasks worker -n default-worker \
 		--loglevel=debug \
 		--concurrency=20 \
 		--pool=gevent \
