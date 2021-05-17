@@ -11,3 +11,16 @@
     endscript
 }
 
+{{ base_dir }}/logs/turnip-celery-repacks.log {
+    rotate 90
+    daily
+    dateext
+    delaycompress
+    compress
+    missingok
+    create 0644 {{ user }} {{ group }}
+    postrotate
+        service turnip-celery-repack reload
+    endscript
+}
+
