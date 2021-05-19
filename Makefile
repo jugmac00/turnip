@@ -110,15 +110,25 @@ run-pack: $(ENV)
 	$(PYTHON) turnipserver.py
 
 run-worker: $(ENV)
-	$(CELERY) -A turnip.tasks worker \
+	$(CELERY) -A turnip.tasks worker -n default-worker \
 		--loglevel=debug \
 		--concurrency=20 \
 		--pool=gevent \
-		--queue=repacks,celery
+		--prefetch-multiplier=1 \
+		--queue=celery
+
+run-repack-worker: $(ENV)
+	$(CELERY) -A turnip.tasks worker -n repack-worker \
+		--loglevel=debug \
+		--concurrency=1 \
+		--pool=gevent \
+		--prefetch-multiplier=1 \
+		--queue=repacks
 
 run:
 	make run-api &\
 	make run-pack &\
+	make run-repack-worker&\
 	make run-worker&\
 	wait;
 
@@ -126,7 +136,9 @@ stop:
 	-pkill -f 'make run-api'
 	-pkill -f 'make run-pack'
 	-pkill -f 'make run-worker'
+	-pkill -f 'make run-repack-worker'	
 	-pkill -f '$(CELERY) -A tasks worker'
+	-pkill -f '$(CELERY) -A tasks repack-worker'	
 
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
