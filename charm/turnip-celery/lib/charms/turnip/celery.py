@@ -44,9 +44,9 @@ def configure_celery():
         '/lib/systemd/system/turnip-celery-repack.service',
         context, perms=0o644)
     if host.service_running('turnip-celery-repack'):
-        host.service_stop('turnip-celery-repack')        
+        host.service_stop('turnip-celery-repack')
     reload_systemd()
     if not host.service_resume('turnip-celery'):
         raise RuntimeError('Failed to start turnip-celery')
     if not host.service_resume('turnip-celery-repack'):
-        raise RuntimeError('Failed to start turnip-celery-repack')    
+        raise RuntimeError('Failed to start turnip-celery-repack')
