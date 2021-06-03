@@ -121,9 +121,9 @@ run-repack-worker: $(ENV)
 	$(CELERY) -A turnip.tasks worker -n repack-worker \
 		--loglevel=debug \
 		--concurrency=1 \
-		--pool=gevent \
 		--prefetch-multiplier=1 \
-		--queue=repacks
+		--queue=repacks \
+		-O=fair
 
 run:
 	make run-api &\
@@ -137,8 +137,8 @@ stop:
 	-pkill -f 'make run-pack'
 	-pkill -f 'make run-worker'
 	-pkill -f 'make run-repack-worker'	
-	-pkill -f '$(CELERY) -A tasks worker'
-	-pkill -f '$(CELERY) -A tasks repack-worker'	
+	-pkill -f '$(CELERY) -A turnip.tasks worker default-worker'
+	-pkill -f '$(CELERY) -A turnip.tasks worker repack-worker'
 
 $(PIP_CACHE): $(ENV)
 	mkdir -p $(PIP_CACHE)
