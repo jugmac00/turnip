@@ -5,4 +5,5 @@ core.logallrefupdates: True
 pack.depth: 100
 pack.window: 100
 pack.windowMemory: 2g
+receive.autogc: False
 repack.writeBitmaps: True

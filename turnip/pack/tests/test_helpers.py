@@ -244,8 +244,9 @@ class TestEnsureConfig(TestCase):
     def assertWritesCorrectConfig(self):
         helpers.ensure_config(self.repo_dir)
         config = Config(path=self.config_path)
-        self.assertTrue(config['core.logallrefupdates'])
-        self.assertTrue(config['repack.writeBitmaps'])
+        self.assertEqual('true', config['core.logallrefupdates'])
+        self.assertEqual('true', config['repack.writeBitmaps'])
+        self.assertEqual('false', config['receive.autogc'])
 
     def test_writes_new(self):
         self.assertWritesCorrectConfig()
