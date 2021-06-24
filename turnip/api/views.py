@@ -5,7 +5,7 @@ import os
 import re
 
 from cornice.resource import resource
-from cornice.util import extract_json_data
+from cornice.validators import extract_cstruct
 from pygit2 import GitError
 import pyramid.httpexceptions as exc
 from pyramid.response import Response
@@ -53,7 +53,7 @@ class RepoAPI(BaseAPI):
 
     def collection_post(self):
         """Initialise a new git repository, or clone from an existing repo."""
-        json_data = extract_json_data(self.request)
+        json_data = extract_cstruct(self.request)['body']
         repo_path = json_data.get('repo_path')
         clone_path = json_data.get('clone_from')
         clone_refs = json_data.get('clone_refs', False)
@@ -113,7 +113,7 @@ class RepoAPI(BaseAPI):
             self.request.errors.add(
                 'body', 'name', 'repository does not exist')
             raise exc.HTTPNotFound()
-        data = extract_json_data(self.request)
+        data = extract_cstruct(self.request)['body']
         for key in data:
             if not hasattr(self, "_patch_%s" % key):
                 self.request.errors.add('body', key, 'unknown property')
@@ -356,7 +356,7 @@ class CommitAPI(BaseAPI):
     @validate_path
     def collection_post(self, repo_store, repo_name):
         """Get commits in bulk."""
-        commits = extract_json_data(self.request).get('commits')
+        commits = extract_cstruct(self.request)['body'].get('commits')
         try:
             commits = store.get_commits(repo_store, repo_name, commits)
         except GitError:
@@ -406,7 +406,7 @@ class DetectMergesAPI(BaseAPI):
         omitted from the response.
         """
         target = self.request.matchdict['target']
-        sources = extract_json_data(self.request).get('sources')
+        sources = extract_cstruct(self.request)['body'].get('sources')
         try:
             merges = store.detect_merges(
                 repo_store, repo_name, target, sources)
