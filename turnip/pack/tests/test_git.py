@@ -9,6 +9,7 @@ from __future__ import (
 
 import hashlib
 import os.path
+from unittest import mock
 
 from fixtures import TempDir, MonkeyPatch
 from pygit2 import init_repository
@@ -37,7 +38,6 @@ from turnip.pack import (
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
 from turnip.pack.tests.test_helpers import MockStatsd
 from turnip.pack.tests.test_hooks import MockHookRPCHandler
-from turnip.tests.compat import mock
 
 
 class DummyPackServerProtocol(git.PackServerProtocol):

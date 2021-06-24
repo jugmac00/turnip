@@ -9,10 +9,10 @@ from __future__ import (
 
 from collections import defaultdict
 import hashlib
+from xmlrpc.client import Binary
 
 from lazr.sshserver.auth import NoSuchPersonWithName
 import six
-from six.moves import xmlrpc_client
 from twisted.web import xmlrpc
 
 __all__ = [
@@ -123,7 +123,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         if self.ref_permissions_fault is not None:
             raise self.ref_permissions_fault
         return [
-            (xmlrpc_client.Binary(ref), permissions)
+            (Binary(ref), permissions)
             for ref, permissions in self.ref_permissions.items()]
 
     def xmlrpc_getMergeProposalURL(self, path, branch, auth_params):

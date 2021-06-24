@@ -8,9 +8,12 @@ from __future__ import (
     )
 
 import os.path
+from xmlrpc.client import (
+    ServerProxy,
+    Transport,
+    )
 
 import six
-from six.moves import xmlrpc_client
 
 
 def compose_path(root, path):
@@ -25,22 +28,22 @@ def compose_path(root, path):
     return full_path
 
 
-class TimeoutTransport(xmlrpc_client.Transport):
+class TimeoutTransport(Transport):
 
     def __init__(self, timeout, use_datetime=0):
         self.timeout = timeout
-        xmlrpc_client.Transport.__init__(self, use_datetime)
+        Transport.__init__(self, use_datetime)
 
     def make_connection(self, host):
-        connection = xmlrpc_client.Transport.make_connection(self, host)
+        connection = Transport.make_connection(self, host)
         connection.timeout = self.timeout
         return connection
 
 
-class TimeoutServerProxy(xmlrpc_client.ServerProxy):
+class TimeoutServerProxy(ServerProxy):
 
     def __init__(self, uri, timeout=10, transport=None, encoding=None,
                  verbose=0, allow_none=0, use_datetime=0):
         t = TimeoutTransport(timeout)
-        xmlrpc_client.ServerProxy.__init__(
+        ServerProxy.__init__(
             self, uri, t, encoding, verbose, allow_none, use_datetime)

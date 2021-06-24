@@ -8,6 +8,8 @@ import logging
 import os
 from subprocess import PIPE, Popen, CalledProcessError, STDOUT
 import uuid
+from urllib.parse import urljoin
+from urllib.request import pathname2url
 
 from pygit2 import (
     clone_repository,
@@ -18,7 +20,6 @@ from pygit2 import (
     Signature,
     )
 import six
-from six.moves import urllib
 
 log = logging.getLogger()
 
@@ -184,8 +185,7 @@ class RepoFactory(object):
 
     def clone_repo(self, repo_factory):
         """Return a pygit2 repo object cloned from an existing factory repo."""
-        clone_from_url = urllib.parse.urljoin(
-            'file:', urllib.request.pathname2url(repo_factory.repo.path))
+        clone_from_url = urljoin('file:', pathname2url(repo_factory.repo.path))
         return clone_repository(clone_from_url, self.repo_path, bare=False)
 
     def build(self):
