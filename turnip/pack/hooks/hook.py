@@ -190,6 +190,7 @@ def send_mp_url(received_line):
                 stdout.write(b'      %s\n' % six.ensure_binary(mp_url, "UTF8"))
                 stdout.write(b'      \n')
 
+
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key
     # from the environment.

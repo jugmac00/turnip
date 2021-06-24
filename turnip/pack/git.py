@@ -768,7 +768,7 @@ class PackVirtServerProtocol(PackProxyServerProtocol):
         else:
             try:
                 yield self.runOnBackend(command, pathname, params)
-            except Exception as e:
+            except Exception:
                 self.server.log.failure('Backend connection failed.')
                 self.server.die(b'Backend connection failed.')
 

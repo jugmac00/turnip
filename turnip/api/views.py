@@ -290,7 +290,7 @@ class DiffAPI(BaseAPI):
     @validate_path
     def get(self, repo_store, repo_name):
         """Returns diff of two commits."""
-        commits = re.split('(\.{2,3})', self.request.matchdict['commits'])
+        commits = re.split(r'(\.{2,3})', self.request.matchdict['commits'])
         context_lines = int(self.request.params.get('context_lines', 3))
         if not len(commits) == 3:
             return exc.HTTPBadRequest()
