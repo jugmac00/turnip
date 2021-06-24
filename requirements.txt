@@ -18,7 +18,7 @@ enum34==1.1.10; python_version < "3.4"
 envdir==0.7
 extras==1.0.0
 fixtures==3.0.0
-flake8==2.4.0
+flake8==3.9.2
 future==0.18.2
 gevent==20.6.2
 gmpy==1.17
@@ -34,19 +34,21 @@ lazr.sshserver==0.1.11
 linecache2==1.0.0
 lxml==4.5.2
 m2r==0.1.14
-mccabe==0.3
+# lp:~launchpad/mccabe:launchpad
+# lp1 Remove use of deprecated 'setup.py test'.
+mccabe==0.6.1+lp1
 mistune==0.8.3
 mock==3.0.5; python_version < "3"
 pathlib2==2.3.5
 Paste==3.5.0
 PasteDeploy==2.1.0
 pbr==5.4.5
-pep8==1.5.7
 psutil==5.7.0
 pyasn1==0.4.8
+pycodestyle==2.7.0
 pycparser==2.17
 pycrypto==2.6.1
-pyflakes==0.8.1
+pyflakes==2.3.1
 pygit2==0.27.4
 pyramid==1.10.4
 python-mimeparse==1.6.0
