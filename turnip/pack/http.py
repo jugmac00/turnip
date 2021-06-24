@@ -13,10 +13,7 @@ import json
 import os.path
 import tempfile
 import textwrap
-try:
-    from urllib.parse import urlencode
-except ImportError:
-    from urllib import urlencode
+from urllib.parse import urlencode
 import uuid
 import zlib
 

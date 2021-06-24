@@ -22,9 +22,9 @@ from __future__ import (
 
 import base64
 import json
+from xmlrpc.client import Binary
 
 import six
-from six.moves import xmlrpc_client
 from twisted.internet import (
     defer,
     protocol,
@@ -173,7 +173,7 @@ class HookRPCHandler(object):
                 result = yield proxy.callRemote(
                     'checkRefPermissions',
                     six.ensure_str(ref_path),
-                    [xmlrpc_client.Binary(path) for path in missing],
+                    [Binary(path) for path in missing],
                     auth_params).addTimeout(
                         self.virtinfo_timeout, self.reactor)
             except xmlrpc.Fault as e:
@@ -194,9 +194,7 @@ class HookRPCHandler(object):
                         "checkRefPermissions virtinfo raised Unauthorized: "
                         "auth_params={auth_params}, ref_path={ref_path}",
                         auth_params=auth_params, ref_path=ref_path)
-                    result = [
-                        (xmlrpc_client.Binary(path), [])
-                        for path in missing]
+                    result = [(Binary(path), []) for path in missing]
                 else:
                     log_context.log.info(
                         "checkRefPermissions virtinfo raised "

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
@@ -18,7 +18,6 @@ import sys
 
 import six
 
-from turnip.compat.files import fd_buffer
 from turnip.pack.helpers import get_repack_data
 
 # XXX twom 2018-10-23 This should be a pygit2 import, but
@@ -182,7 +181,7 @@ def send_mp_url(received_line):
                 {'key': rpc_key,
                  'branch': six.ensure_text(pushed_branch, "UTF-8")})
             if mp_url is not None:
-                stdout = fd_buffer(sys.stdout)
+                stdout = sys.stdout.buffer
                 stdout.write(b'      \n')
                 stdout.write(
                     b"Create a merge proposal for '%s' on Launchpad by"
@@ -194,8 +193,8 @@ def send_mp_url(received_line):
 if __name__ == '__main__':
     # Connect to the RPC server, authenticating using the random key
     # from the environment.
-    stdin = fd_buffer(sys.stdin)
-    stdout = fd_buffer(sys.stdout)
+    stdin = sys.stdin.buffer
+    stdout = sys.stdout.buffer
     rpc_key = os.environ['TURNIP_HOOK_RPC_KEY']
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(os.environ['TURNIP_HOOK_RPC_SOCK'])

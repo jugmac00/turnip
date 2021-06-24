@@ -17,19 +17,12 @@ import re
 import shutil
 import stat
 import tempfile
+from urllib.parse import (
+    urlsplit,
+    urlunsplit,
+    )
 
 from turnip.config import config
-
-try:
-    from urllib.parse import (
-        urlsplit,
-        urlunsplit,
-        )
-except ImportError:
-    from urlparse import (
-        urlsplit,
-        urlunsplit,
-        )
 
 from fixtures import (
     EnvironmentVariable,

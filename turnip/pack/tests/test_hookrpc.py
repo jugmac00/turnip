@@ -10,8 +10,8 @@ from __future__ import (
 import base64
 import contextlib
 import uuid
+from xmlrpc.client import Binary
 
-from six.moves import xmlrpc_client
 from testtools import (
     ExpectedException,
     TestCase,
@@ -225,7 +225,7 @@ class TestHookRPCHandler(TestCase):
                 Equals(path),
                 MatchesListwise([
                     MatchesAll(
-                        IsInstance(xmlrpc_client.Binary),
+                        IsInstance(Binary),
                         MatchesStructure.byEquality(data=ref_path))
                     for ref_path in ref_paths
                     ]),

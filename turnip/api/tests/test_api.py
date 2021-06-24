@@ -13,14 +13,15 @@ import subprocess
 from textwrap import dedent
 import time
 import unittest
+from unittest import mock
 import uuid
+from urllib.parse import quote
 
 from fixtures import (
     EnvironmentVariable,
     TempDir,
     )
 import six
-from six.moves.urllib.parse import quote
 from testtools import TestCase
 from testtools.matchers import (
     Equals,
@@ -38,7 +39,6 @@ from turnip.api.tests.test_helpers import (
     )
 from turnip.config import config
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
-from turnip.tests.compat import mock
 from turnip.tests.tasks import CeleryWorkerFixture
 
 

@@ -10,6 +10,7 @@ from __future__ import (
 from io import BytesIO
 import json
 import os
+from unittest import mock
 
 from fixtures import TempDir
 import six
@@ -39,7 +40,6 @@ from turnip.pack.http import (
     HTTPAuthLoginResource,
     )
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
-from turnip.tests.compat import mock
 from turnip.version_info import version_info
 
 
