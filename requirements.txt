@@ -47,7 +47,7 @@ pycodestyle==2.7.0
 pycparser==2.17
 pycrypto==2.6.1
 pyflakes==2.3.1
-pygit2==0.27.4
+pygit2==1.0.3
 pyramid==1.10.4
 python-mimeparse==1.6.0
 python-openid2==3.2
