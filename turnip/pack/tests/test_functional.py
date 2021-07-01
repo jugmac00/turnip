@@ -103,20 +103,16 @@ class FunctionalTestMixin(WithScenarios):
 
     def startHookRPC(self):
         self.hookrpc_handler = HookRPCHandler(self.virtinfo_url, 15)
-        # XXX cjwatson 2018-11-20: Use bytes so that shutil.rmtree doesn't
-        # get confused on Python 2.
-        dir = tempfile.mkdtemp(prefix=b'turnip-test-hook-')
+        dir = tempfile.mkdtemp(prefix='turnip-test-hook-')
         self.addCleanup(shutil.rmtree, dir, ignore_errors=True)
 
-        self.hookrpc_sock_path = os.path.join(dir, b'hookrpc_sock')
+        self.hookrpc_sock_path = os.path.join(dir, 'hookrpc_sock')
         self.hookrpc_listener = reactor.listenUNIX(
             self.hookrpc_sock_path, HookRPCServerFactory(self.hookrpc_handler))
         self.addCleanup(self.hookrpc_listener.stopListening)
 
     def startPackBackend(self):
-        # XXX cjwatson 2018-11-20: Use bytes so that shutil.rmtree doesn't
-        # get confused on Python 2.
-        self.root = tempfile.mkdtemp(prefix=b'turnip-test-root-')
+        self.root = tempfile.mkdtemp(prefix='turnip-test-root-')
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
         self.statsd_client = MockStatsd()
         self.backend_listener = reactor.listenTCP(
@@ -670,10 +666,10 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.startVirtInfo()
         self.startHookRPC()
         self.startPackBackend()
-        self.internal_name = six.ensure_binary(hashlib.sha256(
-            b'/test').hexdigest())
+        self.internal_name = hashlib.sha256(b'/test').hexdigest()
         yield self.assertCommandSuccess(
-            (b'git', b'init', b'--bare', self.internal_name), path=self.root)
+            (b'git', b'init', b'--bare', self.internal_name.encode()),
+            path=self.root)
 
         self.virt_listener = reactor.listenTCP(
             0,
@@ -724,8 +720,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         yield self.assertCommandSuccess(
             (b'git', b'push', b'origin', b'master'), path=clone1)
         self.assertEqual(
-            six.ensure_text(self.internal_name),
-            self.virtinfo.push_notifications[0][0])
+            self.internal_name, self.virtinfo.push_notifications[0][0])
 
     @defer.inlineCallbacks
     def test_unicode_fault(self):
@@ -842,8 +837,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
         head_target = yield self.get_symbolic_ref(repo, b'HEAD')
         self.assertEqual(b'refs/heads/new-head', head_target)
         self.assertEqual(
-            six.ensure_text(self.internal_name),
-            self.virtinfo.push_notifications[0][0])
+            self.internal_name, self.virtinfo.push_notifications[0][0])
         self.assertIsNotNone(
             self.virtinfo.push_notifications[0][1].get('pack_count'))
         self.assertIsNotNone(
@@ -935,7 +929,7 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
             (b'git', b'push', b'origin', b'master'), path=clone)
         self.assertThat(self.virtinfo.ref_permissions_checks, MatchesListwise([
             MatchesListwise([
-                Equals(six.ensure_text(self.internal_name)),
+                Equals(self.internal_name),
                 Equals([b'refs/heads/master']),
                 MatchesDict({
                     'can-authenticate': Is(True),
