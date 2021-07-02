@@ -24,7 +24,7 @@ requires = [
     'gevent[monitor]',
     'lazr.sshserver>=0.1.7',
     'Paste',
-    'pygit2>=0.27.4,<0.28.0',
+    'pygit2>=0.28.1,<1.1.0',
     'python-openid2',
     'PyYAML',
     'statsd',

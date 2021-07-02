@@ -2,7 +2,7 @@ build-essential
 cgit
 git
 libffi-dev
-libgit2-27
+libgit2-28
 libssl-dev
 libxml2-dev
 libxslt1-dev
