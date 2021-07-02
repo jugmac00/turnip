@@ -86,7 +86,7 @@ clean:
 	rm -f turnip/version_info.py
 
 dist:
-	python ./setup.py sdist
+	python3 ./setup.py sdist
 
 TAGS:
 	ctags -e -R turnip

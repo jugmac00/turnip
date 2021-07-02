@@ -148,7 +148,7 @@ def symlink_force(source, link_name):
 
 def install_packages():
     if hookenv.config()['swift_username']:
-        apt_install('python-swiftclient', fatal=True)
+        apt_install('python3-swiftclient', fatal=True)
 
 
 def install_payload_packages(target_dir):

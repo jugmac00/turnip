@@ -86,7 +86,7 @@ def nrpe_available():
          # NrpeExternalMasterProvides.add_check just joins the argument list
          # with spaces rather than doing appropriate shell quoting.  Also
          # note that ['-C', 'celery'] would be unsafe because the command
-         # name seems to be either celery or python2 depending on exact
+         # name seems to be either celery or python3 depending on exact
          # details of the process lifecycle.
          '--ereg-argument-array', "'celery.*-A turnip.tasks worker'"],
         name='check_celery',
