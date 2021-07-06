@@ -68,7 +68,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
     def get_ref(self, ref):
         repo_path = six.ensure_text(self.repo_path)
         ref = six.ensure_text(ref)
-        url = six.ensure_str('/repo/{}/{}'.format(repo_path, ref))
+        url = '/repo/{}/{}'.format(repo_path, ref)
         resp = self.app.get(quote(url))
         return resp.json
 

@@ -986,7 +986,7 @@ class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
             private_key_path=private_host_key, public_key_path=public_host_key,
             main_log="turnip", access_log="turnip.access",
             access_log_path=os.path.join(root, "access.log"),
-            strport=six.ensure_str('tcp:0'), moduli_path="/etc/ssh/moduli")
+            strport='tcp:0', moduli_path="/etc/ssh/moduli")
         self.service.startService()
         self.addCleanup(self.service.stopService)
         socket = self.service.service._waitingForPort.result.socket
