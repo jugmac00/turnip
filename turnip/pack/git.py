@@ -118,6 +118,12 @@ class PackProtocol(protocol.Protocol, object):
         raise NotImplementedError()
 
     def dataReceived(self, raw_data):
+        if self.raw and not self.paused and not self.__buffer:
+            # Fast path.  We don't care about the content; just forward the
+            # bytes with a minimum of copying.
+            self.rawDataReceived(raw_data)
+            return
+
         self.__buffer += raw_data
         while not self.paused and not self.raw:
             try:
