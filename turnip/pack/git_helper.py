@@ -11,6 +11,7 @@ import os
 import resource
 import subprocess
 import sys
+import time
 
 
 if __name__ == '__main__':
@@ -21,12 +22,15 @@ if __name__ == '__main__':
     fcntl.fcntl(3, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
 
     # Call git and wait for it to finish.
+    start_time = time.clock_gettime(time.CLOCK_MONOTONIC)
     ret = subprocess.call(['git'] + sys.argv[1:])
+    end_time = time.clock_gettime(time.CLOCK_MONOTONIC)
 
     # Dump resource usage information to FD 3.
     resource_fd = os.fdopen(3, 'w')
     rusage = resource.getrusage(resource.RUSAGE_CHILDREN)
     resource_fd.write(json.dumps({
+        "clock_time": end_time - start_time,
         "user_time": rusage.ru_utime,
         "system_time": rusage.ru_stime,
         "max_rss": rusage.ru_maxrss,

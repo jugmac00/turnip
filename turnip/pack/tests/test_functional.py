@@ -176,7 +176,7 @@ class FunctionalTestMixin(WithScenarios):
         defer.returnValue((out, err))
 
     def assertStatsdSuccess(self, repo, command):
-        metrics = ['max_rss', 'system_time', 'user_time']
+        metrics = ['clock_time', 'user_time', 'system_time', 'max_rss']
         repository = re.sub('[^0-9a-zA-Z]+', '-', six.ensure_str(repo))
         self.assertThat(self.statsd_client.vals, MatchesDict({
             u'git,operation={},repo={},env={},metric={}'

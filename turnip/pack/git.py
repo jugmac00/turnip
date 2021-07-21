@@ -348,6 +348,12 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
             except ValueError:
                 pass
             else:
+                self.peer.log.info(
+                    'git exited: clock time {clock_time}, '
+                    'system time {system_time}, user time {user_time}, '
+                    'max RSS {max_rss}',
+                    **resource_usage)
+
                 # remove characters from repository name that
                 # can't be used in statsd
                 repository = re.sub(
@@ -355,23 +361,12 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
                     six.ensure_text(self.peer.raw_pathname))
                 command = six.ensure_text(self.peer.command)
                 environment = config.get("statsd_environment")
-                gauge_name = (
-                    "git,operation={},repo={},env={},metric=max_rss"
-                    .format(command, repository, environment))
 
-                self.statsd_client.gauge(gauge_name, resource_usage['max_rss'])
-
-                gauge_name = (
-                    "git,operation={},repo={},env={},metric=system_time"
-                    .format(command, repository, environment))
-                self.statsd_client.gauge(gauge_name,
-                                         resource_usage['system_time'])
-
-                gauge_name = (
-                    "git,operation={},repo={},env={},metric=user_time"
-                    .format(command, repository, environment))
-                self.statsd_client.gauge(gauge_name,
-                                         resource_usage['user_time'])
+                for metric_name, value in resource_usage.items():
+                    gauge_name = (
+                        "git,operation={},repo={},env={},metric={}"
+                        .format(command, repository, environment, metric_name))
+                    self.statsd_client.gauge(gauge_name, value)
 
     def pauseProducing(self):
         self.transport.pauseProducing()
