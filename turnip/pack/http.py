@@ -287,8 +287,8 @@ class BaseSmartHTTPResource(resource.Resource):
         if request.getUser() or request.getPassword():
             params = yield self.root.authenticateWithPassword(
                 request.getUser(), request.getPassword())
-            defer.returnValue(params)
-        defer.returnValue({})
+            return params
+        return {}
 
     @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, content, request):
@@ -853,7 +853,7 @@ class SmartHTTPFrontendResource(resource.Resource):
         except xmlrpc.Fault as e:
             code = translate_xmlrpc_fault(e.faultCode)
             if code == TurnipFaultCode.UNAUTHORIZED:
-                defer.returnValue({})
+                return {}
             else:
                 raise
-        defer.returnValue(translated)
+        return translated

@@ -211,7 +211,7 @@ class HookTestMixin(object):
             code, stdout, stderr = yield d
         finally:
             self.hookrpc_handler.unregisterKey(key)
-        defer.returnValue((code, stdout, stderr))
+        return code, stdout, stderr
 
     @defer.inlineCallbacks
     def assertAccepted(self, updates, permissions):
