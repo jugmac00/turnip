@@ -158,7 +158,7 @@ class FunctionalTestMixin(WithScenarios):
             self.addDetail('stdout', text_content(six.ensure_text(out)))
             self.addDetail('stderr', text_content(six.ensure_text(err)))
             self.assertEqual(0, code)
-        defer.returnValue(out)
+        return out
 
     @defer.inlineCallbacks
     def assertCommandFailure(self, command, path='.'):
@@ -173,7 +173,7 @@ class FunctionalTestMixin(WithScenarios):
             self.addDetail('stdout', text_content(six.ensure_text(out)))
             self.addDetail('stderr', text_content(six.ensure_text(err)))
             self.assertNotEqual(0, code)
-        defer.returnValue((out, err))
+        return out, err
 
     def assertStatsdSuccess(self, repo, command):
         metrics = ['clock_time', 'user_time', 'system_time', 'max_rss']
@@ -822,7 +822,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
     def get_symbolic_ref(self, path, name):
         out = yield self.getProcessOutput(
             b'git', (b'symbolic-ref', name), env=os.environ, path=path)
-        defer.returnValue(out.rstrip(b'\n'))
+        return out.rstrip(b'\n')
 
     @defer.inlineCallbacks
     def test_turnip_set_symbolic_ref(self):

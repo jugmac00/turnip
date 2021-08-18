@@ -222,9 +222,9 @@ class HookRPCHandler(object):
                 auth_params=auth_params, ref_path=ref_path)
         # cached_permissions is a shallow copy of the key index for
         # self.ref_permissions, so changes will be updated in that.
-        defer.returnValue(
-            {base64.b64encode(ref).decode('UTF-8'): cached_permissions[ref]
-             for ref in paths})
+        return {
+            base64.b64encode(ref).decode('UTF-8'): cached_permissions[ref]
+            for ref in paths}
 
     @defer.inlineCallbacks
     def notify(self, path, loose_object_count, pack_count, auth_params):
@@ -300,7 +300,7 @@ class HookRPCHandler(object):
             raise
         log_context.log.info("getMergeProposalURL done: ref_path={path}",
                              path=path)
-        defer.returnValue(mp_url)
+        return mp_url
 
 
 class HookRPCServerFactory(RPCServerFactory):

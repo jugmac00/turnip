@@ -158,7 +158,7 @@ class ErrorTestMixin(object):
         else:
             self.assertIs(None, self.root.backend_transport)
         yield rendered
-        defer.returnValue(self.request)
+        return self.request
 
     @defer.inlineCallbacks
     def test_backend_immediately_dies(self):

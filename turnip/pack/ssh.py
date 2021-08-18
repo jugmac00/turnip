@@ -228,7 +228,7 @@ class SmartSSHRealm:
         user_dict = yield mind.lookupUserDetails(
             self.authentication_proxy, avatar_id)
         avatar = SmartSSHAvatar(user_dict, self.service)
-        defer.returnValue((interfaces[0], avatar, avatar.logout))
+        return interfaces[0], avatar, avatar.logout
 
 
 class SmartSSHService(SSHService):
