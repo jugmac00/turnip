@@ -3,10 +3,16 @@
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import print_function, unicode_literals
+from __future__ import (
+    print_function,
+    unicode_literals,
+    )
 
 import base64
-from datetime import timedelta, datetime
+from datetime import (
+    datetime,
+    timedelta,
+    )
 import os
 import re
 import subprocess
@@ -14,8 +20,8 @@ from textwrap import dedent
 import time
 import unittest
 from unittest import mock
-import uuid
 from urllib.parse import quote
+import uuid
 
 from fixtures import (
     EnvironmentVariable,

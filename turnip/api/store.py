@@ -2,6 +2,7 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 import base64
+from collections import defaultdict
 import itertools
 import logging
 import os
@@ -9,7 +10,6 @@ import re
 import shutil
 import subprocess
 import uuid
-from collections import defaultdict
 
 from contextlib2 import (
     contextmanager,
@@ -33,8 +33,15 @@ from twisted.web import xmlrpc
 
 from turnip.config import config
 from turnip.helpers import TimeoutServerProxy
-from turnip.pack.helpers import ensure_config, get_repack_data
-from turnip.tasks import app, logger as tasks_logger
+from turnip.pack.helpers import (
+    ensure_config,
+    get_repack_data,
+    )
+from turnip.tasks import (
+    app,
+    logger as tasks_logger,
+    )
+
 
 logger = logging.getLogger(__name__)
 

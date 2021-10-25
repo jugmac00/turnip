@@ -8,7 +8,10 @@ from __future__ import (
     )
 
 from testtools import TestCase
-from twisted.conch.interfaces import ISession, ISessionSetEnv
+from twisted.conch.interfaces import (
+    ISession,
+    ISessionSetEnv,
+    )
 
 from turnip.pack.ssh import SmartSSHSession
 

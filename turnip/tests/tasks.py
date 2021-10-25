@@ -2,7 +2,10 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 import atexit
-from datetime import datetime, timedelta
+from datetime import (
+    datetime,
+    timedelta,
+    )
 import os
 import subprocess
 import sys
@@ -13,6 +16,7 @@ import six
 
 from turnip.config import config
 from turnip.tasks import app
+
 
 BROKER_URL = 'pyamqp://guest@localhost/turnip-test-vhost'
 

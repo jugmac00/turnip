@@ -6,10 +6,15 @@ import fnmatch
 import itertools
 import logging
 import os
-from subprocess import PIPE, Popen, CalledProcessError, STDOUT
-import uuid
+from subprocess import (
+    CalledProcessError,
+    PIPE,
+    Popen,
+    STDOUT,
+    )
 from urllib.parse import urljoin
 from urllib.request import pathname2url
+import uuid
 
 from pygit2 import (
     clone_repository,
@@ -20,6 +25,7 @@ from pygit2 import (
     Signature,
     )
 import six
+
 
 log = logging.getLogger()
 

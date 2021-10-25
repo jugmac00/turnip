@@ -11,7 +11,10 @@ import hashlib
 import os.path
 from unittest import mock
 
-from fixtures import TempDir, MonkeyPatch
+from fixtures import (
+    MonkeyPatch,
+    TempDir,
+    )
 from pygit2 import init_repository
 import six
 from testtools import TestCase

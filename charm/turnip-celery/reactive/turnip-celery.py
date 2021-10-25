@@ -1,7 +1,11 @@
 # Copyright 2018 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import (
+    absolute_import,
+    print_function,
+    unicode_literals,
+    )
 
 from charmhelpers.core import (
     hookenv,
@@ -17,12 +21,12 @@ from charms.reactive import (
     when_not_all,
     )
 
-from charms.turnip.celery import configure_celery
 from charms.turnip.base import (
     configure_service,
     deconfigure_service,
     get_rabbitmq_url,
     )
+from charms.turnip.celery import configure_celery
 
 
 @when('turnip.installed', 'turnip.storage.available', 'turnip.amqp.available')

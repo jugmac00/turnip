@@ -26,6 +26,7 @@ from turnip.pack.hookrpc import (
 from turnip.pack.http import SmartHTTPFrontendResource
 from turnip.pack.ssh import SmartSSHService
 
+
 data_dir = os.path.join(
     os.path.dirname(__file__), "turnip", "pack", "tests", "data")
 
