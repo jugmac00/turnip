@@ -7,8 +7,8 @@ from __future__ import (
     unicode_literals,
     )
 
-import sys
 import logging
+import sys
 
 
 def setupLogger():

@@ -22,8 +22,6 @@ from urllib.parse import (
     urlunsplit,
     )
 
-from turnip.config import config
-
 from fixtures import (
     EnvironmentVariable,
     TempDir,
@@ -56,6 +54,7 @@ from twisted.web import (
     xmlrpc,
     )
 
+from turnip.config import config
 from turnip.pack import helpers
 from turnip.pack.git import (
     PackBackendFactory,

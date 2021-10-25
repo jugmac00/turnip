@@ -14,16 +14,14 @@ import os.path
 
 import statsd
 from twisted.application import (
-    service,
     internet,
+    service,
     )
 from twisted.scripts.twistd import ServerOptions
 
 from turnip.config import config
 from turnip.log import RotatableFileLogObserver
-from turnip.pack.git import (
-    PackBackendFactory,
-    )
+from turnip.pack.git import PackBackendFactory
 from turnip.pack.hookrpc import (
     HookRPCHandler,
     HookRPCServerFactory,

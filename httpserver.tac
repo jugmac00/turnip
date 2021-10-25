@@ -6,8 +6,8 @@
 from __future__ import unicode_literals
 
 from twisted.application import (
-    service,
     internet,
+    service,
     )
 from twisted.scripts.twistd import ServerOptions
 from twisted.web import server

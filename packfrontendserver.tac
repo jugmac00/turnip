@@ -11,8 +11,8 @@ from __future__ import (
     )
 
 from twisted.application import (
-    service,
     internet,
+    service,
     )
 from twisted.scripts.twistd import ServerOptions
 

@@ -20,6 +20,7 @@ import six
 
 from turnip.pack.helpers import get_repack_data
 
+
 # XXX twom 2018-10-23 This should be a pygit2 import, but
 # that currently causes CFFI warnings to be returned to the client.
 GIT_OID_HEX_ZERO = b'0' * 40

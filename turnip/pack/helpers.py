@@ -12,8 +12,8 @@ import enum
 import hashlib
 import os.path
 import re
-import subprocess
 import stat
+import subprocess
 import sys
 from tempfile import (
     mktemp,
@@ -26,6 +26,7 @@ import yaml
 
 import turnip.pack.hooks
 from turnip.version_info import version_info
+
 
 DELIM_PKT = object()
 PKT_LEN_SIZE = 4

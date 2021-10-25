@@ -15,6 +15,7 @@ from lazr.sshserver.auth import NoSuchPersonWithName
 import six
 from twisted.web import xmlrpc
 
+
 __all__ = [
     "FakeAuthServerService",
     "FakeVirtInfoService",

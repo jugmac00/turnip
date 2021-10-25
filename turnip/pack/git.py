@@ -15,10 +15,10 @@ import json
 import os
 import re
 import sys
+import traceback
 import uuid
 
 import six
-import traceback
 from twisted.internet import (
     defer,
     error,
@@ -41,8 +41,8 @@ from turnip.pack.helpers import (
     encode_request,
     ensure_config,
     ensure_hooks,
-    INCOMPLETE_PKT,
     get_repack_data,
+    INCOMPLETE_PKT,
     translate_xmlrpc_fault,
     )
 

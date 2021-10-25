@@ -13,9 +13,9 @@ import os
 from unittest import mock
 
 from fixtures import TempDir
-import six
 from openid.consumer import consumer
 from paste.auth.cookie import encode as encode_cookie
+import six
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (

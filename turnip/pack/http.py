@@ -13,6 +13,7 @@ import json
 import os.path
 import tempfile
 import textwrap
+import time
 from urllib.parse import urlencode
 import uuid
 import zlib
@@ -29,7 +30,6 @@ from paste.auth.cookie import (
     encode as encode_cookie,
     )
 import six
-import time
 from twisted.internet import (
     defer,
     error,
@@ -61,7 +61,9 @@ from turnip.pack.helpers import (
     get_capabilities_advertisement,
     translate_xmlrpc_fault,
     TurnipFaultCode,
-)
+    )
+
+
 try:
     from turnip.version_info import version_info
 except ImportError:

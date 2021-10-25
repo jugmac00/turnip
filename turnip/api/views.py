@@ -10,8 +10,8 @@ from pygit2 import GitError
 import pyramid.httpexceptions as exc
 from pyramid.response import Response
 
-from turnip.config import config
 from turnip.api import store
+from turnip.config import config
 
 
 def is_valid_path(repo_store, repo_path):
