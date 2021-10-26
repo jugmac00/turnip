@@ -32,7 +32,7 @@ from turnip.tests.tasks import CeleryWorkerFixture
 class InitTestCase(TestCase):
 
     def setUp(self):
-        super(InitTestCase, self).setUp()
+        super().setUp()
         self.repo_store = self.useFixture(TempDir()).path
         self.useFixture(EnvironmentVariable("REPO_STORE", self.repo_store))
 

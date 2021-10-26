@@ -620,7 +620,7 @@ class TestBackendFunctional(FunctionalTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        super(TestBackendFunctional, self).setUp()
+        super().setUp()
 
         # Set up a PackBackendFactory on a free port in a clean repo root.
         self.startVirtInfo()
@@ -647,7 +647,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
 
     @defer.inlineCallbacks
     def setUp(self):
-        super(FrontendFunctionalTestMixin, self).setUp()
+        super().setUp()
 
         self.data_dir = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "data"))
@@ -745,7 +745,7 @@ class TestGitFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield super(TestGitFrontendFunctional, self).setUp()
+        yield super().setUp()
 
         # We run a frontend server connecting to the backend and
         # virtinfo servers started by the mixin.
@@ -766,7 +766,7 @@ class TestSmartHTTPFrontendFunctional(FrontendFunctionalTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield super(TestSmartHTTPFrontendFunctional, self).setUp()
+        yield super().setUp()
 
         # We run a frontend server connecting to the backend and
         # virtinfo servers started by the mixin.
@@ -883,7 +883,7 @@ class TestSmartHTTPFrontendWithAuthFunctional(TestSmartHTTPFrontendFunctional):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield super(TestSmartHTTPFrontendWithAuthFunctional, self).setUp()
+        yield super().setUp()
 
         self.virtinfo.require_auth = True
         self.url = (
@@ -944,7 +944,7 @@ class TestSmartSSHServiceFunctional(FrontendFunctionalTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        yield super(TestSmartSSHServiceFunctional, self).setUp()
+        yield super().setUp()
 
         root = six.ensure_text(self.root)
         config = os.path.join(root, "ssh-config")

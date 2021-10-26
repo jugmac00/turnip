@@ -227,7 +227,7 @@ class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
         self.factory.http_request.setHeader(
             b'Content-Type',
             b'application/x-%s-advertisement' % self.factory.command)
-        super(HTTPPackClientRefsProtocol, self).startGoodResponse()
+        super().startGoodResponse()
 
     def backendConnected(self):
         HTTPPackClientProtocol.backendConnected(self)

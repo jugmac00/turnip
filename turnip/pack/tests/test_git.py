@@ -57,7 +57,7 @@ class TestPackServerProtocol(TestCase):
     """Test the base implementation of the git pack network protocol."""
 
     def setUp(self):
-        super(TestPackServerProtocol, self).setUp()
+        super().setUp()
         self.proto = DummyPackServerProtocol()
         self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
@@ -129,7 +129,7 @@ class DummyPackBackendProtocol(git.PackBackendProtocol):
 class TestPackFrontendServerProtocol(TestCase):
 
     def setUp(self):
-        super(TestPackFrontendServerProtocol, self).setUp()
+        super().setUp()
         self.factory = git.PackFrontendFactory('example.com', 12345)
         self.proto = git.PackFrontendServerProtocol()
         self.proto.factory = self.factory
@@ -179,7 +179,7 @@ class TestPackBackendProtocol(TestCase):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     def setUp(self):
-        super(TestPackBackendProtocol, self).setUp()
+        super().setUp()
         self.root = self.useFixture(TempDir()).path
         self.hookrpc_handler = MockHookRPCHandler()
         self.statsd_client = MockStatsd()
@@ -378,7 +378,7 @@ class TestPackVirtServerProtocol(TestCase):
             helpers.decode_packet(self.transport.value()))
 
     def setUp(self):
-        super(TestPackVirtServerProtocol, self).setUp()
+        super().setUp()
         self.root = self.useFixture(TempDir()).path
         self.hookrpc_handler = MockHookRPCHandler()
         self.hookrpc_sock = os.path.join(self.root, 'hookrpc_sock')

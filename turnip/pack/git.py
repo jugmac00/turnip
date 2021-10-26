@@ -62,13 +62,13 @@ class six_dict(dict):
     that soon (see https://twistedmatrix.com/trac/ticket/9933).
     """
     def itervalues(self):
-        return super(six_dict, self).values()
+        return super().values()
 
     def iterkeys(self):
-        return super(six_dict, self).keys()
+        return super().keys()
 
     def __repr__(self):
-        return "<six_dict %s>" % super(six_dict, self).__repr__()
+        return "<six_dict %s>" % super().__repr__()
 
 
 class RequestIDLogger(Logger):
@@ -78,7 +78,7 @@ class RequestIDLogger(Logger):
         if format is not None and request_id is not None:
             format = '[request-id=%s] [%s] %s' % (
                 request_id, self.source.__class__.__name__, format)
-        super(RequestIDLogger, self).emit(level, format=format, **kwargs)
+        super().emit(level, format=format, **kwargs)
 
 
 class UnstoppableProducerWrapper(object):
@@ -286,7 +286,7 @@ class GitProcessProtocol(protocol.ProcessProtocol, object):
         if childFD == 3:
             self.resourceUsageReceived(data)
         else:
-            super(GitProcessProtocol, self).childDataReceived(childFD, data)
+            super().childDataReceived(childFD, data)
 
     def outReceived(self, data):
         self.out_started = True
@@ -483,7 +483,7 @@ class PackProxyServerProtocol(PackServerProtocol):
     def resumeProducing(self):
         # Send our translated request and then open the gate to the client.
         self.sendNextCommand()
-        super(PackProxyServerProtocol, self).resumeProducing()
+        super().resumeProducing()
 
     def readConnectionLost(self):
         # Forward the closed stdin down the stack.

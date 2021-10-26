@@ -236,7 +236,7 @@ class TestEnsureConfig(TestCase):
     """Test repository configuration maintenance."""
 
     def setUp(self):
-        super(TestEnsureConfig, self).setUp()
+        super().setUp()
         self.repo_dir = self.useFixture(TempDir()).path
         init_repository(self.repo_dir, bare=True)
         self.config_path = os.path.join(self.repo_dir, 'config')
@@ -278,7 +278,7 @@ class TestEnsureHooks(TestCase):
     """Test repository hook maintenance."""
 
     def setUp(self):
-        super(TestEnsureHooks, self).setUp()
+        super().setUp()
         self.repo_dir = self.useFixture(TempDir()).path
         self.hooks_dir = os.path.join(self.repo_dir, 'hooks')
         os.mkdir(self.hooks_dir)
@@ -428,7 +428,7 @@ class TestGetRepackData(TestCase):
     """Test get repack indicators for repository."""
 
     def setUp(self):
-        super(TestGetRepackData, self).setUp()
+        super().setUp()
         self.repo_dir = self.useFixture(TempDir()).path
         self.repo = init_repository(self.repo_dir, bare=False)
 

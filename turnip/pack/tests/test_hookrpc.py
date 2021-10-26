@@ -70,7 +70,7 @@ class TestJSONNetStringProtocol(TestCase):
     """Test the JSON netstring protocol."""
 
     def setUp(self):
-        super(TestJSONNetStringProtocol, self).setUp()
+        super().setUp()
         self.proto = DummyJSONNetstringProtocol()
         self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
@@ -127,7 +127,7 @@ class TestRPCServerProtocol(TestCase):
     """Test the socket server that handles git hook callbacks."""
 
     def setUp(self):
-        super(TestRPCServerProtocol, self).setUp()
+        super().setUp()
         self.proto = hookrpc.RPCServerProtocol({
             'sync': sync_rpc_method,
             'async': async_rpc_method,
@@ -196,7 +196,7 @@ class TestHookRPCHandler(TestCase):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     def setUp(self):
-        super(TestHookRPCHandler, self).setUp()
+        super().setUp()
         self.virtinfo = FakeVirtInfoService(allowNone=True)
         self.virtinfo_listener = reactor.listenTCP(
             0, server.Site(self.virtinfo))
