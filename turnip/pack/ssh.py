@@ -130,7 +130,7 @@ class SmartSSHSession(DoNothingSession):
         'git-upload-pack', 'git-receive-pack', 'turnip-set-symbolic-ref'))
 
     def __init__(self, *args, **kwargs):
-        super(SmartSSHSession, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.pack_protocol = None
         self.env = {}
 

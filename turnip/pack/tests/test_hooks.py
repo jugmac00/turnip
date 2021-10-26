@@ -57,7 +57,7 @@ class HookProcessProtocol(protocol.ProcessProtocol):
 class MockHookRPCHandler(hookrpc.HookRPCHandler):
 
     def __init__(self):
-        super(MockHookRPCHandler, self).__init__(b'http://localhost', 15)
+        super().__init__(b'http://localhost', 15)
         self.notifications = []
         self.ref_permissions = {}
 
@@ -175,7 +175,7 @@ class HookTestMixin(object):
         self.notifications.append(path)
 
     def setUp(self):
-        super(HookTestMixin, self).setUp()
+        super().setUp()
         self.hookrpc_handler = MockHookRPCHandler()
         self.hookrpc = hookrpc.HookRPCServerFactory(self.hookrpc_handler)
         self.repo_dir = os.path.join(self.useFixture(TempDir()).path, '.git')
@@ -365,7 +365,7 @@ class TestUpdateHook(TestCase):
     """Tests for the git update hook"""
 
     def setUp(self):
-        super(TestUpdateHook, self).setUp()
+        super().setUp()
         self.useFixture(MonkeyPatch(
             'turnip.pack.hooks.hook.check_ancestor',
             self.patched_ancestor_check

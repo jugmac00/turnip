@@ -48,7 +48,7 @@ class LessDummyRequest(requesthelper.DummyRequest):
     startedWriting = 0
 
     def __init__(self, *args, **kwargs):
-        super(LessDummyRequest, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.content = BytesIO()
         self.cookies = {}
 
@@ -58,13 +58,13 @@ class LessDummyRequest(requesthelper.DummyRequest):
 
     def write(self, data):
         self.startedWriting = 1
-        super(LessDummyRequest, self).write(data)
+        super().write(data)
 
     def registerProducer(self, prod, s):
         # Avoid DummyRequest.registerProducer calling resumeProducing
         # forever, never giving the reactor a chance to run.
         if not s:
-            super(LessDummyRequest, self).registerProducer(prod, s)
+            super().registerProducer(prod, s)
 
     def getUser(self):
         return None
@@ -191,7 +191,7 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
     request_method = 'GET'
 
     def setUp(self):
-        super(TestSmartHTTPRefsResource, self).setUp()
+        super().setUp()
         self.root = FakeRoot()
         self.request = LessDummyRequest([b''])
         self.request.method = b'GET'
@@ -283,7 +283,7 @@ class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     def setUp(self):
-        super(TestSmartHTTPCommandResource, self).setUp()
+        super().setUp()
         self.root = FakeRoot()
         self.request = LessDummyRequest([''])
         self.request.method = b'POST'
@@ -317,7 +317,7 @@ class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
 class TestHTTPAuthLoginResource(TestCase):
     """Unit tests for login resource."""
     def setUp(self):
-        super(TestHTTPAuthLoginResource, self).setUp()
+        super().setUp()
         self.root = FakeRoot(self.useFixture(TempDir()).path)
         self.root.cgit_secret = b'dont-tell-anyone shuuu'
 
@@ -382,7 +382,7 @@ class TestHTTPAuthRootResource(TestCase):
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
 
     def setUp(self):
-        super(TestHTTPAuthRootResource, self).setUp()
+        super().setUp()
         self.root = root = FakeRoot(self.useFixture(TempDir()).path)
         self.virtinfo = virtinfo = FakeVirtInfoService(allowNone=True)
         virtinfo_listener = default_reactor.listenTCP(0, server.Site(virtinfo))

@@ -297,8 +297,7 @@ class AlreadyExistsError(GitError):
     """We tried to initialise a repository that already exists."""
 
     def __init__(self, path):
-        super(AlreadyExistsError, self).__init__(
-            "Repository '%s' already exists" % path)
+        super().__init__("Repository '%s' already exists" % path)
         self.path = path
 
 

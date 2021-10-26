@@ -63,7 +63,7 @@ class ApiRepoStoreMixin:
 class ApiTestCase(TestCase, ApiRepoStoreMixin):
 
     def setUp(self):
-        super(ApiTestCase, self).setUp()
+        super().setUp()
         self.setupRepoStore()
 
     def assertReferencesEqual(self, repo, expected, observed):
@@ -1006,7 +1006,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
 class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
 
     def setUp(self):
-        super(AsyncRepoCreationAPI, self).setUp()
+        super().setUp()
         self.setupRepoStore()
         # XML-RPC server
         self.virtinfo = FakeVirtInfoService(allowNone=True)

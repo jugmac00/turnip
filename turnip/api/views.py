@@ -44,7 +44,7 @@ class RepoAPI(BaseAPI):
     """Provides HTTP API for repository actions."""
 
     def __init__(self, request, context=None):
-        super(RepoAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     def collection_options(self):
@@ -137,7 +137,7 @@ class RepackAPI(BaseAPI):
     """Provides HTTP API for repository repacking."""
 
     def __init__(self, request, context=None):
-        super(RepackAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     @validate_path
@@ -157,7 +157,7 @@ class GarbageCollectAPI(BaseAPI):
     """Provides HTTP API for running gc for repository."""
 
     def __init__(self, request, context=None):
-        super(GarbageCollectAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     @validate_path
@@ -177,7 +177,7 @@ class RefCopyAPI(BaseAPI):
     """Provides HTTP API for git references copy operations."""
 
     def __init__(self, request, context=None):
-        super(RefCopyAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     def _validate_refs(self, repo_store, repo_name, refs_or_commits):
@@ -237,7 +237,7 @@ class RefAPI(BaseAPI):
     """Provides HTTP API for git references."""
 
     def __init__(self, request, context=None):
-        super(RefAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     @validate_path
@@ -284,7 +284,7 @@ class DiffAPI(BaseAPI):
     {name} can be two : separated repositories, for a cross repository diff.
     """
     def __init__(self, request, context=None):
-        super(DiffAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     @validate_path
@@ -316,7 +316,7 @@ class DiffMergeAPI(BaseAPI):
     {name} can be two : separated repositories, for a cross repository diff.
     """
     def __init__(self, request, context=None):
-        super(DiffMergeAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     @validate_path
@@ -341,7 +341,7 @@ class CommitAPI(BaseAPI):
     """Provides HTTP API for git commits."""
 
     def __init__(self, request, context=None):
-        super(CommitAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     @validate_path
@@ -369,7 +369,7 @@ class LogAPI(BaseAPI):
     """Provides HTTP API for git logs."""
 
     def __init__(self, request, context=None):
-        super(LogAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     @validate_path
@@ -391,7 +391,7 @@ class DetectMergesAPI(BaseAPI):
     """Provides HTTP API for detecting merges."""
 
     def __init__(self, request, context=None):
-        super(DetectMergesAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     @validate_path
@@ -420,7 +420,7 @@ class BlobAPI(BaseAPI):
     """Provides HTTP API for fetching blobs."""
 
     def __init__(self, request, context=None):
-        super(BlobAPI, self).__init__()
+        super().__init__()
         self.request = request
 
     @validate_path
