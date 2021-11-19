@@ -9,7 +9,7 @@ PSERVE := $(ENV)/bin/pserve
 FLAKE8 := $(ENV)/bin/flake8
 CELERY := $(ENV)/bin/celery
 PIP := $(ENV)/bin/pip
-VIRTUALENV := virtualenv
+VIRTUALENV := /usr/bin/virtualenv
 VENV_ARGS := -p python3
 
 DEPENDENCIES_URL := https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
