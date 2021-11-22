@@ -195,8 +195,8 @@ When adding the SSH key to LP if emails can't go out the SSH key addition will f
 One possible workaround is to use Fakeemail: https://github.com/tomwardill/fakeemail
 It is recommended that this is done in a venv (https://pypi.org/project/pipsi/):
 
-	sudo apt install pipsi
-	pipsi install fakeemail
+	sudo apt install pipx
+	pipx install fakeemail
 	~/.local/bin/fakeemail  25 8082 0.0.0.0
 	Message stored for: root@localhost
 
