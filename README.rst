@@ -141,7 +141,7 @@ In the Turnip container the hosts file needs to point to the LP container (x.x.x
 	ff02::3 ip6-allhosts
 
 A basic test that can be performed by dropping into the Turnip container shell. Below exception is expected as Repository '1' did not exist when the RPC call was performed, it does show however that Turnip is able to resolve xmlrpc-private.launchpad.test and there is connectivity between LP and Turnip:
-	user@launchpad:~$ lxc exec turnip python3
+	user@launchpad:~$ lxc exec turnip-bionic python3
 	...
 	>>> from xmlrpc.client import ServerProxy
 	>>> proxy = ServerProxy('http://xmlrpc-private.launchpad.test:8087/git')
