@@ -152,7 +152,11 @@ A basic test that can be performed by dropping into the Turnip container shell. 
 	>>> exit()
 	root@turnip-bionic:~#
 
-In your LP container edit ~/.gitconfig and add these lines, where USER is your Launchpad username:
+In your LP container the hosts file needs to point to the Turnip container (x.x.x.x is the IP address of Turnip):
+
+	x.x.x.x git.launchpad.test
+
+Then, also in your LP container edit ~/.gitconfig and add these lines, where USER is your Launchpad username:
 
 	[url "git+ssh://USER@git.launchpad.test/"]
 		insteadof = lptest:
