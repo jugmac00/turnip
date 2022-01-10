@@ -638,7 +638,7 @@ class PackBackendProtocol(PackServerProtocol):
             # must be old-style classes or derived from BaseException,
             # not NoneType", since proxy.callRemote and Twisted event loop
             # could clean up the current exception. That's why we store
-            # current exception at the begining of the `except` block and
+            # current exception at the beginning of the `except` block and
             # reraise it here.
             six.reraise(t, v, tb)
 
