@@ -59,7 +59,7 @@ class RepoFactory(object):
         self.author = Signature('Test Author', 'author@bar.com')
         self.branches = []
         self.commits = []
-        self.committer = Signature('Test Commiter', 'committer@bar.com')
+        self.committer = Signature('Test Committer', 'committer@bar.com')
         self.num_branches = num_branches
         self.num_commits = num_commits
         self.num_tags = num_tags
