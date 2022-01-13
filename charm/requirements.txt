@@ -4,6 +4,6 @@ mock==1.0.1
 pep8==1.5.7
 pyflakes==0.8.1
 pyinotify==0.9.5
-PyYAML==3.11
+PyYAML==5.4
 six==1.9.0
 sniffer==0.3.4
