@@ -80,6 +80,15 @@ bootstrap-test:
 test: $(ENV) bootstrap-test
 	$(PYTHON) -m unittest discover $(ARGS) turnip
 
+# XXX jugmac00 2022-01-13:
+# this is a temporary solution to enable selecting single tests more easily
+# test setup will be redone in https://warthogs.atlassian.net/browse/LP-598
+# sample command:
+# make runpytest ARGS="-k filtered_by_blob_paths"
+runpytest: $(ENV) bootstrap-test
+	$(PYTHON) -m pip install pdbpp pytest
+	$(PYTHON) -m pytest $(ARGS)
+
 clean:
 	find turnip -name '*.py[co]' -exec rm '{}' \;
 	rm -rf $(ENV) $(PIP_CACHE)
