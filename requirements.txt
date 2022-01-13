@@ -6,7 +6,7 @@ Automat==20.2.0
 bcrypt==3.1.7
 beautifulsoup4==4.6.3
 billiard==3.6.3.0
-celery==4.4.6
+celery==5.2.2
 cffi==1.14.1
 configparser==4.0.2
 constantly==15.1.0
