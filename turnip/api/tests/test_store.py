@@ -386,7 +386,7 @@ class InitTestCase(TestCase):
         dest_ref_name = 'refs/merge/123'
         store.fetch_refs.apply_async(args=([
             (orig_path, orig_commit_oid.hex, dest_path, dest_ref_name)], ))
-        celery_fixture.waitUntil(5, lambda: len(dest.references.objects) == 1)
+        celery_fixture.waitUntil(10, lambda: len(dest.references.objects) == 1)
 
         self.assertEqual(1, len(dest.references.objects))
         copied_ref = dest.references.objects[0]
@@ -411,7 +411,7 @@ class InitTestCase(TestCase):
                 return dest[orig_blob_id].data == b'changed foobar content'
             except KeyError:
                 return False
-        celery_fixture.waitUntil(5, waitForNewCommit)
+        celery_fixture.waitUntil(10, waitForNewCommit)
 
         self.assertEqual(1, len(dest.references.objects))
         copied_ref = dest.references.objects[0]
@@ -441,7 +441,7 @@ class InitTestCase(TestCase):
         operations = [(orig_path, new_ref_name)]
         store.delete_refs.apply_async((operations, ))
         celery_fixture.waitUntil(
-            5, lambda: len(orig.references.objects) < before_refs_len)
+            10, lambda: len(orig.references.objects) < before_refs_len)
 
         self.assertEqual(before_refs_len - 1, len(orig.references.objects))
         self.assertNotIn(
@@ -475,7 +475,7 @@ class InitTestCase(TestCase):
 
         # Assert we have 0 loose objects after repack job ran
         celery_fixture.waitUntil(
-            5, lambda: self.hasZeroLooseObjects(orig_path))
+            10, lambda: self.hasZeroLooseObjects(orig_path))
 
     def test_gc(self):
         celery_fixture = CeleryWorkerFixture()
@@ -492,4 +492,4 @@ class InitTestCase(TestCase):
 
         # Assert we have 0 loose objects after a gc job ran
         celery_fixture.waitUntil(
-            5, lambda: self.hasZeroLooseObjects(orig_path))
+            10, lambda: self.hasZeroLooseObjects(orig_path))
