@@ -351,7 +351,7 @@ class CommitAPI(BaseAPI):
             commit = store.get_commit(repo_store, repo_name, commit_sha1)
         except GitError:
             return exc.HTTPNotFound()
-        return commit
+        return store.format_commit(commit)
 
     @validate_path
     def collection_post(self, repo_store, repo_name):
@@ -361,7 +361,7 @@ class CommitAPI(BaseAPI):
             commits = store.get_commits(repo_store, repo_name, commits)
         except GitError:
             return exc.HTTPNotFound()
-        return commits
+        return [store.format_commit(commit) for commit in commits]
 
 
 @resource(path='/repo/{name}/log/{sha1}')

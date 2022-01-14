@@ -72,6 +72,9 @@ def format_ref(ref, git_object):
 
 def format_commit(git_object):
     """Return a formatted commit object dict."""
+    # XXX jugmac00 2022-01-14: this is an additional type check, which
+    # currently does not get executed by the test suite
+    # better safe than sorry
     if git_object.type != GIT_OBJ_COMMIT:
         raise GitError('Invalid type: object {} is not a commit.'.format(
             git_object.oid.hex))
@@ -672,8 +675,10 @@ def get_merge_diff(repo_store, repo_name, sha1_base,
         if patch is None:
             patch = u''
         shas = [sha1_base, sha1_head]
-        commits = [get_commit(repo_store, repo_name, sha, repo)
-                   for sha in shas]
+        commits = [
+            format_commit(get_commit(repo_store, repo_name, sha, repo))
+            for sha in shas
+        ]
         return {'commits': commits, 'patch': patch,
                 'conflicts': sorted(conflicts)}
 
@@ -687,8 +692,10 @@ def get_diff(repo_store, repo_name, sha1_from, sha1_to, context_lines=3):
     """
     with open_repo(repo_store, repo_name) as repo:
         shas = [sha1_from, sha1_to]
-        commits = [get_commit(repo_store, repo_name, sha, repo)
-                   for sha in shas]
+        commits = [
+            format_commit(get_commit(repo_store, repo_name, sha, repo))
+            for sha in shas
+        ]
         diff = repo.diff(
             commits[0]['sha1'], commits[1]['sha1'], False, 0,
             context_lines)
@@ -735,7 +742,10 @@ def get_commit(repo_store, repo_name, revision, repo=None):
         except KeyError:
             raise GitError('Object {} does not exist in repository {}.'.format(
                 revision, repo_name))
-        return format_commit(git_object)
+        if git_object.type != GIT_OBJ_COMMIT:
+            raise GitError('Invalid type: object {} is not a commit.'.format(
+                git_object.oid.hex))
+        return git_object
 
 
 def get_commits(repo_store, repo_name, commit_oids):
