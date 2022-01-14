@@ -493,7 +493,7 @@ class TurnipAuthCookieSigner(AuthCookieSigner):
         sha1 = paste.auth.cookie.sha1
         hmac = paste.auth.cookie.hmac
         make_time = paste.auth.cookie.make_time
-        decode = base64.decodestring(
+        decode = base64.decodebytes(
             cookie.replace(b"_", b"/").replace(b"~", b"="))
         signature = decode[:_signature_size]
         expires = decode[_signature_size:_header_size]
