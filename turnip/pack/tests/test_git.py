@@ -176,7 +176,7 @@ class TestPackFrontendServerProtocol(TestCase):
 class TestPackBackendProtocol(TestCase):
     """Test the Git pack backend protocol."""
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=10)
 
     def setUp(self):
         super().setUp()
@@ -369,7 +369,7 @@ class DummyPackBackendFactory(git.PackBackendFactory):
 class TestPackVirtServerProtocol(TestCase):
     """Test the Git pack virt protocol."""
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=10)
 
     def assertKilledWith(self, message):
         self.assertFalse(self.transport.connected)

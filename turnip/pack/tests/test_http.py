@@ -186,7 +186,7 @@ class ErrorTestMixin(object):
 
 class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=10)
 
     request_method = 'GET'
 
@@ -280,7 +280,7 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
 
 class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=10)
 
     def setUp(self):
         super().setUp()
@@ -379,7 +379,7 @@ class TestHTTPAuthLoginResource(TestCase):
 
 class TestHTTPAuthRootResource(TestCase):
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=10)
 
     def setUp(self):
         super().setUp()
