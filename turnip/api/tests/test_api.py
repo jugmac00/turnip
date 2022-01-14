@@ -398,7 +398,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
             return ('refs/merge/123/head' in repo2_refs and
                     'refs/merge/987/head' in repo3_refs)
 
-        celery_fixture.waitUntil(5, branchCreated)
+        celery_fixture.waitUntil(10, branchCreated)
         self.assertEqual(4, len(repo2.references.objects))
         self.assertEqual(202, resp.status_code)
         self.assertEqual(b'', resp.body)
