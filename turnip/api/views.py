@@ -11,6 +11,7 @@ import pyramid.httpexceptions as exc
 from pyramid.response import Response
 
 from turnip.api import store
+from turnip.api.formatter import format_commit
 from turnip.config import config
 
 
@@ -351,7 +352,7 @@ class CommitAPI(BaseAPI):
             commit = store.get_commit(repo_store, repo_name, commit_sha1)
         except GitError:
             return exc.HTTPNotFound()
-        return store.format_commit(commit)
+        return format_commit(commit)
 
     @validate_path
     def collection_post(self, repo_store, repo_name):
@@ -361,7 +362,7 @@ class CommitAPI(BaseAPI):
             commits = store.get_commits(repo_store, repo_name, commits)
         except GitError:
             return exc.HTTPNotFound()
-        return [store.format_commit(commit) for commit in commits]
+        return [format_commit(commit) for commit in commits]
 
 
 @resource(path='/repo/{name}/log/{sha1}')
