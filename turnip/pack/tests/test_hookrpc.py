@@ -193,7 +193,7 @@ class TestRPCServerProtocol(TestCase):
 class TestHookRPCHandler(TestCase):
     """Test the hook RPC handler."""
 
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=10)
 
     def setUp(self):
         super().setUp()

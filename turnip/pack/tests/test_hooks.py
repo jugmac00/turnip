@@ -166,7 +166,7 @@ class TestNetstringRecv(TestCase):
 
 
 class HookTestMixin(object):
-    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=5)
+    run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=10)
 
     old_sha1 = b'a' * 40
     new_sha1 = b'b' * 40

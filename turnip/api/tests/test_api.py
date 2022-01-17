@@ -1030,7 +1030,8 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
         for i in range(reactor_iterations):
             default_reactor.iterate()
 
-    def assertRepositoryCreatedAsynchronously(self, repo_path, timeout_secs=5):
+    def assertRepositoryCreatedAsynchronously(self, repo_path,
+                                              timeout_secs=10):
         """Waits up to `timeout_secs` for a repository to be available."""
         timeout = timedelta(seconds=timeout_secs)
         start = datetime.now()
@@ -1049,7 +1050,7 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
             "Repository %s was not created after %s secs"
             % (repo_path, timeout_secs))
 
-    def assertAnyMockCalledAsync(self, mocks, timeout_secs=5):
+    def assertAnyMockCalledAsync(self, mocks, timeout_secs=10):
         """Asserts that any of the mocks in *args will be called in the
         next timeout_secs seconds.
         """
