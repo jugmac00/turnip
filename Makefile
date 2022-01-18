@@ -84,7 +84,7 @@ test: $(ENV) bootstrap-test
 # this is a temporary solution to enable selecting single tests more easily
 # test setup will be redone in https://warthogs.atlassian.net/browse/LP-598
 # sample command:
-# make runpytest ARGS="-k filtered_by_blob_paths"
+# make runpytest ARGS="-k expression"
 runpytest: $(ENV) bootstrap-test
 	$(PYTHON) -m pip install pdbpp pytest
 	$(PYTHON) -m pytest $(ARGS)

@@ -773,6 +773,58 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         self.assertEqual(1, len(resp.json))
         self.assertEqual(bulk_commits['commits'][0], resp.json[0]['sha1'])
 
+    def test_repo_get_launchpad_yaml_from_commit_collection(self):
+        factory = RepoFactory(self.repo_store, num_commits=10)
+        factory.build()
+
+        # standard configuration file name
+        c1 = factory.add_commit('bar', '.launchpad.yaml')
+        # commit which must not be returned
+        c2 = factory.commits[0]
+
+        payload = {
+            'filter_paths': [".launchpad.yaml", "debian/.launchpad.yaml"],
+            "commits": [c1.hex, c2.hex]
+        }
+
+        resp = self.app.post_json(
+            '/repo/{}/commits'.format(self.repo_path), payload
+        )
+
+        self.assertEqual(1, len(resp.json))
+        self.assertIn("blobs", resp.json[0])
+        self.assertEqual(
+            {'.launchpad.yaml': {'size': 3, 'data': 'YmFy'}},
+            resp.json[0]["blobs"]
+        )
+
+    def test_repo_get_launchpad_yaml_from_commit_collection_debian_edition(
+        self
+    ):
+        factory = RepoFactory(self.repo_store, num_commits=10)
+        factory.build()
+
+        # debian packaging: typical random files are added under `debian/...`
+        c1 = factory.add_commit('bar', 'debian/.launchpad.yaml')
+        # commit which must not be returned
+        c2 = factory.commits[0]
+
+        payload = {
+            'filter_paths': [".launchpad.yaml", "debian/.launchpad.yaml"],
+            "commits": [c1.hex, c2.hex]
+        }
+
+        resp = self.app.post_json(
+            '/repo/{}/commits'.format(self.repo_path), payload
+        )
+
+        self.assertEqual(1, len(resp.json))
+        self.assertIn("blobs", resp.json[0])
+        self.assertEqual(
+            {'debian/.launchpad.yaml': {'size': 3, 'data': 'YmFy'}},
+            resp.json[0]["blobs"]
+        )
+
     def test_repo_get_log_signatures(self):
         """Ensure signatures are correct."""
         factory = RepoFactory(self.repo_store)

@@ -11,7 +11,10 @@ import pyramid.httpexceptions as exc
 from pyramid.response import Response
 
 from turnip.api import store
-from turnip.api.formatter import format_commit
+from turnip.api.formatter import (
+    format_blob,
+    format_commit,
+    )
 from turnip.config import config
 
 
@@ -357,12 +360,28 @@ class CommitAPI(BaseAPI):
     @validate_path
     def collection_post(self, repo_store, repo_name):
         """Get commits in bulk."""
-        commits = extract_cstruct(self.request)['body'].get('commits')
+        payload = extract_cstruct(self.request)["body"]
+        commits = payload.get("commits")
+        filter_paths = payload.get("filter_paths", [])
         try:
             commits = store.get_commits(repo_store, repo_name, commits)
         except GitError:
             return exc.HTTPNotFound()
-        return [format_commit(commit) for commit in commits]
+
+        # format commits and filter them if applicable
+        rv = []
+        for commit in commits:
+            d = dict()
+            # apply filter if given
+            for path in filter_paths:
+                if path in commit.tree:
+                    if not d.get("blobs"):
+                        d["blobs"] = dict()
+                    d["blobs"][path] = format_blob(commit.tree[path])
+            if not filter_paths or d:
+                d.update(format_commit(commit))
+                rv.append(d)
+        return rv
 
 
 @resource(path='/repo/{name}/log/{sha1}')
