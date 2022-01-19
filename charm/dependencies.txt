@@ -2,7 +2,7 @@ interface			@
 interface/rabbitmq		git+https://github.com/openstack/charm-interface-rabbitmq;revno=571f486
 interface/http			git+https://github.com/juju-solutions/interface-http;revno=4a232c69
 interface/mount			git+https://github.com/juju-solutions/interface-mount;revno=d5a2526f
-interface/nrpe-external-master	git+https://github.com/cmars/nrpe-external-master-interface;revno=20b2b9fb
+interface/nrpe-external-master	git+https://github.com/canonical-ols/nrpe-external-master-interface;revno=20b2b9fb
 
 layer				@
 layer/apt			git+https://git.launchpad.net/layer-apt;revno=cf78622e
