@@ -21,6 +21,7 @@ None of the Python interfaces here should be considered stable.
    self
    architecture
    development
+   qa
    internal_protocol
    deployment
 
