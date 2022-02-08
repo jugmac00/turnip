@@ -17,3 +17,5 @@ parts
 tags
 TAGS
 turnip/version_info.py
+.tox/
+docs/_build/
