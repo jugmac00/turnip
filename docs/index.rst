@@ -1,4 +1,8 @@
-======
+.. turnip documentation master file, created by
+   sphinx-quickstart on Tue Feb  8 14:01:22 2022.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
 turnip
 ======
 
@@ -11,5 +15,12 @@ the frontend to the storage layer.
 
 None of the Python interfaces here should be considered stable.
 
-Documentation can be found at
-https://turnip.readthedocs.io/en/latest/index.html
+.. toctree::
+   :maxdepth: 2
+
+   self
+   architecture
+   development
+   internal_protocol
+   deployment
+

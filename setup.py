@@ -45,6 +45,9 @@ deploy_requires = [
     'envdir',
     'gunicorn',
     ]
+docs_requires = {
+    'sphinx',
+}
 
 setup(
     name='turnip',
@@ -73,7 +76,9 @@ setup(
     tests_require=test_requires,
     extras_require=dict(
         test=test_requires,
-        deploy=deploy_requires),
+        deploy=deploy_requires,
+        docs=docs_requires,
+    ),
     test_suite='turnip',
     entry_points="""\
     [paste.app_factory]
