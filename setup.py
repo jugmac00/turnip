@@ -29,7 +29,7 @@ requires = [
     'python-openid2',
     'PyYAML',
     'statsd',
-    'Twisted[conch]',
+    'Twisted[conch_nacl]',
     'waitress',
     'zope.interface',
     ]
