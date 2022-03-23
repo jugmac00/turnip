@@ -1,4 +1,4 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2022 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -15,7 +15,6 @@ from unittest import mock
 from fixtures import TempDir
 from openid.consumer import consumer
 from paste.auth.cookie import encode as encode_cookie
-import six
 from testtools import TestCase
 from testtools.deferredruntest import AsynchronousDeferredRunTest
 from twisted.internet import (
@@ -34,13 +33,12 @@ from turnip.pack import (
     helpers,
     http,
     )
-from turnip.pack.helpers import encode_packet
+from turnip.pack.helpers import get_capabilities_advertisement
 from turnip.pack.http import (
     get_protocol_version_from_request,
     HTTPAuthLoginResource,
     )
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
-from turnip.version_info import version_info
 
 
 class LessDummyRequest(requesthelper.DummyRequest):
@@ -261,15 +259,9 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
             b'turnip-request-id': mock.ANY,
             b'turnip-stateless-rpc': b'yes'})
 
-        ver = six.ensure_binary(version_info["revision_id"])
-        capabilities = (
-            encode_packet(b'version 2\n') +
-            encode_packet(b'agent=git/2.25.1@turnip/%s\n' % ver) +
-            encode_packet(b'ls-refs\n') +
-            encode_packet(b'fetch=shallow\n') +
-            encode_packet(b'server-option\n') +
-            b'0000'
-            )
+        # Details tested separately; see
+        # turnip.pack.tests.test_helpers.TestCapabilityAdvertisement.
+        capabilities = get_capabilities_advertisement(version=b"2")
         self.assertEqual(
             capabilities +
             b'001e# service=git-upload-pack\n'
