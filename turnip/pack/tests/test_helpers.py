@@ -1,4 +1,4 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2022 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -347,7 +347,8 @@ class TestCapabilityAdvertisement(TestCase):
 
         turnip_capabilities = get_capabilities_advertisement(version=b'2')
         version = six.ensure_binary(version_info["revision_id"])
-        turnip_agent = encode_packet(b"agent=git/2.25.1@turnip/%s\n" % version)
+        turnip_agent = encode_packet(
+            b"agent=git/%s@turnip/%s\n" % (git_version_num, version))
 
         self.assertEqual(
             turnip_capabilities,

@@ -1,4 +1,4 @@
-# Copyright 2015 Canonical Ltd.  This software is licensed under the
+# Copyright 2015-2022 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 from __future__ import (
@@ -9,13 +9,16 @@ from __future__ import (
 
 from collections import OrderedDict
 import enum
+from functools import lru_cache
 import hashlib
 import os.path
 import re
+import shutil
 import stat
 import subprocess
 import sys
 from tempfile import (
+    mkdtemp,
     mktemp,
     NamedTemporaryFile,
     )
@@ -248,6 +251,28 @@ def translate_xmlrpc_fault(code):
     return result
 
 
+@lru_cache(maxsize=1)
+def _get_git_v2_capabilities_advertisement():
+    """Returns git's own v2 capability advertisement, parsed into packets."""
+    git_dir = mkdtemp(prefix="git-advertisement-")
+    try:
+        subprocess.check_call(
+            ["git", "init", git_dir], stdout=subprocess.DEVNULL)
+        env = dict(os.environ)
+        env["GIT_PROTOCOL"] = "version=2"
+        advertisement = subprocess.check_output(
+            ["git", "upload-pack", git_dir], input=b"", env=env)
+    finally:
+        shutil.rmtree(git_dir, ignore_errors=True)
+    packets = []
+    while advertisement:
+        packet, advertisement = decode_packet(advertisement)
+        if packet is None:
+            break
+        packets.append(packet)
+    return packets
+
+
 def get_capabilities_advertisement(version=b'1'):
     """Returns the capability advertisement binary string to be sent to
     clients for a given protocol version requested.
@@ -257,11 +282,10 @@ def get_capabilities_advertisement(version=b'1'):
     if version != b'2':
         return b""
     turnip_version = six.ensure_binary(version_info.get("revision_id", '-1'))
-    return (
-        encode_packet(b"version 2\n") +
-        encode_packet(b"agent=git/2.25.1@turnip/%s\n" % turnip_version) +
-        encode_packet(b"ls-refs\n") +
-        encode_packet(b"fetch=shallow\n") +
-        encode_packet(b"server-option\n") +
-        b'0000'
-    )
+    advertisement = bytearray()
+    for packet in _get_git_v2_capabilities_advertisement():
+        if packet.startswith(b"agent="):
+            packet = b"%s@turnip/%s\n" % (packet.rstrip(b"\n"), turnip_version)
+        advertisement += encode_packet(packet)
+    advertisement += b"0000"
+    return bytes(advertisement)
