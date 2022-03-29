@@ -324,8 +324,10 @@ def add_nagios_e2e_checks(nagios):
         nagios.add_check(
             [os.path.join(nrpe_dir(), 'check_git_refs'), url],
             name='check_turnip_git_refs_{}'.format(i),
-            description='Git E2E {} - hint: check nfs-ganesha status'.format(
-                url),
+            description=(
+                'Git E2E {} - hint: check nfs-ganesha.service if all '
+                'appservers are bad, otherwise check '
+                'srv-turnip-data.mount').format(url),
             context=config['nagios_context'])
 
 
