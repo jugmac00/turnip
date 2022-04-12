@@ -41,7 +41,8 @@ from turnip.pack.http import (
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
 
 
-class LessDummyRequest(requesthelper.DummyRequest):
+# wokeignore:rule=dummy
+class LessFakeRequest(requesthelper.DummyRequest):
 
     startedWriting = 0
 
@@ -59,6 +60,7 @@ class LessDummyRequest(requesthelper.DummyRequest):
         super().write(data)
 
     def registerProducer(self, prod, s):
+        # wokeignore:rule=dummy
         # Avoid DummyRequest.registerProducer calling resumeProducing
         # forever, never giving the reactor a chance to run.
         if not s:
@@ -77,12 +79,12 @@ class LessDummyRequest(requesthelper.DummyRequest):
         return self.cookies.get(name)
 
 
-class AuthenticatedLessDummyRequest(LessDummyRequest):
+class AuthenticatedLessFakeRequest(LessFakeRequest):
     def getUser(self):
-        return 'dummy-username'
+        return 'fake-username'
 
     def getPassword(self):
-        return 'dummy-password'
+        return 'fake-password'
 
 
 def render_resource(resource, request):
@@ -191,7 +193,7 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.root = FakeRoot()
-        self.request = LessDummyRequest([b''])
+        self.request = LessFakeRequest([b''])
         self.request.method = b'GET'
 
     def makeResource(self, service):
@@ -234,7 +236,7 @@ class TestSmartHTTPRefsResource(ErrorTestMixin, TestCase):
 
     @defer.inlineCallbacks
     def test_good_authenticated(self):
-        self.request = AuthenticatedLessDummyRequest([b''])
+        self.request = AuthenticatedLessFakeRequest([b''])
         yield self.performRequest(
             helpers.encode_packet(b'I am git protocol data.') +
             b'And I am raw, since we got a good packet to start with.')
@@ -277,7 +279,7 @@ class TestSmartHTTPCommandResource(ErrorTestMixin, TestCase):
     def setUp(self):
         super().setUp()
         self.root = FakeRoot()
-        self.request = LessDummyRequest([''])
+        self.request = LessFakeRequest([''])
         self.request.method = b'POST'
         self.request.requestHeaders.addRawHeader(
             b'Content-Type', b'application/x-git-upload-pack-request')
@@ -328,7 +330,7 @@ class TestHTTPAuthLoginResource(TestCase):
             'nickname': 'pappacena', 'country': 'BR'
         }
 
-        request = LessDummyRequest([''])
+        request = LessFakeRequest([''])
         request.method = b'GET'
         request.path = b'/example'
         request.args = {
@@ -350,7 +352,7 @@ class TestHTTPAuthLoginResource(TestCase):
 
     def test_getSession(self):
         response = mock.Mock()
-        request = LessDummyRequest([''])
+        request = LessFakeRequest([''])
         request.method = b'GET'
         request.path = b'/example'
         request.args = {
@@ -389,7 +391,7 @@ class TestHTTPAuthRootResource(TestCase):
     def test__beginLogin(self):
         root = self.root
         root.openid_provider_root = 'https://testopenid.test/'
-        request = LessDummyRequest([''])
+        request = LessFakeRequest([''])
         request.method = b'GET'
         request.path = b'/example'
         session = {}
@@ -410,7 +412,7 @@ class TestHTTPAuthRootResource(TestCase):
 
     def test_translatePath_timeout(self):
         root = self.root
-        request = LessDummyRequest([''])
+        request = LessFakeRequest([''])
         request.method = b'GET'
         request.path = b'/example'
         d = render_resource(http.HTTPAuthRootResource(root), request)
@@ -424,12 +426,12 @@ class TestHTTPAuthRootResource(TestCase):
     @defer.inlineCallbacks
     def test_render_root_repo(self):
         root = self.root
-        request = LessDummyRequest([''])
+        request = LessFakeRequest([''])
         store.init_repo(os.path.join(
             root.repo_store, self.virtinfo.getInternalPath('/example')))
         request.method = b'GET'
         request.path = b'/example'
-        request.uri = b'http://dummy/example'
+        request.uri = b'http://fake.example.com/example'
         yield render_resource(http.HTTPAuthRootResource(root), request)
         response_content = b''.join(request.written)
         self.assertIn(b"Repository seems to be empty", response_content)
@@ -437,15 +439,15 @@ class TestHTTPAuthRootResource(TestCase):
 
 class TestProtocolVersion(TestCase):
     def test_get_protocol_version_from_request_default_zero(self):
-        request = LessDummyRequest("/foo")
+        request = LessFakeRequest("/foo")
         self.assertEqual(b'0', get_protocol_version_from_request(request))
 
     def test_get_protocol_version_from_request_fallback_to_zero(self):
-        request = LessDummyRequest("/foo")
+        request = LessFakeRequest("/foo")
         request.requestHeaders.setRawHeaders('git-protocol', [b'invalid'])
         self.assertEqual(b'0', get_protocol_version_from_request(request))
 
     def test_get_protocol_version_from_request(self):
-        request = LessDummyRequest("/foo")
+        request = LessFakeRequest("/foo")
         request.requestHeaders.setRawHeaders('git-protocol', [b'version=2'])
         self.assertEqual(b'2', get_protocol_version_from_request(request))
