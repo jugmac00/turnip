@@ -332,7 +332,7 @@ class TestCapabilityAdvertisement(TestCase):
         our git command advertises."""
         root = tempfile.mkdtemp(prefix=b'turnip-test-root-')
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        # Create a dummy repository
+        # Create an empty repository
         subprocess.call(['git', 'init', root])
 
         git_version = subprocess.check_output(['git', '--version'])

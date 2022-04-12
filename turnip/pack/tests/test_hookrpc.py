@@ -42,7 +42,7 @@ from turnip.pack import hookrpc
 from turnip.pack.tests.fake_servers import FakeVirtInfoService
 
 
-class DummyJSONNetstringProtocol(hookrpc.JSONNetstringProtocol):
+class FakeJSONNetstringProtocol(hookrpc.JSONNetstringProtocol):
 
     response_deferred = None
 
@@ -71,7 +71,7 @@ class TestJSONNetStringProtocol(TestCase):
 
     def setUp(self):
         super().setUp()
-        self.proto = DummyJSONNetstringProtocol()
+        self.proto = FakeJSONNetstringProtocol()
         self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)

@@ -43,7 +43,7 @@ from turnip.pack.tests.test_helpers import MockStatsd
 from turnip.pack.tests.test_hooks import MockHookRPCHandler
 
 
-class DummyPackServerProtocol(git.PackServerProtocol):
+class FakePackServerProtocol(git.PackServerProtocol):
 
     test_request = None
 
@@ -58,7 +58,7 @@ class TestPackServerProtocol(TestCase):
 
     def setUp(self):
         super().setUp()
-        self.proto = DummyPackServerProtocol()
+        self.proto = FakePackServerProtocol()
         self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
         self.proto.makeConnection(self.transport)
@@ -116,7 +116,7 @@ class TestPackServerProtocol(TestCase):
         self.assertKilledWith(b'Bad request: flush-pkt instead')
 
 
-class DummyPackBackendProtocol(git.PackBackendProtocol):
+class FakePackBackendProtocol(git.PackBackendProtocol):
 
     test_process = None
 
@@ -187,7 +187,7 @@ class TestPackBackendProtocol(TestCase):
         self.factory = git.PackBackendFactory(
             self.root, self.hookrpc_handler,
             self.hookrpc_sock, self.statsd_client)
-        self.proto = DummyPackBackendProtocol()
+        self.proto = FakePackBackendProtocol()
         self.proto.factory = self.factory
         self.transport = testing.StringTransportWithDisconnection()
         self.transport.protocol = self.proto
@@ -356,7 +356,7 @@ class TestPackBackendProtocol(TestCase):
         self.assertKilledWith(b'Symbolic ref target may not contain " "')
 
 
-class DummyPackBackendFactory(git.PackBackendFactory):
+class FakePackBackendFactory(git.PackBackendFactory):
 
     test_protocol = None
 
@@ -382,9 +382,9 @@ class TestPackVirtServerProtocol(TestCase):
         self.root = self.useFixture(TempDir()).path
         self.hookrpc_handler = MockHookRPCHandler()
         self.hookrpc_sock = os.path.join(self.root, 'hookrpc_sock')
-        self.backend_factory = DummyPackBackendFactory(
+        self.backend_factory = FakePackBackendFactory(
             self.root, self.hookrpc_handler, self.hookrpc_sock)
-        self.backend_factory.protocol = DummyPackBackendProtocol
+        self.backend_factory.protocol = FakePackBackendProtocol
         self.backend_listener = default_reactor.listenTCP(
             0, self.backend_factory)
         self.backend_port = self.backend_listener.getHost().port
