@@ -31,7 +31,7 @@ ipaddress==1.0.23
 kombu==4.6.11
 lazr.sshserver==0.1.11
 linecache2==1.0.0
-lxml==4.5.2
+lxml==4.9.1
 m2r==0.1.14
 # lp:~launchpad/mccabe:launchpad
 # lp1 Remove use of deprecated 'setup.py test'.
