@@ -16,6 +16,7 @@ Environment=SMART_SSH_PORT={{ port }}
 Environment=TURNIP_LOG_DIR={{ base_dir }}/logs
 ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-frontend-ssh.log --python=sshserver.tac
 ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target

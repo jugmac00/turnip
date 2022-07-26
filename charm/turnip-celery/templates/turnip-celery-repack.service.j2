@@ -21,6 +21,7 @@ ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID
 LimitNOFILE=1048576
 PrivateTmp=true
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
