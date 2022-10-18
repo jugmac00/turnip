@@ -23,6 +23,7 @@ Environment=STATSD_ENVIRONMENT={{ statsd_environment }}
 ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-backend.log --python=packbackendserver.tac
 ExecReload=/bin/kill -s HUP $MAINPID
 LimitNOFILE=1048576
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target

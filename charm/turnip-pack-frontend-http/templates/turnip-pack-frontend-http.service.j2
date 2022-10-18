@@ -25,6 +25,7 @@ Environment=VIRTINFO_TIMEOUT={{ virtinfo_timeout }}
 ExecStart={{ venv_dir }}/bin/twistd --nodaemon --pidfile= --logfile={{ base_dir }}/logs/turnip-pack-frontend-http.log --python=httpserver.tac
 ExecReload=/bin/kill -s HUP $MAINPID
 LimitNOFILE=1048576
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
