@@ -116,7 +116,7 @@ class FakeRoot(object):
         self.site_name = 'turnip'
 
     def authenticateWithPassword(self, user, password):
-        """Pretends to talk to Launchpad XML-RPC service to authenticate the user.
+        """Pretends to talk to Launchpad XML-RPC to authenticate the user.
 
         This method returns a dict with different data types to make sure
         nothing breaks when forwarding this data across the layers.
