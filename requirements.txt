@@ -22,7 +22,7 @@ future==0.18.2
 gevent==20.6.2
 gmpy==1.17
 greenlet==0.4.16
-gunicorn==19.3.0
+gunicorn==20.1.0
 hyperlink==19.0.0
 idna==2.9
 importlib_metadata==1.7.0
