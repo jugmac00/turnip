@@ -8,9 +8,26 @@ Create a bionic container (optional):
 
 .. code:: bash
 
-    lxc launch ubuntu:bionic turnip-bionic
+    lxc launch ubuntu:bionic turnip-bionic -p ${USER}
 
 (You may want to use a profile to bind-mount your home directory as well.)
+
+SSH into the new container and navigate to the turnip repo.
+
+Create a python virtual env:
+
+.. code:: bash
+
+    python3 -m venv env
+    source env/bin/activate
+
+.. note::
+    If you created a container, you may need to install python virtual env:
+
+    .. code:: bash
+
+        sudo apt-get update
+        sudo apt-get install -y python3-venv
 
 Run the following:
 
@@ -21,6 +38,14 @@ Run the following:
         cat system-dependencies.txt dependencies-devel.txt charm/packages.txt | sudo xargs apt-get install -y --no-install-recommends
         make bootstrap
         mkdir -p /var/tmp/git.launchpad.test
+
+.. note::
+    If you are running a different ubuntu version on your container (e.g. focal), you might need to run:
+
+    .. code:: bash
+
+        make clean
+        make
 
 Running
 -------
