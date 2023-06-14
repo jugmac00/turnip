@@ -6,5 +6,6 @@ libgit2-28
 libssl-dev
 libxml2-dev
 libxslt1-dev
+lsb-release
 python3-dev
 virtualenv

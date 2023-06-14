@@ -29,7 +29,7 @@ PIP_ENV += PIP_FIND_LINKS="$(PIP_FIND_LINKS)"
 
 # Create archives in labelled directories (e.g.
 # <rev-id>/$(PROJECT_NAME).tar.gz)
-TARBALL_BUILD_LABEL ?= $(shell git rev-parse HEAD)
+TARBALL_BUILD_LABEL ?= $(shell git rev-parse HEAD)-$(shell lsb_release -cs)
 TARBALL_FILE_NAME = turnip.tar.gz
 TARBALL_BUILDS_DIR ?= build
 TARBALL_BUILD_DIR = $(TARBALL_BUILDS_DIR)/$(TARBALL_BUILD_LABEL)
