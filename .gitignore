@@ -19,3 +19,5 @@ TAGS
 turnip/version_info.py
 .tox/
 docs/_build/
+# do not track build artifacts
+*.charm
