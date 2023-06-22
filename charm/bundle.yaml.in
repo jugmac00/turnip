@@ -33,24 +33,18 @@ applications:
     num_units: 1
     options:
       build_label: "%BUILD_LABEL%"
-    resources:
-      turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-pack-virt:
     charm: ./dist/turnip-pack-virt
     num_units: 1
     to: [turnip-pack-backend]
     options:
       build_label: "%BUILD_LABEL%"
-    resources:
-      turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-pack-frontend-git:
     charm: ./dist/turnip-pack-frontend-git
     num_units: 1
     to: [turnip-pack-backend]
     options:
       build_label: "%BUILD_LABEL%"
-    resources:
-      turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-pack-frontend-ssh:
     charm: ./dist/turnip-pack-frontend-ssh
     num_units: 1
@@ -59,32 +53,24 @@ applications:
       build_label: "%BUILD_LABEL%"
       private_ssh_key: "%PRIVATE_SSH_KEY%"
       public_ssh_key: "%PUBLIC_SSH_KEY%"
-    resources:
-      turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-pack-frontend-http:
     charm: ./dist/turnip-pack-frontend-http
     num_units: 1
     to: [turnip-pack-backend]
     options:
       build_label: "%BUILD_LABEL%"
-    resources:
-      turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-api:
     charm: ./dist/turnip-api
     num_units: 1
     to: [turnip-pack-backend]
     options:
       build_label: "%BUILD_LABEL%"
-    resources:
-      turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
   turnip-celery:
     charm: ./dist/turnip-celery
     num_units: 1
     to: [turnip-pack-backend]
     options:
       build_label: "%BUILD_LABEL%"
-    resources:
-      turnip: "../build/%BUILD_LABEL%/turnip.tar.gz"
 relations:
   - ["haproxy", "turnip-pack-backend"]
   - ["haproxy", "turnip-pack-virt:turnip-pack-backend"]

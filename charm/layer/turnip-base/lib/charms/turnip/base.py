@@ -212,12 +212,7 @@ def install_payload():
                 os.path.join('turnip-builds', object_name), archive_path,
                 container=swift_container, **swift_creds)
         else:
-            resource_path = hookenv.resource_get('turnip')
-            if resource_path and os.path.getsize(resource_path):
-                with open(resource_path, 'rb') as resource:
-                    host.write_file(archive_path, resource.read(), perms=0o644)
-            else:
-                raise PayloadError('No build available, so cannot deploy code')
+            raise PayloadError('No build available, so cannot deploy code')
 
         # Unpack source
         target_dir = os.path.join(payloads_dir(), desired_build_label)
