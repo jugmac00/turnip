@@ -10,8 +10,6 @@ export INTERFACE_PATH := $(TMPDIR)/deps/interface
 CHARM_WHEELS_DIR := $(TMPDIR)/deps/charm-wheels
 
 BUILD_LABEL = $(shell git rev-parse HEAD)
-TARBALL = $(APP_NAME).tar.gz
-ASSET = ../build/$(BUILD_LABEL)/$(TARBALL)
 
 CHARMS := \
 	turnip-pack-backend \
@@ -80,17 +78,12 @@ bundle.yaml: bundle.yaml.in tmp/git.launchpad.test.crt tmp/ssh-host-key
 	     -e "s/%PUBLIC_SSH_KEY%/$$(base64 -w 0 <tmp/ssh-host-key.pub)/g" \
 	     bundle.yaml.in >bundle.yaml
 
-deploy: build payload bundle.yaml
+deploy: build bundle.yaml
 	@echo "Deploying $(APP_NAME)..."
 	@juju deploy ./bundle.yaml
 	@echo "You will need to point these to a Launchpad/turnipcake deployment:"
 	@echo "  - authentication_endpoint (turnip-pack-frontend-ssh)"
 	@echo "  - virtinfo_endpoint (turnip-pack-{backend,virt,frontend-http})"
-
-payload: $(ASSET)
-$(ASSET):
-	@echo "Building asset for $(BUILD_LABEL)..."
-	@$(MAKE) -C .. build-tarball
 
 clean:
 	@find . -name \*.pyc -delete
@@ -140,4 +133,4 @@ setup-jenkaas:
 	sudo snap install --classic charm
 
 .PHONY: $(foreach charm,$(CHARMS),build-$(charm))
-.PHONY: all build clean deploy lint payload publish setup-jenkaas
+.PHONY: all build clean deploy lint publish setup-jenkaas

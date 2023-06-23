@@ -117,7 +117,7 @@ parts:
       - "-layers"
   launchpad-layers:
     source: https://git.launchpad.net/launchpad-layers
-    source-commit: "010076b94e548088d1501a77eefaa93d142db983"
+    source-commit: "6fcdb345faecb9940ec2fe541e255c546c950ed0"
     source-submodules: []
     source-type: git
     plugin: dump
