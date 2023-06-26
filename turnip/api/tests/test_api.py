@@ -982,6 +982,36 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         self.assertEqual(200, resp.status_code)
         self.assertEqual({b.hex: c.hex, e.hex: g.hex}, resp.json)
 
+    def test_repo_detect_merges_stop(self):
+        """detect-merges stops walking at specified stop commits.
+
+        This reduces the depth of history it needs to scan, which can be
+        important for large repositories.
+        """
+        factory = RepoFactory(self.repo_store)
+        # A---C---D---G---H
+        #  \ /       /
+        #   B---E---F---I
+        a = factory.add_commit('a\n', 'file')
+        b = factory.add_commit('b\n', 'file', parents=[a])
+        c = factory.add_commit('c\n', 'file', parents=[a, b])
+        d = factory.add_commit('d\n', 'file', parents=[c])
+        e = factory.add_commit('e\n', 'file', parents=[b])
+        f = factory.add_commit('f\n', 'file', parents=[e])
+        g = factory.add_commit('g\n', 'file', parents=[d, f])
+        h = factory.add_commit('h\n', 'file', parents=[g])
+        i = factory.add_commit('i\n', 'file', parents=[f])
+        resp = self.app.post_json('/repo/{}/detect-merges/{}'.format(
+            self.repo_path, h),
+            {'sources': [b.hex, e.hex, i.hex], 'stop': [c.hex]})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({e.hex: g.hex}, resp.json)
+        resp = self.app.post_json('/repo/{}/detect-merges/{}'.format(
+            self.repo_path, h),
+            {'sources': [b.hex, e.hex, i.hex], 'stop': [c.hex, g.hex]})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual({}, resp.json)
+
     def test_repo_blob(self):
         """Getting an existing blob works."""
         factory = RepoFactory(self.repo_store)

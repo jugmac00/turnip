@@ -703,7 +703,7 @@ def get_commits(repo_store, repo_name, commit_oids):
         return commits
 
 
-def detect_merges(repo_store, repo_name, target_oid, source_oids):
+def detect_merges(repo_store, repo_name, target_oid, source_oids, stop_oids):
     """Check whether each of the requested commits has been merged."""
     with open_repo(repo_store, repo_name) as repo:
         target = repo.get(target_oid)
@@ -717,7 +717,10 @@ def detect_merges(repo_store, repo_name, target_oid, source_oids):
         merge_info = {}
         last_mainline = target_oid
         next_mainline = target_oid
-        for commit in repo.walk(target_oid, GIT_SORT_TOPOLOGICAL):
+        walker = repo.walk(target_oid, GIT_SORT_TOPOLOGICAL)
+        for stop_oid in stop_oids:
+            walker.hide(stop_oid)
+        for commit in walker:
             if commit.id.hex == next_mainline:
                 last_mainline = commit.id.hex
                 if commit.parent_ids:

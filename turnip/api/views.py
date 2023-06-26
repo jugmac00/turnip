@@ -426,10 +426,12 @@ class DetectMergesAPI(BaseAPI):
         omitted from the response.
         """
         target = self.request.matchdict['target']
-        sources = extract_cstruct(self.request)['body'].get('sources')
+        payload = extract_cstruct(self.request)['body']
+        sources = payload.get('sources')
+        stops = payload.get('stop', [])
         try:
             merges = store.detect_merges(
-                repo_store, repo_name, target, sources)
+                repo_store, repo_name, target, sources, stops)
         except GitError:
             return exc.HTTPNotFound()
         return merges
