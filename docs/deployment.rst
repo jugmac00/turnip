@@ -2,4 +2,4 @@ Deployment
 ==========
 
 Turnip is deployed with its own set of charms.
-See charm/README.md in the source tree.
+See https://git.launchpad.net/launchpad-mojo-specs/tree/lp-git/README.md.

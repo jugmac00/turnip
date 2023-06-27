@@ -6,6 +6,10 @@ Pyramid.
 
 # Usage
 
+The simplest way to deploy the full charmed stack is by using the [Mojo
+spec](https://git.launchpad.net/launchpad-mojo-specs/tree/lp-git/README.md).
+If you can't do that for some reason, then read on.
+
     $ juju add-model turnip
     $ make deploy
 
