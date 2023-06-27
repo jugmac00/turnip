@@ -6,11 +6,12 @@ Pyramid.
 
 # Usage
 
-    $ juju add-model turnip
-    $ make deploy PIP_SOURCE_DIR=/path/to/dependencies
+The simplest way to deploy the full charmed stack is by using the [Mojo
+spec](https://git.launchpad.net/launchpad-mojo-specs/tree/lp-git/README.md).
+If you can't do that for some reason, then read on.
 
-... where `/path/to/dependencies` is the path to a clone of
-https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies.
+    $ juju add-model turnip
+    $ make deploy
 
 This will deploy Turnip itself, but it must be linked to a separate service
 that defines things like how to translate repository paths, how to
@@ -19,7 +20,7 @@ authenticate users, and so on.  This may be Launchpad or the stub
 
     $ git clone https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/turnipcake
     $ cd turnipcake/charm
-    $ make deploy PIP_SOURCE_DIR=/path/to/dependencies
+    $ make deploy
     $ juju add-relation turnip-api turnipcake
     $ juju add-relation haproxy turnipcake:turnipcake
     $ HAPROXY_ADDRESS="$(juju status --format=json haproxy | jq -r '.applications.haproxy.units[]."public-address"')"
