@@ -10,6 +10,7 @@ tags:
   # https://docs.jujucharms.com/devel/en/authors-charm-metadata#charm-store-fields
   - network
 series:
+  - focal
   - bionic
   - xenial
 subordinate: false
