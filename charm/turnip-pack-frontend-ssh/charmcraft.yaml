@@ -10,8 +10,8 @@ bases:
       architectures: [amd64]
 parts:
   charm-wheels:
-    source: https://git.launchpad.net/~pelpsi/turnip/+git/dependencies
-    source-commit: "98a2ca73fabfbce1cd69bc04a95641bdae5817ea"
+    source: https://git.launchpad.net/~ubuntuone-hackers/ols-charm-deps/+git/wheels
+    source-commit: "7bcd79fa4fca485eaf15ee9e2ee16f3ab902678d"
     source-submodules: []
     source-type: git
     plugin: dump

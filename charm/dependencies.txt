@@ -12,4 +12,4 @@ layer/status			git+https://github.com/juju-solutions/layer-status;revno=02658f0f
 layer/turnip-base		../../../layer/turnip-base;method=link
 layer/turnip-storage		../../../layer/turnip-storage;method=link
 
-charm-wheels			git+https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
+charm-wheels			git+https://git.launchpad.net/~ubuntuone-hackers/ols-charm-deps/+git/wheels
