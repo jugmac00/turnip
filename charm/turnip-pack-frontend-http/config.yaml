@@ -54,8 +54,10 @@ options:
       A list of repository URLs to run end-to-end checks on. Multiple
       entries should be separated by spaces.
   haproxy_service_options:
+    type: string
     default: |
       - mode http
       - option httplog
       - option httpchk
       - balance leastconn
+    description: HAProxy service options.
