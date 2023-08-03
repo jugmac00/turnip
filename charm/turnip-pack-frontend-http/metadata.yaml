@@ -11,6 +11,7 @@ tags:
   - network
   - web_server
 series:
+  - focal
   - bionic
   - xenial
 subordinate: false

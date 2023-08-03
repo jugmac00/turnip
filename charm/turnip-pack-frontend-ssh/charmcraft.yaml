@@ -2,16 +2,16 @@ type: charm
 bases:
   - build-on:
     - name: ubuntu
-      channel: "18.04"
+      channel: "20.04"
       architectures: [amd64]
     run-on:
     - name: ubuntu
-      channel: "18.04"
+      channel: "20.04"
       architectures: [amd64]
 parts:
   charm-wheels:
-    source: https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/dependencies
-    source-commit: "030fe3e51edfe8e8c8b3590b52c4792b21631f01"
+    source: https://git.launchpad.net/~ubuntuone-hackers/ols-charm-deps/+git/wheels
+    source-commit: "7bcd79fa4fca485eaf15ee9e2ee16f3ab902678d"
     source-submodules: []
     source-type: git
     plugin: dump
@@ -21,7 +21,7 @@ parts:
       - "-charm-wheels"
   interface-rabbitmq:
     source: https://github.com/openstack/charm-interface-rabbitmq
-    source-commit: "571f4864c2f942d92991b3f413323a04c6f56d72"
+    source-commit: "383121fc584d2d3bf9d233eba0d3708398a4c468"
     source-submodules: []
     source-type: git
     plugin: dump
@@ -33,7 +33,7 @@ parts:
       - "-layers"
   interface-http:
     source: https://github.com/juju-solutions/interface-http
-    source-commit: "4a232c6998a0c7deac0c2362e7a9a4f1c776603b"
+    source-commit: "632131b1f122daf6fb601fd4c9f1e4dbb1a92e09"
     source-submodules: []
     source-type: git
     plugin: dump
@@ -57,7 +57,7 @@ parts:
       - "-layers"
   interface-nrpe-external-master:
     source: https://github.com/canonical-ols/nrpe-external-master-interface
-    source-commit: "20b2b9fb80613997cb99b8096040cbba72a0ef0c"
+    source-commit: "3a195bf592c6b45a58fce0d398ba6921dd0bae3b"
     source-submodules: []
     source-type: git
     plugin: dump
@@ -69,7 +69,7 @@ parts:
       - "-layers"
   layer-apt:
     source: https://git.launchpad.net/layer-apt
-    source-commit: "cf78622e68fe1ca97eb8993c5adc2616f9e110b9"
+    source-commit: "76bddfb640ab8767fc7e4a4b73a4a4e781948f34"
     source-submodules: []
     source-type: git
     plugin: dump
@@ -81,7 +81,7 @@ parts:
       - "-layers"
   layer-basic:
     source: https://github.com/juju-solutions/layer-basic
-    source-commit: "baf582236a7b946da4cd140fd6532a2e0c2774d5"
+    source-commit: "e3affe74ff0c33e2fbfc560fcd1d873726c40233"
     source-submodules: []
     source-type: git
     plugin: dump
@@ -105,7 +105,7 @@ parts:
       - "-layers"
   layer-status:
     source: https://github.com/juju-solutions/layer-status
-    source-commit: "02658f0f6b2d29316b79820b206cec532c0459c8"
+    source-commit: "a7d7b6423db37a47611310039e6ed1929c0a2eab"
     source-submodules: []
     source-type: git
     plugin: dump
@@ -117,7 +117,7 @@ parts:
       - "-layers"
   launchpad-layers:
     source: https://git.launchpad.net/launchpad-layers
-    source-commit: "466a8348106b0a14e4c1cf18fbafe13d1f927bad"
+    source-commit: "300b0d9fd332c055395fe209512335cea03c7af3"
     source-submodules: []
     source-type: git
     plugin: dump
@@ -142,6 +142,7 @@ parts:
     source: .
     plugin: reactive
     build-snaps: [charm]
+    build-packages: [python3-dev]
     build-environment:
       - CHARM_LAYERS_DIR: $CRAFT_STAGE/layers/layer
       - CHARM_INTERFACES_DIR: $CRAFT_STAGE/layers/interface
