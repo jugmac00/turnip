@@ -128,7 +128,7 @@ parts:
       - layers
     prime:
       - "-layers"
-  turnip-celery:
+  charm:
     after:
       - charm-wheels
       - interface-rabbitmq
