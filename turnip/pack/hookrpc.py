@@ -271,29 +271,12 @@ class HookRPCHandler(object):
                 self.virtinfo_timeout, self.reactor)
         except xmlrpc.Fault as e:
             code = translate_xmlrpc_fault(e.faultCode)
-            if code in (
-                    TurnipFaultCode.NOT_FOUND,
-                    TurnipFaultCode.UNAUTHORIZED,
-                    ):
-                # These faults can happen with unlucky timing: a NOT_FOUND
-                # fault can happen if the repository was removed from disk
-                # between translatePath and checkRefPermissions (although
-                # that's impossible in practice with Launchpad's
-                # implementation); similarly, an UNAUTHORIZED fault can
-                # happen if the user's access to the repository was removed
-                # between translatePath and checkRefPermissions.  Just
-                # treat this as if the user has no permissions on any ref.
-                log_context.log.info(
-                    "getMergeProposalURL virtinfo raised Unauthorized: "
-                    "auth_params={auth_params}, ref_path={ref_path}",
-                    auth_params=auth_params, branch=branch)
-            else:
-                log_context.log.info(
-                    "getMergeProposalURL virtinfo raised "
-                    "{fault_code} {fault_string}: "
-                    "auth_params={auth_params}, ref_path={ref_path}",
-                    fault_code=code.name, fault_string=e.faultString,
-                    auth_params=auth_params, branch=branch)
+            log_context.log.info(
+                "getMergeProposalURL virtinfo raised "
+                "{fault_code} {fault_string}: "
+                "auth_params={auth_params}, ref_path={ref_path}",
+                fault_code=code.name, fault_string=e.faultString,
+                auth_params=auth_params, branch=branch)
         except defer.TimeoutError:
             log_context.log.info(
                 "getMergeProposalURL timed out: ref_path={path}", path=path)
