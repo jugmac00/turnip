@@ -1,35 +1,59 @@
 Development
 ===========
 
+Prerequisites
+-------------
+
+* LXD is installed and set up. See
+  `<https://documentation.ubuntu.com/lxd/en/latest/getting_started/>`_
+  for more details.
+
+* A working Launchpad development environment is available. See
+  `<https://launchpad.readthedocs.io/en/latest/how-to/running.html>`_ for more
+  details.
+
+* A local user on the Launchpad development instance with an SSH key added.
+  Use the ``utilities/make-lp-user`` script inside the Launchpad container
+  to create a new user account. This script looks for SSH public keys in
+  the home directory of the user and automatically adds them to the created
+  account.
+
+
 Setup
 -----
 
-Create a bionic container (optional):
+These instructions should work with Ubuntu 18.04 (bionic) or 20.04 (focal).
+
+Create a LXD container.
 
 .. code:: bash
 
     lxc launch ubuntu:bionic turnip-bionic -p ${USER}
 
-(You may want to use a profile to bind-mount your home directory as well.)
+Replace ``bionic`` in the above command with ``focal`` to create a
+``focal`` container.
 
-SSH into the new container and navigate to the turnip repo.
+It is useful to use a LXD profile to bind-mount your home directory inside
+this container. See the `Launchpad setup guide`_ for an example of how to
+do this.
 
-Create a python virtual env:
+.. _Launchpad setup guide:  https://launchpad.readthedocs.io/en/latest/how-to/running.html#create-a-lxd-container
+
+Log in into the new container using SSH (you can do this by finding the IP
+address of the turnip container from the output of the ``lxc ls`` command and
+then running ``ssh <IP address of the container>``) and navigate to top-level
+directory of the turnip repository.
+
+Create a Python virtual environment.
 
 .. code:: bash
 
+    sudo apt update
+    sudo apt install -y python3-venv
     python3 -m venv env
     source env/bin/activate
 
-.. note::
-    If you created a container, you may need to install python virtual env:
-
-    .. code:: bash
-
-        sudo apt-get update
-        sudo apt-get install -y python3-venv
-
-Run the following:
+Run the following commands to install turnip's dependencies and bootstrap it.
 
 .. code:: bash
 
@@ -40,7 +64,8 @@ Run the following:
         mkdir -p /var/tmp/git.launchpad.test
 
 .. note::
-    If you are running a different ubuntu version on your container (e.g. focal), you might need to run:
+    If you are running a different Ubuntu version on your container
+    (e.g. focal), you might need to run:
 
     .. code:: bash
 
@@ -50,49 +75,41 @@ Run the following:
 Running
 -------
 
-Pack smart-http/ssh services can be started with:
+Start the pack smart-http/ssh services with:
 
 .. code:: bash
 
     make run-pack
 
-The HTTP API can be started with:
+Start the HTTP API with:
 
 .. code:: bash
 
    make run-api
 
 
-Running LP locally as a Git client to Turnip
---------------------------------------------
+Running Launchpad locally as a Git client to turnip
+---------------------------------------------------
 
-Turnip container needs to be able to talk to xmlrpc-private.launchpad.test.
+The turnip container needs to be able to communicate with
+``xmlrpc-private.launchpad.test`` for this to work.
 
-In the turnip container the hosts file needs to point to the LP container
-(x.x.x.x is the IP address of LP):
+In the turnip container, update the hosts file to point to the Launchpad
+container, where ``x.x.x.x`` is its IP address.
 
 .. code:: bash
 
     user@turnip-bionic:~/turnip$ cat /etc/hosts
-    127.0.0.1 localhost
+    ...
     x.x.x.x launchpad.test launchpad.test answers.launchpad.test archive.launchpad.test api.launchpad.test bazaar.launchpad.test bazaar-internal.launchpad.test blueprints.launchpad.test bugs.launchpad.test code.launchpad.test feeds.launchpad.test keyserver.launchpad.test lists.launchpad.test ppa.launchpad.test private-ppa.launchpad.test testopenid.test translations.launchpad.test xmlrpc-private.launchpad.test xmlrpc.launchpad.test
-    # The following lines are desirable for IPv6 capable hosts
-    ::1 ip6-localhost ip6-loopback
-    fe00::0 ip6-localnet
-    ff00::0 ip6-mcastprefix
-    ff02::1 ip6-allnodes
-    ff02::2 ip6-allrouters
-    ff02::3 ip6-allhosts
+    ...
 
-A basic test that can be performed by dropping into the turnip container shell.
-Below exception is expected as Repository ``1`` did not exist when the RPC
-call was performed, it does show however that turnip is able to resolve
-``xmlrpc-private.launchpad.test`` and there is connectivity between LP and
-turnip:
+Perform a basic test of the connectivity by running the following
+commands and statements.
 
 .. code:: bash
 
-	user@launchpad:~$ lxc exec turnip-bionic python3
+    user@launchpad:~$ lxc exec turnip-bionic python3
 
 .. code:: python
 
@@ -106,25 +123,36 @@ turnip:
     >>> exit()
     root@turnip-bionic:~#
 
-In your LP container the hosts file needs to point to the turnip container
-(x.x.x.x is the IP address of turnip):
+The above exception is expected as ``Repository '1'`` did not exist when
+the RPC call was performed. But it shows that turnip is able to resolve
+``xmlrpc-private.launchpad.test`` and that there is connectivity between
+Launchpad and turnip.
 
-    x.x.x.x git.launchpad.test
-
-Then, also in your LP container edit ~/.gitconfig and add these lines,
-where USER is your Launchpad username:
+In the Launchpad container, update the hosts file to point to the turnip
+container, where ``x.x.x.x`` is its IP address.
 
 .. code:: bash
 
-    [url "git+ssh://USER@git.launchpad.test/"]
+    user@launchpad:~$ cat /etc/hosts
+    ...
+    x.x.x.x git.launchpad.test
+    ...
+
+Also edit ``~/.gitconfig`` in the Launchpad container and add these lines,
+where ``USER`` is your Launchpad username on the local instance.
+
+.. code:: bash
+
+    [url "git+ssh://USER@git.launchpad.test:9422/"]
         insteadof = lptest:
 
-Create a new repository locally (user@launchpad:~/repo in LP container in below
-example) and push it to LP&Turnip:
+Create a new repository, ``~/repo`` in the Launchpad container and push it
+to turnip. In the below command, ``USER`` is your Launchpad username on the
+local instance.
 
 .. code:: bash
 
-    user@launchpad:~/repo$ git remote add origin git+ssh://user@git.launchpad.test:9422/~user/+git/repo
+    user@launchpad:~/repo$ git remote add origin lptest:~USER/+git/repo
     user@launchpad:~/repo$ git push --set-upstream origin master
     Counting objects: 3, done.
     Writing objects: 100% (3/3), 231 bytes | 231.00 KiB/s, done.
@@ -132,10 +160,10 @@ example) and push it to LP&Turnip:
     To git+ssh://git.launchpad.test:9422/~user/+git/repo
     * [new branch]      master -> master
     Branch 'master' set up to track remote branch 'master' from 'origin'.
-    user@launchpad:~/repo$ 
+    user@launchpad:~/repo$
 
 
-The LP log for above push:
+The Launchpad log for above push should look like:
 
 .. code::
 
@@ -157,32 +185,28 @@ The LP log for above push:
     10.209.173.202 - "" "xmlrpc-private.launchpad.test" [16/Dec/2019:13:41:18 +0300] "POST /git HTTP/1.0" 200 588 7 0.0113499164581 0.00207781791687 0.00744009017944 "Anonymous" "GitApplication:" "" "Twisted/XMLRPClib"
 
 
-Your local LP user must exist in LP - created with
-``utilities/make-lp-user USER`` - and have an ssh key in local LP.
-When adding the SSH key to LP if emails can't go out the SSH key addition will
-fail. 
-One possible workaround is to use Fakeemail:
-https://github.com/tomwardill/fakeemail
+When creating and pushing new branches to turnip with this local setup,
+the branches have to be scanned (data about the branch copied into the
+Launchpad database) for Launchpad to know about them.
 
-It is recommended to install it in a virtual environment,
-e.g. via `pipx <https://pypa.github.io/pipx/>`_:
+Run the following command in the Launchpad container from the top-level
+directory of the Launchpad repository to make Launchpad scan the git
+branches.
 
 .. code:: bash
 
-    pipx install fakeemail
-    ~/.local/bin/fakeemail  25 8082 0.0.0.0
-    Message stored for: root@localhost
+    cronscripts/process-job-source.py -v IGitRefScanJobSource
 
-When creating and pushing new branches to LP with this local setup,
-the branches need to be scanned (data about the branch copied into the
-Launchpad database).
-On production, this happens via the magic of cron.
-Locally you can make it happen by running in your launchpad directory:
+Now the branch should be up-to-date and you can view it in the branch page
+in the local Launchpad instance.
+
+Now you can create a merge proposal from a branch. After creating it, generate
+the preview diff for the merge proposal by running the following command
+inside the Launchpad container from the top-level directory of the Launchpad
+repository.
 
 .. code:: bash
 
-    cronscripts/process-job-source.py IGitRefScanJobSource
+    cronscripts/process-job-source.py -v IBranchMergeProposalJobSource
 
-Now you have a fully working and up-to-date branch.
-You should be able to look at the branch page in Launchpad,
-view the source in codebrowse, and so on.
+These commands are automatically run in the production environment by cron jobs.
