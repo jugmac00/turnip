@@ -22,16 +22,13 @@ Prerequisites
 Setup
 -----
 
-These instructions should work with Ubuntu 18.04 (bionic) or 20.04 (focal).
+These instructions should work with the Ubuntu 20.04 (focal) LXD container.
 
-Create a LXD container.
+Create the LXD container.
 
 .. code:: bash
 
-    lxc launch ubuntu:bionic turnip-bionic -p ${USER}
-
-Replace ``bionic`` in the above command with ``focal`` to create a
-``focal`` container.
+    lxc launch ubuntu:focal turnip-focal -p ${USER}
 
 It is useful to use a LXD profile to bind-mount your home directory inside
 this container. See the `Launchpad setup guide`_ for an example of how to
@@ -63,19 +60,11 @@ Run the following commands to install turnip's dependencies and bootstrap it.
         make bootstrap
         mkdir -p /var/tmp/git.launchpad.test
 
-.. note::
-    If you are running a different Ubuntu version on your container
-    (e.g. focal), you might need to run:
-
-    .. code:: bash
-
-        make clean
-        make
-
 Running
 -------
 
-Start the pack smart-http/ssh services with:
+Navigate to the turnip repository's top-level directory. You can now start
+the pack smart-http/ssh services with:
 
 .. code:: bash
 
@@ -99,7 +88,7 @@ container, where ``x.x.x.x`` is its IP address.
 
 .. code:: bash
 
-    user@turnip-bionic:~/turnip$ cat /etc/hosts
+    user@turnip-focal:~/turnip$ cat /etc/hosts
     ...
     x.x.x.x launchpad.test launchpad.test answers.launchpad.test archive.launchpad.test api.launchpad.test bazaar.launchpad.test bazaar-internal.launchpad.test blueprints.launchpad.test bugs.launchpad.test code.launchpad.test feeds.launchpad.test keyserver.launchpad.test lists.launchpad.test ppa.launchpad.test private-ppa.launchpad.test testopenid.test translations.launchpad.test xmlrpc-private.launchpad.test xmlrpc.launchpad.test
     ...
@@ -109,7 +98,7 @@ commands and statements.
 
 .. code:: bash
 
-    user@launchpad:~$ lxc exec turnip-bionic python3
+    user@launchpad:~$ lxc exec turnip-focal python3
 
 .. code:: python
 
@@ -121,7 +110,7 @@ commands and statements.
     ...
     xmlrpclib.Fault: <Fault 290: "Repository '1' not found.">
     >>> exit()
-    root@turnip-bionic:~#
+    root@turnip-focal:~#
 
 The above exception is expected as ``Repository '1'`` did not exist when
 the RPC call was performed. But it shows that turnip is able to resolve
