@@ -1,7 +1,6 @@
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from collections import defaultdict
 import itertools
 import logging
 import os
@@ -9,11 +8,10 @@ import re
 import shutil
 import subprocess
 import uuid
+from collections import defaultdict
 
-from contextlib2 import (
-    contextmanager,
-    ExitStack,
-    )
+import six
+from contextlib2 import ExitStack, contextmanager
 from pygit2 import (
     GIT_OBJ_COMMIT,
     GIT_OBJ_TAG,
@@ -21,59 +19,48 @@ from pygit2 import (
     GIT_SORT_TOPOLOGICAL,
     GitError,
     IndexEntry,
-    init_repository,
     Oid,
     Repository,
-    )
-import six
+    init_repository,
+)
 from twisted.web import xmlrpc
 
-from turnip.api.formatter import (
-    format_blob,
-    format_commit,
-    format_ref,
-    )
+from turnip.api.formatter import format_blob, format_commit, format_ref
 from turnip.config import config
 from turnip.helpers import TimeoutServerProxy
-from turnip.pack.helpers import (
-    ensure_config,
-    get_repack_data,
-    )
-from turnip.tasks import (
-    app,
-    logger as tasks_logger,
-    )
-
+from turnip.pack.helpers import ensure_config, get_repack_data
+from turnip.tasks import app
+from turnip.tasks import logger as tasks_logger
 
 logger = logging.getLogger(__name__)
 
 
 # Where to store repository status information inside a repository directory.
-REPOSITORY_CREATING_FILE_NAME = '.turnip-creating'
+REPOSITORY_CREATING_FILE_NAME = ".turnip-creating"
 
 
 def is_bare_repo(repo_path):
-    return not os.path.exists(os.path.join(repo_path, '.git'))
+    return not os.path.exists(os.path.join(repo_path, ".git"))
 
 
 def alternates_path(repo_path):
     """Git object alternates path.
     See http://git-scm.com/docs/gitrepository-layout
     """
-    return os.path.join(repo_path, 'objects', 'info', 'alternates')
+    return os.path.join(repo_path, "objects", "info", "alternates")
 
 
 def write_alternates(repo_path, alternate_repo_paths):
     with open(alternates_path(repo_path), "w") as f:
         for path in alternate_repo_paths:
             if is_bare_repo(path):
-                objects_path = os.path.join(path, 'objects')
+                objects_path = os.path.join(path, "objects")
             else:
-                objects_path = os.path.join(path, '.git', 'objects')
+                objects_path = os.path.join(path, ".git", "objects")
             f.write("{}\n".format(objects_path))
 
 
-object_dir_re = re.compile(r'\A[0-9a-f][0-9a-f]\Z')
+object_dir_re = re.compile(r"\A[0-9a-f][0-9a-f]\Z")
 
 
 @app.task
@@ -97,7 +84,7 @@ def fetch_refs(operations):
     errors = []
     for repo_pair, refs_pairs in grouped_refs.items():
         from_root, to_root = repo_pair
-        cmd = [b'git', b'fetch', b'--no-tags', from_root]
+        cmd = [b"git", b"fetch", b"--no-tags", from_root]
         for src, dst in refs_pairs:
             src = six.ensure_binary(src)
             dst = six.ensure_binary(dst if dst else src)
@@ -105,10 +92,10 @@ def fetch_refs(operations):
 
         # XXX pappacena: On Python3, this could be replaced with
         # stdout=subprocess.DEVNULL.
-        with open(os.devnull, 'wb') as devnull:
+        with open(os.devnull, "wb") as devnull:
             proc = subprocess.Popen(
-                cmd, cwd=to_root,
-                stdout=devnull, stderr=subprocess.PIPE)
+                cmd, cwd=to_root, stdout=devnull, stderr=subprocess.PIPE
+            )
             _, stderr = proc.communicate()
         if proc.returncode != 0:
             errors.append((cmd, stderr))
@@ -159,7 +146,8 @@ def copy_refs(from_root, to_root):
                     packable_refs[ref.raw_name] = (obj.id, None)
         if ref.raw_name not in packable_refs:
             to_repo.references.create(
-                ref, from_repo.references[ref].target, force=True)
+                ref, from_repo.references[ref].target, force=True
+            )
     return packable_refs
 
 
@@ -174,15 +162,18 @@ def write_packed_refs(root, packable_refs):
     for each ref.
     """
     if packable_refs:
-        with open(os.path.join(root, 'packed-refs'), 'wb') as packed_refs:
+        with open(os.path.join(root, "packed-refs"), "wb") as packed_refs:
             packed_refs.write(
-                b'# pack-refs with: peeled fully-peeled sorted \n')
+                b"# pack-refs with: peeled fully-peeled sorted \n"
+            )
             for ref_name, (oid, peeled_oid) in sorted(packable_refs.items()):
                 packed_refs.write(
-                    b'%s %s\n' % (oid.hex.encode('ascii'), ref_name))
+                    b"%s %s\n" % (oid.hex.encode("ascii"), ref_name)
+                )
                 if peeled_oid is not None:
                     packed_refs.write(
-                        b'^%s\n' % (peeled_oid.hex.encode('ascii'),))
+                        b"^%s\n" % (peeled_oid.hex.encode("ascii"),)
+                    )
 
 
 def get_file_mode(path):
@@ -202,19 +193,20 @@ def import_into_subordinate(sub_root, from_root, log=None):
     written using `write_packed_refs`.
     """
     log = log if log else logger
-    for dirname in os.listdir(os.path.join(from_root, 'objects')):
+    for dirname in os.listdir(os.path.join(from_root, "objects")):
         # We want to hardlink any children of the loose fanout or pack
         # directories.
-        if (not os.path.isdir(os.path.join(from_root, 'objects', dirname))
-                or (dirname != 'pack' and not object_dir_re.match(dirname))):
+        if not os.path.isdir(os.path.join(from_root, "objects", dirname)) or (
+            dirname != "pack" and not object_dir_re.match(dirname)
+        ):
             continue
 
-        sub_dir = os.path.join(sub_root, 'objects', dirname)
+        sub_dir = os.path.join(sub_root, "objects", dirname)
         if not os.path.exists(sub_dir):
             os.makedirs(sub_dir)
-        for name in os.listdir(os.path.join(from_root, 'objects', dirname)):
-            from_path = os.path.join(from_root, 'objects', dirname, name)
-            sub_path = os.path.join(sub_root, 'objects', dirname, name)
+        for name in os.listdir(os.path.join(from_root, "objects", dirname)):
+            from_path = os.path.join(from_root, "objects", dirname, name)
+            sub_path = os.path.join(sub_root, "objects", dirname, name)
             if not os.path.isfile(from_path) or os.path.exists(sub_path):
                 continue
             try:
@@ -222,14 +214,18 @@ def import_into_subordinate(sub_root, from_root, log=None):
             except Exception as e:
                 log.critical(
                     "Error in import_into_subordinate while executing "
-                    "os.link(%s, %s): %s" % (from_path, sub_path, e))
+                    "os.link(%s, %s): %s" % (from_path, sub_path, e)
+                )
                 log.info(
                     "File modes: from_path: %s / from_path_dir: %s / "
-                    "sub_path: %s / sub_path_dir: %s" %
-                    (get_file_mode(from_path),
-                     get_file_mode(os.path.dirname(from_path)),
-                     get_file_mode(sub_path),
-                     get_file_mode(os.path.dirname(sub_path))))
+                    "sub_path: %s / sub_path_dir: %s"
+                    % (
+                        get_file_mode(from_path),
+                        get_file_mode(os.path.dirname(from_path)),
+                        get_file_mode(sub_path),
+                        get_file_mode(os.path.dirname(sub_path)),
+                    )
+                )
                 raise
 
     # Copy over the refs.
@@ -247,8 +243,14 @@ class AlreadyExistsError(GitError):
         self.path = path
 
 
-def init_repo(repo_path, clone_from=None, clone_refs=False,
-              alternate_repo_paths=None, is_bare=True, log=None):
+def init_repo(
+    repo_path,
+    clone_from=None,
+    clone_refs=False,
+    alternate_repo_paths=None,
+    is_bare=True,
+    log=None,
+):
     """Initialise a new git repository or clone from existing."""
     if os.path.exists(repo_path):
         raise AlreadyExistsError(repo_path)
@@ -265,27 +267,33 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         # subordinate tree that's then set as an alternate for the real
         # repo. This lets git-receive-pack expose available commits as
         # extra haves without polluting refs in the real repo.
-        sub_path = os.path.join(repo_path, 'turnip-subordinate')
+        sub_path = os.path.join(repo_path, "turnip-subordinate")
         log.info("Running init_repository for subordinate %s" % sub_path)
         init_repository(sub_path, True)
 
         packable_refs = {}
-        if os.path.exists(os.path.join(clone_from, 'turnip-subordinate')):
-            packable_refs.update(import_into_subordinate(
-                sub_path, os.path.join(clone_from, 'turnip-subordinate'),
-                log=log))
-        packable_refs.update(import_into_subordinate(
-            sub_path, clone_from, log=log))
+        if os.path.exists(os.path.join(clone_from, "turnip-subordinate")):
+            packable_refs.update(
+                import_into_subordinate(
+                    sub_path,
+                    os.path.join(clone_from, "turnip-subordinate"),
+                    log=log,
+                )
+            )
+        packable_refs.update(
+            import_into_subordinate(sub_path, clone_from, log=log)
+        )
 
-        log.info("Running write_packed_refs(%s, %s)" %
-                 (sub_path, packable_refs))
+        log.info(
+            "Running write_packed_refs(%s, %s)" % (sub_path, packable_refs)
+        )
         write_packed_refs(sub_path, packable_refs)
 
     new_alternates = []
     if alternate_repo_paths:
         new_alternates.extend(alternate_repo_paths)
     if clone_from:
-        new_alternates.append('../turnip-subordinate')
+        new_alternates.append("../turnip-subordinate")
 
     log.info("Running write_alternates(%s, %s)" % (repo_path, new_alternates))
     write_alternates(repo_path, new_alternates)
@@ -299,8 +307,9 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
         log.info("Running copy_refs(%s, %s)" % (clone_from, repo_path))
         packable_refs = copy_refs(clone_from, repo_path)
 
-        log.info("Running write_packed_refs(%s, %s)" %
-                 (repo_path, packable_refs))
+        log.info(
+            "Running write_packed_refs(%s, %s)" % (repo_path, packable_refs)
+        )
         write_packed_refs(repo_path, packable_refs)
 
     log.info("Running ensure_config(%s)" % repo_path)
@@ -311,25 +320,39 @@ def init_repo(repo_path, clone_from=None, clone_refs=False,
 
 
 @app.task
-def init_and_confirm_repo(untranslated_path, repo_path, clone_from=None,
-                          clone_refs=False, alternate_repo_paths=None,
-                          is_bare=True):
+def init_and_confirm_repo(
+    untranslated_path,
+    repo_path,
+    clone_from=None,
+    clone_refs=False,
+    alternate_repo_paths=None,
+    is_bare=True,
+):
     logger = tasks_logger
     xmlrpc_endpoint = config.get("virtinfo_endpoint")
     xmlrpc_timeout = float(config.get("virtinfo_timeout"))
     xmlrpc_auth_params = {"user": "+launchpad-services"}
     xmlrpc_proxy = TimeoutServerProxy(
-        xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True)
+        xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True
+    )
     try:
         logger.info(
             "Initializing and confirming repository creation: "
-            "%s; %s; %s; %s; %s", repo_path, clone_from, clone_refs,
-            alternate_repo_paths, is_bare)
+            "%s; %s; %s; %s; %s",
+            repo_path,
+            clone_from,
+            clone_refs,
+            alternate_repo_paths,
+            is_bare,
+        )
         init_repo(
-            repo_path, clone_from, clone_refs, alternate_repo_paths, is_bare)
+            repo_path, clone_from, clone_refs, alternate_repo_paths, is_bare
+        )
         logger.debug(
             "Confirming repository creation: %s; %s",
-            untranslated_path, xmlrpc_auth_params)
+            untranslated_path,
+            xmlrpc_auth_params,
+        )
         xmlrpc_proxy.confirmRepoCreation(untranslated_path, xmlrpc_auth_params)
     except Exception as e:
         logger.error("Error creating repository at %s: %s", repo_path, e)
@@ -339,7 +362,9 @@ def init_and_confirm_repo(untranslated_path, repo_path, clone_from=None,
             logger.error("Error deleting repository at %s: %s", repo_path, e)
         logger.debug(
             "Aborting repository creation: %s; %s",
-            untranslated_path, xmlrpc_auth_params)
+            untranslated_path,
+            xmlrpc_auth_params,
+        )
         xmlrpc_proxy.abortRepoCreation(untranslated_path, xmlrpc_auth_params)
 
 
@@ -354,17 +379,25 @@ def open_repo(repo_store, repo_name, force_ephemeral=False):
     :param force_ephemeral: create an ephemeral repository even if repo_name
         does not contain ':'.
     """
-    if force_ephemeral or ':' in repo_name:
+    if force_ephemeral or ":" in repo_name:
         # Create ephemeral repo with alternates set from both.  Neither git
         # nor libgit2 will respect a relative alternate path except in the
         # root repo, so we explicitly include the turnip-subordinate for
         # each repo.  If it doesn't exist it'll just be ignored.
-        repos = list(itertools.chain(*(
-            (os.path.join(repo_store, repo),
-             os.path.join(repo_store, repo, 'turnip-subordinate'))
-            for repo in repo_name.split(':'))))
+        repos = list(
+            itertools.chain(
+                *(
+                    (
+                        os.path.join(repo_store, repo),
+                        os.path.join(repo_store, repo, "turnip-subordinate"),
+                    )
+                    for repo in repo_name.split(":")
+                )
+            )
+        )
         ephemeral_repo_path = os.path.join(
-            repo_store, 'ephemeral-' + uuid.uuid4().hex)
+            repo_store, "ephemeral-" + uuid.uuid4().hex
+        )
         try:
             init_repo(ephemeral_repo_path, alternate_repo_paths=repos)
             repo = Repository(ephemeral_repo_path)
@@ -385,7 +418,7 @@ def open_repo(repo_store, repo_name, force_ephemeral=False):
 
 def get_default_branch(repo_path):
     repo = Repository(repo_path)
-    return repo.references['HEAD'].target
+    return repo.references["HEAD"].target
 
 
 def set_repository_creating(repo_path, is_creating):
@@ -393,7 +426,7 @@ def set_repository_creating(repo_path, is_creating):
         raise ValueError("Repository %s does not exist." % repo_path)
     file_path = os.path.join(repo_path, REPOSITORY_CREATING_FILE_NAME)
     if is_creating:
-        open(file_path, 'a').close()
+        open(file_path, "a").close()
     else:
         try:
             os.unlink(file_path)
@@ -421,46 +454,49 @@ def delete_repo(repo_path):
     shutil.rmtree(repo_path)
 
 
-@app.task(queue='repacks')
+@app.task(queue="repacks")
 def repack(repo_path):
     """Repack a repository with git-repack."""
     logger = tasks_logger
     logger.info(
-        "Asynchronous repack triggered for repository: "
-        "%s", repo_path)
+        "Asynchronous repack triggered for repository: " "%s", repo_path
+    )
 
     ensure_config(repo_path)
 
-    repack_args = ['git', 'repack', '-Adql']
+    repack_args = ["git", "repack", "-Adql"]
 
     try:
         subprocess.check_call(
-            repack_args, cwd=repo_path,
-            stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        logger.info(
-            "Repack completed for repository: "
-            "%s", repo_path)
+            repack_args,
+            cwd=repo_path,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        logger.info("Repack completed for repository: " "%s", repo_path)
         try:
             repo_name = os.path.basename(repo_path)
             loose_object_count, pack_count = get_repack_data(path=repo_path)
             xmlrpc_endpoint = config.get("virtinfo_endpoint")
             xmlrpc_timeout = float(config.get("virtinfo_timeout"))
             xmlrpc_proxy = TimeoutServerProxy(
-                xmlrpc_endpoint,
-                timeout=xmlrpc_timeout,
-                allow_none=True)
+                xmlrpc_endpoint, timeout=xmlrpc_timeout, allow_none=True
+            )
             xmlrpc_proxy.updateRepackStats(
                 repo_name,
-                {'loose_object_count': loose_object_count,
-                 'pack_count': pack_count})
+                {
+                    "loose_object_count": loose_object_count,
+                    "pack_count": pack_count,
+                },
+            )
         except xmlrpc.Fault:
-            logger.info("Failed to signal LP to update its repack stats for "
-                        "this repository %s after repack completed.",
-                        repo_path)
+            logger.info(
+                "Failed to signal LP to update its repack stats for "
+                "this repository %s after repack completed.",
+                repo_path,
+            )
     except subprocess.CalledProcessError:
-        logger.info(
-            "Repack failed for repository: "
-            "%s", repo_path)
+        logger.info("Repack failed for repository: " "%s", repo_path)
         raise
 
 
@@ -469,24 +505,23 @@ def gc(repo_path):
     """Run as git gc for repository."""
     logger = tasks_logger
     logger.info(
-        "Asynchronous GC run triggered for repository: "
-        "%s", repo_path)
+        "Asynchronous GC run triggered for repository: " "%s", repo_path
+    )
 
     ensure_config(repo_path)
 
-    gc_args = ['git', 'gc']
+    gc_args = ["git", "gc"]
 
     try:
         subprocess.check_call(
-            gc_args, cwd=repo_path,
-            stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        logger.info(
-            "GC completed for repository: "
-            "%s", repo_path)
+            gc_args,
+            cwd=repo_path,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        logger.info("GC completed for repository: " "%s", repo_path)
     except subprocess.CalledProcessError:
-        logger.info(
-            "GC failed for repository: "
-            "%s", repo_path)
+        logger.info("GC failed for repository: " "%s", repo_path)
         raise
 
 
@@ -501,15 +536,17 @@ def get_refs(repo_store, repo_name, exclude_prefixes=None):
                 ref = ref_obj.name
                 if isinstance(ref, bytes):
                     ref_bytes = ref
-                    ref = ref.decode('utf-8')
+                    ref = ref.decode("utf-8")
                 else:
-                    ref_bytes = ref.encode('utf-8')
+                    ref_bytes = ref.encode("utf-8")
                 git_object = repo.references[ref_bytes].peel()
             except UnicodeDecodeError:
                 pass
             else:
-                if not any(ref.startswith(exclude_prefix)
-                           for exclude_prefix in (exclude_prefixes or [])):
+                if not any(
+                    ref.startswith(exclude_prefix)
+                    for exclude_prefix in (exclude_prefixes or [])
+                ):
                     refs.update(format_ref(ref, git_object))
         return refs
 
@@ -517,13 +554,14 @@ def get_refs(repo_store, repo_name, exclude_prefixes=None):
 def get_ref(repo_store, repo_name, ref):
     """Return a specific ref for a git repository."""
     with open_repo(repo_store, repo_name) as repo:
-        git_object = repo.references[ref.encode('utf-8')].peel()
+        git_object = repo.references[ref.encode("utf-8")].peel()
         ref_obj = format_ref(ref, git_object)
         return ref_obj
 
 
-def get_common_ancestor_diff(repo_store, repo_name, sha1_target, sha1_source,
-                             context_lines=3):
+def get_common_ancestor_diff(
+    repo_store, repo_name, sha1_target, sha1_source, context_lines=3
+):
     """Get diff of common ancestor and source diff.
 
     :param sha1_target: target sha1 for merge base.
@@ -536,8 +574,9 @@ def get_common_ancestor_diff(repo_store, repo_name, sha1_target, sha1_source,
             # We have no merge base.  Fall back to a ".."-style diff, just
             # like "git diff" does.
             common_ancestor = sha1_target
-        return get_diff(repo_store, repo_name, common_ancestor,
-                        sha1_source, context_lines)
+        return get_diff(
+            repo_store, repo_name, common_ancestor, sha1_source, context_lines
+        )
 
 
 def _add_conflicted_files(repo, index):
@@ -556,7 +595,8 @@ def _add_conflicted_files(repo, index):
     if index.conflicts is not None:
         for conflict in list(index.conflicts):
             conflict_entry = [
-                entry for entry in conflict if entry is not None][0]
+                entry for entry in conflict if entry is not None
+            ][0]
             path = conflict_entry.path
             conflicts.add(path)
             ancestor, ours, theirs = conflict
@@ -572,25 +612,28 @@ def _add_conflicted_files(repo, index):
                 # A modify/delete conflict.  Turn the "delete" side into
                 # a fake empty file so that we can generate a useful
                 # conflict diff.
-                empty_oid = repo.create_blob(b'')
+                empty_oid = repo.create_blob(b"")
                 if ours is None:
-                    ours = IndexEntry(
-                        path, empty_oid, conflict_entry.mode)
+                    ours = IndexEntry(path, empty_oid, conflict_entry.mode)
                 if theirs is None:
-                    theirs = IndexEntry(
-                        path, empty_oid, conflict_entry.mode)
-            merged_file = repo.merge_file_from_index(
-                ancestor, ours, theirs)
+                    theirs = IndexEntry(path, empty_oid, conflict_entry.mode)
+            merged_file = repo.merge_file_from_index(ancestor, ours, theirs)
             # merge_file_from_index gratuitously decodes as UTF-8, so
             # encode it back again.
-            blob_oid = repo.create_blob(merged_file.encode('utf-8'))
+            blob_oid = repo.create_blob(merged_file.encode("utf-8"))
             index.add(IndexEntry(path, blob_oid, conflict_entry.mode))
             del index.conflicts[path]
     return conflicts
 
 
-def get_merge_diff(repo_store, repo_name, sha1_base,
-                   sha1_head, context_lines=3, sha1_prerequisite=None):
+def get_merge_diff(
+    repo_store,
+    repo_name,
+    sha1_base,
+    sha1_head,
+    context_lines=3,
+    sha1_prerequisite=None,
+):
     """Get diff of common ancestor and source diff.
 
     :param sha1_base: target sha1 for merge.
@@ -600,11 +643,12 @@ def get_merge_diff(repo_store, repo_name, sha1_base,
         merge into `sha1_target` before computing diff to `sha1_source`.
     """
     with open_repo(
-            repo_store, repo_name,
-            force_ephemeral=(sha1_prerequisite is not None)) as repo:
+        repo_store, repo_name, force_ephemeral=(sha1_prerequisite is not None)
+    ) as repo:
         if sha1_prerequisite is not None:
             prerequisite_index = repo.merge_commits(
-                sha1_base, sha1_prerequisite)
+                sha1_base, sha1_prerequisite
+            )
             _add_conflicted_files(repo, prerequisite_index)
             from_tree = repo[prerequisite_index.write_tree(repo=repo)]
         else:
@@ -612,18 +656,22 @@ def get_merge_diff(repo_store, repo_name, sha1_base,
         merged_index = repo.merge_commits(sha1_base, sha1_head)
         conflicts = _add_conflicted_files(repo, merged_index)
         diff = merged_index.diff_to_tree(
-            from_tree, context_lines=context_lines)
+            from_tree, context_lines=context_lines
+        )
         diff.find_similar()
         patch = diff.patch
         if patch is None:
-            patch = u''
+            patch = ""
         shas = [sha1_base, sha1_head]
         commits = [
             format_commit(get_commit(repo_store, repo_name, sha, repo))
             for sha in shas
         ]
-        return {'commits': commits, 'patch': patch,
-                'conflicts': sorted(conflicts)}
+        return {
+            "commits": commits,
+            "patch": patch,
+            "conflicts": sorted(conflicts),
+        }
 
 
 def get_diff(repo_store, repo_name, sha1_from, sha1_to, context_lines=3):
@@ -640,15 +688,15 @@ def get_diff(repo_store, repo_name, sha1_from, sha1_to, context_lines=3):
             for sha in shas
         ]
         diff = repo.diff(
-            commits[0]['sha1'], commits[1]['sha1'], False, 0,
-            context_lines)
+            commits[0]["sha1"], commits[1]["sha1"], False, 0, context_lines
+        )
         diff.find_similar()
         patch = diff.patch
         if patch is None:
-            patch = u''
+            patch = ""
         return {
-            'commits': commits,
-            'patch': patch,
+            "commits": commits,
+            "patch": patch,
         }
 
 
@@ -683,11 +731,17 @@ def get_commit(repo_store, repo_name, revision, repo=None):
             else:
                 git_object = repo.revparse_single(revision)
         except KeyError:
-            raise GitError('Object {} does not exist in repository {}.'.format(
-                revision, repo_name))
+            raise GitError(
+                "Object {} does not exist in repository {}.".format(
+                    revision, repo_name
+                )
+            )
         if git_object.type != GIT_OBJ_COMMIT:
-            raise GitError('Invalid type: object {} is not a commit.'.format(
-                git_object.oid.hex))
+            raise GitError(
+                "Invalid type: object {} is not a commit.".format(
+                    git_object.oid.hex
+                )
+            )
         return git_object
 
 
@@ -708,8 +762,11 @@ def detect_merges(repo_store, repo_name, target_oid, source_oids, stop_oids):
     with open_repo(repo_store, repo_name) as repo:
         target = repo.get(target_oid)
         if target is None:
-            raise GitError('Object {} does not exist in repository {}.'.format(
-                target_oid, repo_name))
+            raise GitError(
+                "Object {} does not exist in repository {}.".format(
+                    target_oid, repo_name
+                )
+            )
         if not source_oids:
             return {}
 

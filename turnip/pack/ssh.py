@@ -1,57 +1,29 @@
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import (
-    absolute_import,
-    print_function,
-    unicode_literals,
-    )
+from __future__ import absolute_import, print_function, unicode_literals
 
 import shlex
 import uuid
 
-from lazr.sshserver.auth import (
-    LaunchpadAvatar,
-    PublicKeyFromLaunchpadChecker,
-    )
+import six
+from lazr.sshserver.auth import LaunchpadAvatar, PublicKeyFromLaunchpadChecker
 from lazr.sshserver.service import SSHService
 from lazr.sshserver.session import DoNothingSession
-import six
-from twisted.conch.interfaces import (
-    ISession,
-    ISessionSetEnv,
-    )
-from twisted.cred.portal import (
-    IRealm,
-    Portal,
-    )
-from twisted.internet import (
-    defer,
-    protocol,
-    reactor,
-    )
+from twisted.conch.interfaces import ISession, ISessionSetEnv
+from twisted.cred.portal import IRealm, Portal
+from twisted.internet import defer, protocol, reactor
 from twisted.internet.error import ProcessTerminated
-from twisted.python import (
-    components,
-    failure,
-    )
+from twisted.python import components, failure
 from twisted.web.xmlrpc import Proxy
 from zope.interface import implementer
 
-from turnip.pack.git import (
-    ERROR_PREFIX,
-    PackProtocol,
-    VIRT_ERROR_PREFIX,
-    )
-from turnip.pack.helpers import (
-    encode_packet,
-    encode_request,
-    )
-
+from turnip.pack.git import ERROR_PREFIX, VIRT_ERROR_PREFIX, PackProtocol
+from turnip.pack.helpers import encode_packet, encode_request
 
 __all__ = [
     "SmartSSHSession",
-    ]
+]
 
 
 class SSHPackClientProtocol(PackProtocol):
@@ -73,17 +45,21 @@ class SSHPackClientProtocol(PackProtocol):
         # distinction is for the benefit of the smart HTTP frontend, and is
         # not otherwise useful here.
         if msg.startswith(VIRT_ERROR_PREFIX):
-            _, msg = msg[len(VIRT_ERROR_PREFIX):].split(b' ', 1)
+            _, msg = msg[len(VIRT_ERROR_PREFIX) :].split(b" ", 1)
         self.factory.ssh_protocol.outReceived(
-            encode_packet(ERROR_PREFIX + msg))
+            encode_packet(ERROR_PREFIX + msg)
+        )
 
     def connectionMade(self):
         """Forward the command and arguments to the backend."""
         self.factory.deferred.callback(self)
         self.sendPacket(
             encode_request(
-                self.factory.command, self.factory.pathname,
-                self.factory.params))
+                self.factory.command,
+                self.factory.pathname,
+                self.factory.params,
+            )
+        )
 
     def packetReceived(self, data):
         """Check and forward the first packet from the backend.
@@ -93,7 +69,7 @@ class SSHPackClientProtocol(PackProtocol):
         """
         self.raw = True
         if data is not None and data.startswith(ERROR_PREFIX):
-            self.backendConnectionFailed(data[len(ERROR_PREFIX):])
+            self.backendConnectionFailed(data[len(ERROR_PREFIX) :])
         else:
             self.rawDataReceived(encode_packet(data))
 
@@ -104,11 +80,11 @@ class SSHPackClientProtocol(PackProtocol):
         if not self._closed:
             self._closed = True
             self.factory.ssh_protocol.processEnded(
-                failure.Failure(ProcessTerminated(exitCode=0)))
+                failure.Failure(ProcessTerminated(exitCode=0))
+            )
 
 
 class SSHPackClientFactory(protocol.ClientFactory):
-
     protocol = SSHPackClientProtocol
 
     def __init__(self, command, pathname, params, ssh_protocol, deferred):
@@ -126,8 +102,9 @@ class SSHPackClientFactory(protocol.ClientFactory):
 class SmartSSHSession(DoNothingSession):
     """SSH session allowing only Git smart SSH requests."""
 
-    allowed_services = frozenset((
-        'git-upload-pack', 'git-receive-pack', 'turnip-set-symbolic-ref'))
+    allowed_services = frozenset(
+        ("git-upload-pack", "git-receive-pack", "turnip-set-symbolic-ref")
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -143,11 +120,11 @@ class SmartSSHSession(DoNothingSession):
         self.env[name] = value
 
     def getProtocolVersion(self):
-        version = self.env.get('GIT_PROTOCOL', b'version=0')
+        version = self.env.get("GIT_PROTOCOL", b"version=0")
         try:
-            return six.ensure_binary(version.split(b'version=', 1)[1])
+            return six.ensure_binary(version.split(b"version=", 1)[1])
         except IndexError:
-            return b'0'
+            return b"0"
 
     @defer.inlineCallbacks
     def connectToBackend(self, factory, service, path, ssh_protocol):
@@ -157,16 +134,17 @@ class SmartSSHSession(DoNothingSession):
         recorded in the session avatar.
         """
         params = {
-            b'turnip-authenticated-user': self.avatar.username.encode('utf-8'),
-            b'turnip-authenticated-uid': str(self.avatar.user_id),
-            b'turnip-request-id': str(uuid.uuid4()),
-            b'version': self.getProtocolVersion(),
-            }
+            b"turnip-authenticated-user": self.avatar.username.encode("utf-8"),
+            b"turnip-authenticated-uid": str(self.avatar.user_id),
+            b"turnip-request-id": str(uuid.uuid4()),
+            b"version": self.getProtocolVersion(),
+        }
         d = defer.Deferred()
         client_factory = factory(service, path, params, ssh_protocol, d)
         service = self.avatar.service
         conn = reactor.connectTCP(
-            service.backend_host, service.backend_port, client_factory)
+            service.backend_host, service.backend_port, client_factory
+        )
         self.pack_protocol = yield d
         ssh_protocol.makeConnection(conn.transport)
 
@@ -187,11 +165,13 @@ class SmartSSHSession(DoNothingSession):
             return
         if not args:
             self.errorWithMessage(
-                protocol, b"%s requires an argument.\r\n" % git_cmd)
+                protocol, b"%s requires an argument.\r\n" % git_cmd
+            )
             return
         try:
             self.connectToBackend(
-                SSHPackClientFactory, git_cmd, args[0], protocol)
+                SSHPackClientFactory, git_cmd, args[0], protocol
+            )
         except Exception as e:
             self.errorWithMessage(protocol, str(e).encode("UTF-8"))
 
@@ -200,8 +180,10 @@ class SmartSSHSession(DoNothingSession):
             self.pack_protocol.transport.loseConnection()
 
     def eofReceived(self):
-        if (self.pack_protocol is not None and
-                self.pack_protocol.transport.connected):
+        if (
+            self.pack_protocol is not None
+            and self.pack_protocol.transport.connected
+        ):
             self.pack_protocol.transport.loseWriteConnection()
 
 
@@ -227,28 +209,39 @@ class SmartSSHRealm:
     def requestAvatar(self, avatar_id, mind, *interfaces):
         # Fetch the user's details from the authserver.
         user_dict = yield mind.lookupUserDetails(
-            self.authentication_proxy, avatar_id)
+            self.authentication_proxy, avatar_id
+        )
         avatar = SmartSSHAvatar(user_dict, self.service)
         return interfaces[0], avatar, avatar.logout
 
 
 class SmartSSHService(SSHService):
-
     def _makePortal(self, authentication_endpoint):
         authentication_proxy = Proxy(authentication_endpoint)
         realm = SmartSSHRealm(self, authentication_proxy)
         checkers = [PublicKeyFromLaunchpadChecker(authentication_proxy)]
         return Portal(realm, checkers=checkers)
 
-    def __init__(self, backend_host, backend_port, authentication_endpoint,
-                 *args, **kwargs):
+    def __init__(
+        self,
+        backend_host,
+        backend_port,
+        authentication_endpoint,
+        *args,
+        **kwargs,
+    ):
         SSHService.__init__(
-            self, portal=self._makePortal(
-                six.ensure_binary(authentication_endpoint)),
-            *args, **kwargs)
+            self,
+            portal=self._makePortal(
+                six.ensure_binary(authentication_endpoint)
+            ),
+            *args,
+            **kwargs,
+        )
         self.backend_host = backend_host
         self.backend_port = backend_port
 
 
 components.registerAdapter(
-    SmartSSHSession, SmartSSHAvatar, ISession, ISessionSetEnv)
+    SmartSSHSession, SmartSSHAvatar, ISession, ISessionSetEnv
+)

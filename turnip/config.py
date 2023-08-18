@@ -7,10 +7,9 @@ import os
 
 import yaml
 
-
 __all__ = [
-    'config',
-    ]
+    "config",
+]
 
 
 class TurnipConfig(object):
@@ -19,12 +18,13 @@ class TurnipConfig(object):
     def __init__(self):
         """Load default configuration from config.yaml"""
         config_file_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 'config.yaml')
+            os.path.dirname(os.path.dirname(__file__)), "config.yaml"
+        )
         with open(config_file_path) as config_file:
             self.defaults = yaml.safe_load(config_file)
 
     def get(self, key):
-        return os.getenv(key.upper()) or self.defaults.get(key.lower()) or ''
+        return os.getenv(key.upper()) or self.defaults.get(key.lower()) or ""
 
 
 config = TurnipConfig()

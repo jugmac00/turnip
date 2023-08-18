@@ -14,40 +14,31 @@ netstrings. Hooks authenticate using a secret key from their
 environment.
 """
 
-from __future__ import (
-    absolute_import,
-    print_function,
-    unicode_literals,
-    )
+from __future__ import absolute_import, print_function, unicode_literals
 
 import base64
 import json
 from xmlrpc.client import Binary
 
 import six
-from twisted.internet import (
-    defer,
-    protocol,
-    reactor as default_reactor,
-    )
+from twisted.internet import defer, protocol
+from twisted.internet import reactor as default_reactor
 from twisted.protocols import basic
 from twisted.web import xmlrpc
 
 from turnip.pack.git import RequestIDLogger
-from turnip.pack.helpers import (
-    translate_xmlrpc_fault,
-    TurnipFaultCode,
-    )
+from turnip.pack.helpers import TurnipFaultCode, translate_xmlrpc_fault
 
 
 class JSONNetstringProtocol(basic.NetstringReceiver):
     """A protocol that sends and receives JSON as netstrings."""
+
     # 200MB should be enough.
     MAX_LENGTH = 200 * 1024 * 1024
 
     def stringReceived(self, string):
         try:
-            val = json.loads(string.decode('utf-8'))
+            val = json.loads(string.decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             self.invalidValueReceived(string)
         else:
@@ -60,7 +51,7 @@ class JSONNetstringProtocol(basic.NetstringReceiver):
         raise NotImplementedError()
 
     def sendValue(self, value):
-        self.sendString(json.dumps(value).encode('utf-8'))
+        self.sendString(json.dumps(value).encode("utf-8"))
 
 
 class RPCServerProtocol(JSONNetstringProtocol):
@@ -79,7 +70,7 @@ class RPCServerProtocol(JSONNetstringProtocol):
             self.sendValue({"error": "Command must be a JSON object"})
             return
         val = dict(val)
-        op = val.pop('op', None)
+        op = val.pop("op", None)
         if not op:
             self.sendValue({"error": "No op specified"})
             return
@@ -101,7 +92,6 @@ class RPCServerProtocol(JSONNetstringProtocol):
 
 
 class RPCServerFactory(protocol.ServerFactory):
-
     protocol = RPCServerProtocol
 
     def __init__(self, methods):
@@ -117,7 +107,7 @@ class HookRPCLogContext(object):
     log = RequestIDLogger()
 
     def __init__(self, auth_params):
-        self.request_id = auth_params.get('request-id')
+        self.request_id = auth_params.get("request-id")
 
 
 class HookRPCHandler(object):
@@ -153,35 +143,38 @@ class HookRPCHandler(object):
     @defer.inlineCallbacks
     def checkRefPermissions(self, proto, args):
         """Get permissions for a set of refs."""
-        log_context = HookRPCLogContext(self.auth_params[args['key']])
-        auth_params = self.auth_params[args['key']]
-        ref_path = self.ref_paths[args['key']]
+        log_context = HookRPCLogContext(self.auth_params[args["key"]])
+        auth_params = self.auth_params[args["key"]]
+        ref_path = self.ref_paths[args["key"]]
         # We don't log all the ref paths being checked, since there can be a
         # lot of them.
         log_context.log.info(
             "checkRefPermissions request received: "
             "auth_params={auth_params}, ref_path={ref_path}",
-            auth_params=auth_params, ref_path=ref_path)
+            auth_params=auth_params,
+            ref_path=ref_path,
+        )
 
-        cached_permissions = self.ref_permissions[args['key']]
+        cached_permissions = self.ref_permissions[args["key"]]
         paths = [
-            base64.b64decode(path.encode('UTF-8')) for path in args['paths']]
+            base64.b64decode(path.encode("UTF-8")) for path in args["paths"]
+        ]
         missing = [x for x in paths if x not in cached_permissions]
         if missing:
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
             try:
                 result = yield proxy.callRemote(
-                    'checkRefPermissions',
+                    "checkRefPermissions",
                     six.ensure_str(ref_path),
                     [Binary(path) for path in missing],
-                    auth_params).addTimeout(
-                        self.virtinfo_timeout, self.reactor)
+                    auth_params,
+                ).addTimeout(self.virtinfo_timeout, self.reactor)
             except xmlrpc.Fault as e:
                 code = translate_xmlrpc_fault(e.faultCode)
                 if code in (
-                        TurnipFaultCode.NOT_FOUND,
-                        TurnipFaultCode.UNAUTHORIZED,
-                        ):
+                    TurnipFaultCode.NOT_FOUND,
+                    TurnipFaultCode.UNAUTHORIZED,
+                ):
                     # These faults can happen with unlucky timing: a NOT_FOUND
                     # fault can happen if the repository was removed from disk
                     # between translatePath and checkRefPermissions (although
@@ -193,96 +186,120 @@ class HookRPCHandler(object):
                     log_context.log.info(
                         "checkRefPermissions virtinfo raised Unauthorized: "
                         "auth_params={auth_params}, ref_path={ref_path}",
-                        auth_params=auth_params, ref_path=ref_path)
+                        auth_params=auth_params,
+                        ref_path=ref_path,
+                    )
                     result = [(Binary(path), []) for path in missing]
                 else:
                     log_context.log.info(
                         "checkRefPermissions virtinfo raised "
                         "{fault_code} {fault_string}: "
                         "auth_params={auth_params}, ref_path={ref_path}",
-                        fault_code=code.name, fault_string=e.faultString,
-                        auth_params=auth_params, ref_path=ref_path)
+                        fault_code=code.name,
+                        fault_string=e.faultString,
+                        auth_params=auth_params,
+                        ref_path=ref_path,
+                    )
                     raise
             except defer.TimeoutError:
                 log_context.log.info(
                     "checkRefPermissions virtinfo timed out: "
                     "auth_params={auth_params}, ref_path={ref_path}",
-                    auth_params=auth_params, ref_path=ref_path)
+                    auth_params=auth_params,
+                    ref_path=ref_path,
+                )
                 raise
             log_context.log.info(
                 "checkRefPermissions virtinfo response: "
                 "auth_params={auth_params}, ref_path={ref_path}",
-                auth_params=auth_params, ref_path=ref_path)
+                auth_params=auth_params,
+                ref_path=ref_path,
+            )
             for ref, permission in result:
                 cached_permissions[ref.data] = permission
         else:
             log_context.log.info(
                 "checkRefPermissions returning cached permissions: "
                 "auth_params={auth_params}, ref_path={ref_path}",
-                auth_params=auth_params, ref_path=ref_path)
+                auth_params=auth_params,
+                ref_path=ref_path,
+            )
         # cached_permissions is a shallow copy of the key index for
         # self.ref_permissions, so changes will be updated in that.
         return {
-            base64.b64encode(ref).decode('UTF-8'): cached_permissions[ref]
-            for ref in paths}
+            base64.b64encode(ref).decode("UTF-8"): cached_permissions[ref]
+            for ref in paths
+        }
 
     @defer.inlineCallbacks
     def notify(self, path, loose_object_count, pack_count, auth_params):
         proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
-        statistics = dict({("loose_object_count", loose_object_count),
-                           ("pack_count", pack_count)})
-        yield proxy.callRemote('notify', six.ensure_str(path),
-                               statistics,
-                               auth_params).addTimeout(
-            self.virtinfo_timeout, self.reactor)
+        statistics = dict(
+            {
+                ("loose_object_count", loose_object_count),
+                ("pack_count", pack_count),
+            }
+        )
+        yield proxy.callRemote(
+            "notify", six.ensure_str(path), statistics, auth_params
+        ).addTimeout(self.virtinfo_timeout, self.reactor)
 
     @defer.inlineCallbacks
     def notifyPush(self, proto, args):
         """Notify the virtinfo service about a push."""
-        log_context = HookRPCLogContext(self.auth_params[args['key']])
-        path = self.ref_paths[args['key']]
-        auth_params = self.auth_params[args['key']]
-        loose_object_count = args.get('loose_object_count')
-        pack_count = args.get('pack_count')
+        log_context = HookRPCLogContext(self.auth_params[args["key"]])
+        path = self.ref_paths[args["key"]]
+        auth_params = self.auth_params[args["key"]]
+        loose_object_count = args.get("loose_object_count")
+        pack_count = args.get("pack_count")
         log_context.log.info(
-            "notifyPush request received: ref_path={path}", path=path)
+            "notifyPush request received: ref_path={path}", path=path
+        )
         try:
-            yield self.notify(path, loose_object_count,
-                              pack_count, auth_params)
+            yield self.notify(
+                path, loose_object_count, pack_count, auth_params
+            )
         except defer.TimeoutError:
             log_context.log.info(
-                "notifyPush timed out: ref_path={path}", path=path)
+                "notifyPush timed out: ref_path={path}", path=path
+            )
             raise
         log_context.log.info("notifyPush done: ref_path={path}", path=path)
 
     @defer.inlineCallbacks
     def getMergeProposalURL(self, proto, args):
-        log_context = HookRPCLogContext(self.auth_params[args['key']])
-        path = six.ensure_text(self.ref_paths[args['key']])
-        auth_params = self.auth_params[args['key']]
-        branch = six.ensure_text(args['branch'])
+        log_context = HookRPCLogContext(self.auth_params[args["key"]])
+        path = six.ensure_text(self.ref_paths[args["key"]])
+        auth_params = self.auth_params[args["key"]]
+        branch = six.ensure_text(args["branch"])
         log_context.log.info(
-            "getMergeProposalURL request received: ref_path={path}", path=path)
+            "getMergeProposalURL request received: ref_path={path}", path=path
+        )
         mp_url = None
         try:
             proxy = xmlrpc.Proxy(self.virtinfo_url, allowNone=True)
             mp_url = yield proxy.callRemote(
-                'getMergeProposalURL', path, branch, auth_params).addTimeout(
-                self.virtinfo_timeout, self.reactor)
+                "getMergeProposalURL", path, branch, auth_params
+            ).addTimeout(self.virtinfo_timeout, self.reactor)
         except xmlrpc.Fault as e:
             code = translate_xmlrpc_fault(e.faultCode)
             log_context.log.info(
                 "getMergeProposalURL virtinfo raised "
                 "{fault_code} {fault_string}: "
                 "auth_params={auth_params}, ref_path={ref_path}",
-                fault_code=code.name, fault_string=e.faultString,
-                auth_params=auth_params, branch=branch)
+                fault_code=code.name,
+                fault_string=e.faultString,
+                auth_params=auth_params,
+                branch=branch,
+            )
         except defer.TimeoutError:
             log_context.log.info(
-                "getMergeProposalURL timed out: ref_path={path}", path=path)
+                "getMergeProposalURL timed out: ref_path={path}", path=path
+            )
             raise
-        log_context.log.info("getMergeProposalURL done: ref_path={path}",
-                             path=path)
+        log_context.log.info(
+            "getMergeProposalURL done: ref_path={path}", path=path
+        )
         return mp_url
 
 
@@ -292,7 +309,7 @@ class HookRPCServerFactory(RPCServerFactory):
     def __init__(self, hookrpc_handler):
         self.hookrpc_handler = hookrpc_handler
         self.methods = {
-            'check_ref_permissions': self.hookrpc_handler.checkRefPermissions,
-            'notify_push': self.hookrpc_handler.notifyPush,
-            'get_mp_url': self.hookrpc_handler.getMergeProposalURL,
-            }
+            "check_ref_permissions": self.hookrpc_handler.checkRefPermissions,
+            "notify_push": self.hookrpc_handler.notifyPush,
+            "get_mp_url": self.hookrpc_handler.getMergeProposalURL,
+        }

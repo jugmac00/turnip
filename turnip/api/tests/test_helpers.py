@@ -6,26 +6,20 @@ import fnmatch
 import itertools
 import logging
 import os
-from subprocess import (
-    CalledProcessError,
-    PIPE,
-    Popen,
-    STDOUT,
-    )
+import uuid
+from subprocess import PIPE, STDOUT, CalledProcessError, Popen
 from urllib.parse import urljoin
 from urllib.request import pathname2url
-import uuid
 
+import six
 from pygit2 import (
-    clone_repository,
     GIT_FILEMODE_BLOB,
     IndexEntry,
-    init_repository,
     Repository,
     Signature,
-    )
-import six
-
+    clone_repository,
+    init_repository,
+)
 
 log = logging.getLogger()
 
@@ -54,17 +48,23 @@ def chdir(dirname=None):
 class RepoFactory(object):
     """Builds a git repository in a user defined state."""
 
-    def __init__(self, repo_path=None, num_commits=None,
-                 num_branches=None, num_tags=None, clone_from=None):
-        self.author = Signature('Test Author', 'author@bar.com')
+    def __init__(
+        self,
+        repo_path=None,
+        num_commits=None,
+        num_branches=None,
+        num_tags=None,
+        clone_from=None,
+    ):
+        self.author = Signature("Test Author", "author@bar.com")
         self.branches = []
         self.commits = []
-        self.committer = Signature('Test Committer', 'committer@bar.com')
+        self.committer = Signature("Test Committer", "committer@bar.com")
         self.num_branches = num_branches
         self.num_commits = num_commits
         self.num_tags = num_tags
         self.repo_path = repo_path
-        self.pack_dir = os.path.join(repo_path, 'objects', 'pack')
+        self.pack_dir = os.path.join(repo_path, "objects", "pack")
         if clone_from:
             self.repo = self.clone_repo(clone_from)
         else:
@@ -73,11 +73,20 @@ class RepoFactory(object):
     @property
     def packs(self):
         """Return list of pack files."""
-        return [filename for filename in fnmatch.filter(
-            os.listdir(self.pack_dir), '*.pack')]
+        return [
+            filename
+            for filename in fnmatch.filter(os.listdir(self.pack_dir), "*.pack")
+        ]
 
-    def add_commit(self, blob_content, file_path, parents=[],
-                   ref=None, author=None, committer=None):
+    def add_commit(
+        self,
+        blob_content,
+        file_path,
+        parents=[],
+        ref=None,
+        author=None,
+        committer=None,
+    ):
         """Create a commit from blob_content and file_path."""
         repo = self.repo
         if not author:
@@ -85,50 +94,60 @@ class RepoFactory(object):
         if not committer:
             committer = self.committer
         tree_id = self.stage(file_path, blob_content)
-        oid = repo.create_commit(ref, author, committer,
-                                 blob_content, tree_id, parents)
+        oid = repo.create_commit(
+            ref, author, committer, blob_content, tree_id, parents
+        )
         self.set_head(oid)  # set master
         return oid
 
     def set_head(self, oid):
         try:
-            master_ref = self.repo.references['refs/heads/master']
+            master_ref = self.repo.references["refs/heads/master"]
         except KeyError:
-            master_ref = self.repo.references.create('refs/heads/master', oid)
+            master_ref = self.repo.references.create("refs/heads/master", oid)
         finally:
             master_ref.set_target(oid)
 
     def add_branch(self, name, oid):
         commit = self.repo.get(oid)
-        branch = self.repo.create_branch('branch-{}'.format(name), commit)
+        branch = self.repo.create_branch("branch-{}".format(name), commit)
         self.branches.append(branch)
         return branch
 
     def _get_cmd_line_auth_params(self):
         return [
-            '-c', 'user.name={}'.format(self.author.name),
-            '-c', 'user.email={}'.format(self.author.email),
-            '-c', 'author.name={}'.format(self.author.name),
-            '-c', 'author.email={}'.format(self.author.email),
-            '-c', 'committer.name={}'.format(self.committer.name),
-            '-c', 'committer.email={}'.format(self.committer.email),
+            "-c",
+            "user.name={}".format(self.author.name),
+            "-c",
+            "user.email={}".format(self.author.email),
+            "-c",
+            "author.name={}".format(self.author.name),
+            "-c",
+            "author.email={}".format(self.author.email),
+            "-c",
+            "committer.name={}".format(self.committer.name),
+            "-c",
+            "committer.email={}".format(self.committer.email),
         ]
 
     def add_tag(self, tag_name, tag_message, oid):
         """Create a tag from tag_name and oid."""
-        cmd_line = ['git', '-C', self.repo_path]
+        cmd_line = ["git", "-C", self.repo_path]
         cmd_line += self._get_cmd_line_auth_params()
-        cmd_line += ['tag', '-m', tag_message, tag_name, oid.hex]
+        cmd_line += ["tag", "-m", tag_message, tag_name, oid.hex]
         subproc = Popen(cmd_line, stdout=PIPE, stderr=STDOUT)
         out, err = subproc.communicate()
         retcode = subproc.returncode
         if retcode:
             log.error(
                 "Command %s finished with error code %s. stdout/stderr:\n%s",
-                cmd_line, retcode, out)
+                cmd_line,
+                retcode,
+                out,
+            )
             raise CalledProcessError(retcode, cmd_line)
 
-    def makeSignature(self, name, email, encoding='utf-8'):
+    def makeSignature(self, name, email, encoding="utf-8"):
         """Return an author or committer signature."""
         # email should always be str on python3, but pygit2
         # doesn't enforce the same for name.
@@ -137,23 +156,27 @@ class RepoFactory(object):
 
     def stage(self, path, content):
         """Stage a file and return a tree id."""
-        self.repo.index.add(IndexEntry(
-            path, self.repo.create_blob(content), GIT_FILEMODE_BLOB))
+        self.repo.index.add(
+            IndexEntry(path, self.repo.create_blob(content), GIT_FILEMODE_BLOB)
+        )
         return self.repo.index.write_tree()
 
     def generate_commits(self, num_commits, parents=[]):
         """Generate n number of commits."""
         for i in range(num_commits):
             blob_content = (
-                b'commit ' + str(i).encode('ascii') + b' - '
-                + uuid.uuid1().hex.encode('ascii'))
-            test_file = 'test.txt'
+                b"commit "
+                + str(i).encode("ascii")
+                + b" - "
+                + uuid.uuid1().hex.encode("ascii")
+            )
+            test_file = "test.txt"
             self.stage(test_file, blob_content)
             commit_oid = self.add_commit(blob_content, test_file, parents)
             self.commits.append(commit_oid)
             parents = [commit_oid]
             if i == num_commits - 1:
-                ref = 'refs/heads/master'
+                ref = "refs/heads/master"
                 try:
                     self.repo.references[ref]
                 except KeyError:
@@ -165,7 +188,7 @@ class RepoFactory(object):
         repo = self.repo
         oid = repo.head.peel().oid
         for i in range(num_tags):
-            self.add_tag('tag{}'.format(i), 'tag message {}'.format(i), oid)
+            self.add_tag("tag{}".format(i), "tag message {}".format(i), oid)
 
     def generate_branches(self, num_branches, num_commits):
         """Generate n number of branches with n commits."""
@@ -173,15 +196,15 @@ class RepoFactory(object):
         parents = []
         for i in range(num_branches):
             self.generate_commits(num_commits, parents)
-            oid = repo.revparse_single('HEAD')
-            branch = repo.create_branch('branch-{}'.format(i), oid)
+            oid = repo.revparse_single("HEAD")
+            branch = repo.create_branch("branch-{}".format(i), oid)
             self.branches.append(branch)
             parents.append(self.commits[0])
 
     def nonexistent_oid(self):
         """Return an arbitrary OID that does not exist in this repo."""
-        for oid_chars in itertools.product('0123456789abcdef', repeat=40):
-            oid = ''.join(oid_chars)
+        for oid_chars in itertools.product("0123456789abcdef", repeat=40):
+            oid = "".join(oid_chars)
             if oid not in self.repo:
                 return oid
         raise Exception("repo appears to contain every possible OID!")
@@ -191,7 +214,7 @@ class RepoFactory(object):
 
     def clone_repo(self, repo_factory):
         """Return a pygit2 repo object cloned from an existing factory repo."""
-        clone_from_url = urljoin('file:', pathname2url(repo_factory.repo.path))
+        clone_from_url = urljoin("file:", pathname2url(repo_factory.repo.path))
         return clone_repository(clone_from_url, self.repo_path, bare=False)
 
     def build(self):

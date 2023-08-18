@@ -4,16 +4,9 @@
 # You can run this .tac file directly with:
 #    twistd -ny packfrontendserver.tac
 
-from __future__ import (
-    absolute_import,
-    print_function,
-    unicode_literals,
-    )
+from __future__ import absolute_import, print_function, unicode_literals
 
-from twisted.application import (
-    internet,
-    service,
-    )
+from twisted.application import internet, service
 from twisted.scripts.twistd import ServerOptions
 
 from turnip.config import config
@@ -25,9 +18,11 @@ def getPackFrontendService():
     """Return a PackFrontend Service."""
 
     return internet.TCPServer(
-        int(config.get('pack_frontend_port')),
-        PackFrontendFactory(config.get('pack_virt_host'),
-                            int(config.get('pack_virt_port'))))
+        int(config.get("pack_frontend_port")),
+        PackFrontendFactory(
+            config.get("pack_virt_host"), int(config.get("pack_virt_port"))
+        ),
+    )
 
 
 options = ServerOptions()
@@ -35,5 +30,6 @@ options.parseOptions()
 
 application = service.Application("Turnip Pack Frontend Service")
 application.addComponent(
-    RotatableFileLogObserver(options.get('logfile')), ignoreClass=1)
+    RotatableFileLogObserver(options.get("logfile")), ignoreClass=1
+)
 getPackFrontendService().setServiceParent(application)
