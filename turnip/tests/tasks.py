@@ -2,14 +2,11 @@
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
 import atexit
-from datetime import (
-    datetime,
-    timedelta,
-    )
 import os
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta
 
 import fixtures
 import six
@@ -17,8 +14,7 @@ import six
 from turnip.config import config
 from turnip.tasks import app
 
-
-BROKER_URL = 'pyamqp://guest@localhost/turnip-test-vhost'
+BROKER_URL = "pyamqp://guest@localhost/turnip-test-vhost"
 
 
 def setupCelery():
@@ -32,10 +28,12 @@ class CeleryWorkerFixture(fixtures.Fixture):
     fixture is setUp. Keep in mind that this will run in a separated
     new process, so mock patches for example will be lost.
     """
+
     _worker_proc = None
 
-    def __init__(self, loglevel="info", logfile=None,
-                 force_restart=True, env=None):
+    def __init__(
+        self, loglevel="info", logfile=None, force_restart=True, env=None
+    ):
         """
         Build a celery worker for test cases.
 
@@ -58,14 +56,19 @@ class CeleryWorkerFixture(fixtures.Fixture):
         if CeleryWorkerFixture._worker_proc is not None:
             return
         bin_path = os.path.dirname(sys.executable)
-        celery = os.path.join(bin_path, 'celery')
+        celery = os.path.join(bin_path, "celery")
         cmd = [
-            celery, 'worker', '-A', 'turnip.tasks', '--quiet',
-            '--pool=gevent',
-            '--concurrency=20',
-            '--broker=%s' % BROKER_URL,
-            '--loglevel=%s' % self.loglevel,
-            '--queue=repacks,celery']
+            celery,
+            "worker",
+            "-A",
+            "turnip.tasks",
+            "--quiet",
+            "--pool=gevent",
+            "--concurrency=20",
+            "--broker=%s" % BROKER_URL,
+            "--loglevel=%s" % self.loglevel,
+            "--queue=repacks,celery",
+        ]
         if self.logfile:
             cmd += ["--logfile=%s" % self.logfile]
 
@@ -102,8 +105,9 @@ class CeleryWorkerFixture(fixtures.Fixture):
                 return
             time.sleep(0.2)
         raise AttributeError(
-            "%s(*%s, **%s) never returned True after %s seconds" %
-            (callable.__name__, args, kwargs, seconds))
+            "%s(*%s, **%s) never returned True after %s seconds"
+            % (callable.__name__, args, kwargs, seconds)
+        )
 
     def _setUp(self):
         self.startCeleryWorker()

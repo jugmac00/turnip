@@ -1,11 +1,7 @@
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import (
-    absolute_import,
-    print_function,
-    unicode_literals,
-    )
+from __future__ import absolute_import, print_function, unicode_literals
 
 import base64
 import io
@@ -14,55 +10,31 @@ import os.path
 import tempfile
 import textwrap
 import time
-from urllib.parse import urlencode
 import uuid
 import zlib
+from urllib.parse import urlencode
 
-from openid.consumer import consumer
-from openid.extensions.sreg import (
-    SRegRequest,
-    SRegResponse,
-    )
 import paste.auth.cookie
-from paste.auth.cookie import (
-    AuthCookieSigner,
-    decode as decode_cookie,
-    encode as encode_cookie,
-    )
 import six
-from twisted.internet import (
-    defer,
-    error,
-    protocol,
-    reactor as default_reactor,
-    )
-from twisted.python import (
-    compat,
-    log,
-    )
-from twisted.web import (
-    http,
-    resource,
-    server,
-    static,
-    twcgi,
-    xmlrpc,
-    )
+from openid.consumer import consumer
+from openid.extensions.sreg import SRegRequest, SRegResponse
+from paste.auth.cookie import AuthCookieSigner
+from paste.auth.cookie import decode as decode_cookie
+from paste.auth.cookie import encode as encode_cookie
+from twisted.internet import defer, error, protocol
+from twisted.internet import reactor as default_reactor
+from twisted.python import compat, log
+from twisted.web import http, resource, server, static, twcgi, xmlrpc
 
 from turnip.helpers import compose_path
-from turnip.pack.git import (
-    ERROR_PREFIX,
-    PackProtocol,
-    VIRT_ERROR_PREFIX,
-    )
+from turnip.pack.git import ERROR_PREFIX, VIRT_ERROR_PREFIX, PackProtocol
 from turnip.pack.helpers import (
+    TurnipFaultCode,
     encode_packet,
     encode_request,
     get_capabilities_advertisement,
     translate_xmlrpc_fault,
-    TurnipFaultCode,
-    )
-
+)
 
 try:
     from turnip.version_info import version_info
@@ -73,25 +45,26 @@ except ImportError:
 def fail_request(request, message, code=http.INTERNAL_SERVER_ERROR):
     if not request.startedWriting:
         request.setResponseCode(code)
-        request.setHeader(b'Content-Type', b'text/plain; charset=UTF-8')
+        request.setHeader(b"Content-Type", b"text/plain; charset=UTF-8")
         if not isinstance(message, bytes):
-            message = message.encode('UTF-8')
+            message = message.encode("UTF-8")
         request.write(message)
     request.unregisterProducer()
     request.finish()
     # Some callsites want to be able to return from render_*, so make
     # that possible.
-    return b''
+    return b""
 
 
 def get_protocol_version_from_request(request):
     version_header = request.requestHeaders.getRawHeaders(
-        b'git-protocol', [b'version=0'])[0]
+        b"git-protocol", [b"version=0"]
+    )[0]
     try:
-        return six.ensure_binary(version_header).split(b'version=', 1)[1]
+        return six.ensure_binary(version_header).split(b"version=", 1)[1]
     except IndexError:
         pass
-    return b'0'
+    return b"0"
 
 
 class HTTPPackClientProtocol(PackProtocol):
@@ -114,7 +87,8 @@ class HTTPPackClientProtocol(PackProtocol):
     def startGoodResponse(self):
         """Prepare the HTTP response for forwarding from the backend."""
         self.factory.http_request.write(
-            get_capabilities_advertisement(self.getProtocolVersion()))
+            get_capabilities_advertisement(self.getProtocolVersion())
+        )
 
     def getProtocolVersion(self):
         return get_protocol_version_from_request(self.factory.http_request)
@@ -130,20 +104,21 @@ class HTTPPackClientProtocol(PackProtocol):
         # afterwards. But we can make educated guesses.
         error_code = None
         if msg.startswith(VIRT_ERROR_PREFIX):
-            error_name, msg = msg[len(VIRT_ERROR_PREFIX):].split(b' ', 1)
-            if error_name == b'NOT_FOUND':
+            error_name, msg = msg[len(VIRT_ERROR_PREFIX) :].split(b" ", 1)
+            if error_name == b"NOT_FOUND":
                 error_code = http.NOT_FOUND
-            elif error_name == b'FORBIDDEN':
+            elif error_name == b"FORBIDDEN":
                 error_code = http.FORBIDDEN
-            elif error_name == b'UNAUTHORIZED':
+            elif error_name == b"UNAUTHORIZED":
                 error_code = http.UNAUTHORIZED
                 self.factory.http_request.setHeader(
-                    b'WWW-Authenticate', b'Basic realm=turnip')
-            elif error_name == b'GATEWAY_TIMEOUT':
+                    b"WWW-Authenticate", b"Basic realm=turnip"
+                )
+            elif error_name == b"GATEWAY_TIMEOUT":
                 error_code = http.GATEWAY_TIMEOUT
             else:
                 error_code = http.INTERNAL_SERVER_ERROR
-        elif msg.startswith(b'Repository is read-only'):
+        elif msg.startswith(b"Repository is read-only"):
             error_code = http.FORBIDDEN
         elif not self.user_error_possible:
             error_code = http.INTERNAL_SERVER_ERROR
@@ -167,14 +142,16 @@ class HTTPPackClientProtocol(PackProtocol):
         """Forward the request and the client's payload to the backend."""
         self.factory.deferred.callback(None)
         self.factory.http_request.notifyFinish().addBoth(self._finish)
-        self.factory.http_request.registerProducer(
-            self.transport, True)
+        self.factory.http_request.registerProducer(self.transport, True)
         self.sendPacket(
             encode_request(
-                self.factory.command, self.factory.pathname,
-                self.factory.params))
+                self.factory.command,
+                self.factory.pathname,
+                self.factory.params,
+            )
+        )
         self.sendRawData(self.factory.body.read())
-        if hasattr(self.transport, 'loseWriteConnection'):
+        if hasattr(self.transport, "loseWriteConnection"):
             self.transport.loseWriteConnection()
 
     def packetReceived(self, data):
@@ -188,7 +165,9 @@ class HTTPPackClientProtocol(PackProtocol):
             # Handle the error nicely if it's known (eg. 404 on
             # nonexistent repo). If it's unknown, just forward the error
             # along to the client and forward as normal.
-            virt_error = self.backendConnectionFailed(data[len(ERROR_PREFIX):])
+            virt_error = self.backendConnectionFailed(
+                data[len(ERROR_PREFIX) :]
+            )
         else:
             virt_error = False
         if not virt_error:
@@ -211,11 +190,11 @@ class HTTPPackClientProtocol(PackProtocol):
                 self.factory.http_request.finish()
             else:
                 fail_request(
-                    self.factory.http_request, b'Backend connection lost.')
+                    self.factory.http_request, b"Backend connection lost."
+                )
 
 
 class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
-
     # The only user input is the request line, which the virt proxy should
     # cause to always be valid. Any unrecognised error is probably a backend
     # failure from repository corruption or similar.
@@ -225,30 +204,31 @@ class HTTPPackClientRefsProtocol(HTTPPackClientProtocol):
         """Prepare the HTTP response for forwarding from the backend."""
         self.factory.http_request.setResponseCode(http.OK)
         self.factory.http_request.setHeader(
-            b'Content-Type',
-            b'application/x-%s-advertisement' % self.factory.command)
+            b"Content-Type",
+            b"application/x-%s-advertisement" % self.factory.command,
+        )
         super().startGoodResponse()
 
     def backendConnected(self):
         HTTPPackClientProtocol.backendConnected(self)
         self.rawDataReceived(
-            encode_packet(b'# service=%s\n' % self.factory.command))
+            encode_packet(b"# service=%s\n" % self.factory.command)
+        )
         self.rawDataReceived(encode_packet(None))
 
 
 class HTTPPackClientCommandProtocol(HTTPPackClientProtocol):
-
     def startGoodResponse(self):
         """Prepare the HTTP response for forwarding from the backend."""
-        if self.getProtocolVersion() != b'2':
+        if self.getProtocolVersion() != b"2":
             self.factory.http_request.setResponseCode(http.OK)
             self.factory.http_request.setHeader(
-                b'Content-Type',
-                b'application/x-%s-result' % self.factory.command)
+                b"Content-Type",
+                b"application/x-%s-result" % self.factory.command,
+            )
 
 
 class HTTPPackClientFactory(protocol.ClientFactory):
-
     def __init__(self, command, pathname, params, body, http_request, d):
         self.command = command
         self.pathname = pathname
@@ -262,12 +242,10 @@ class HTTPPackClientFactory(protocol.ClientFactory):
 
 
 class HTTPPackClientCommandFactory(HTTPPackClientFactory):
-
     protocol = HTTPPackClientCommandProtocol
 
 
 class HTTPPackClientRefsFactory(HTTPPackClientFactory):
-
     protocol = HTTPPackClientRefsProtocol
 
 
@@ -288,7 +266,8 @@ class BaseSmartHTTPResource(resource.Resource):
         """Attempt authentication of the request with the virt service."""
         if request.getUser() or request.getPassword():
             params = yield self.root.authenticateWithPassword(
-                request.getUser(), request.getPassword())
+                request.getUser(), request.getPassword()
+            )
             return params
         return {}
 
@@ -300,14 +279,15 @@ class BaseSmartHTTPResource(resource.Resource):
         by the virt service, if any.
         """
         params = {
-            b'turnip-can-authenticate': b'yes',
-            b'turnip-request-id': str(uuid.uuid4()),
-            b'version': six.ensure_binary(
-                get_protocol_version_from_request(request))
-            }
+            b"turnip-can-authenticate": b"yes",
+            b"turnip-request-id": str(uuid.uuid4()),
+            b"version": six.ensure_binary(
+                get_protocol_version_from_request(request)
+            ),
+        }
         authenticated_params = yield self.authenticateUser(request)
         for key, value in authenticated_params.items():
-            encoded_key = ('turnip-authenticated-' + six.ensure_str(key))
+            encoded_key = "turnip-authenticated-" + six.ensure_str(key)
             params[encoded_key] = six.text_type(value)
         params.update(self.extra_params)
         d = defer.Deferred()
@@ -322,8 +302,9 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
     isLeaf = True
 
     extra_params = {
-        b'turnip-stateless-rpc': b'yes',
-        b'turnip-advertise-refs': b'yes'}
+        b"turnip-stateless-rpc": b"yes",
+        b"turnip-advertise-refs": b"yes",
+    }
 
     def __init__(self, root, path):
         self.root = root
@@ -331,20 +312,27 @@ class SmartHTTPRefsResource(BaseSmartHTTPResource):
 
     def render_GET(self, request):
         try:
-            service = request.args[b'service'][0]
+            service = request.args[b"service"][0]
         except (KeyError, IndexError):
             return fail_request(
-                request, b'Only git smart HTTP clients are supported.',
-                code=http.NOT_FOUND)
+                request,
+                b"Only git smart HTTP clients are supported.",
+                code=http.NOT_FOUND,
+            )
 
         if service not in self.root.allowed_services:
             return fail_request(
-                request, b'Unsupported service.', code=http.FORBIDDEN)
+                request, b"Unsupported service.", code=http.FORBIDDEN
+            )
 
         d = self.connectToBackend(
-            HTTPPackClientRefsFactory, service, self.path, request.content,
-            request)
-        d.addErrback(self.errback, request, b'Backend connection failed')
+            HTTPPackClientRefsFactory,
+            service,
+            self.path,
+            request.content,
+            request,
+        )
+        d.addErrback(self.errback, request, b"Backend connection failed")
         return server.NOT_DONE_YET
 
 
@@ -353,7 +341,7 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
 
     isLeaf = True
 
-    extra_params = {b'turnip-stateless-rpc': b'yes'}
+    extra_params = {b"turnip-stateless-rpc": b"yes"}
 
     def __init__(self, root, service, path):
         self.root = root
@@ -361,25 +349,33 @@ class SmartHTTPCommandResource(BaseSmartHTTPResource):
         self.path = path
 
     def render_POST(self, request):
-        content_type = request.requestHeaders.getRawHeaders(b'Content-Type')
-        if content_type != [b'application/x-%s-request' % self.service]:
+        content_type = request.requestHeaders.getRawHeaders(b"Content-Type")
+        if content_type != [b"application/x-%s-request" % self.service]:
             return fail_request(
-                request, b'Invalid Content-Type for service.',
-                code=http.BAD_REQUEST)
+                request,
+                b"Invalid Content-Type for service.",
+                code=http.BAD_REQUEST,
+            )
 
         content = request.content
         # XXX: We really need to hack twisted.web to stream the request
         # body, and decode it in a less hacky manner (git always uses
         # C-E: gzip without negotiating).
         content_encoding = request.requestHeaders.getRawHeaders(
-            b'Content-Encoding')
-        if content_encoding == [b'gzip']:
+            b"Content-Encoding"
+        )
+        if content_encoding == [b"gzip"]:
             content = io.BytesIO(
-                zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS))
+                zlib.decompress(request.content.read(), 16 + zlib.MAX_WBITS)
+            )
         d = self.connectToBackend(
-            HTTPPackClientCommandFactory, self.service, self.path, content,
-            request)
-        d.addErrback(self.errback, request, b'Backend connection failed')
+            HTTPPackClientCommandFactory,
+            self.service,
+            self.path,
+            content,
+            request,
+        )
+        d.addErrback(self.errback, request, b"Backend connection failed")
         return server.NOT_DONE_YET
 
 
@@ -390,16 +386,17 @@ class SmartHTTPRootResource(resource.Resource):
         self.root = root
 
     def render_GET(self, request):
-        if 'revision_id' in version_info:
+        if "revision_id" in version_info:
             request.setHeader(
-                b'X-Turnip-Revision',
-                version_info['revision_id'].encode('UTF-8'))
+                b"X-Turnip-Revision",
+                version_info["revision_id"].encode("UTF-8"),
+            )
         request.redirect(self.root.main_site_root)
-        return b''
+        return b""
 
     def render_OPTIONS(self, request):
         # Trivially respond to OPTIONS / for the sake of haproxy.
-        return b''
+        return b""
 
 
 class DirectoryWithoutListings(static.File):
@@ -412,13 +409,15 @@ class DirectoryWithoutListings(static.File):
 class RobotsResource(static.Data):
     """HTTP resource to serve our robots.txt."""
 
-    robots_txt = textwrap.dedent("""\
+    robots_txt = textwrap.dedent(
+        """\
         User-agent: *
         Disallow: /
-        """).encode('US-ASCII')
+        """
+    ).encode("US-ASCII")
 
     def __init__(self):
-        static.Data.__init__(self, self.robots_txt, 'text/plain')
+        static.Data.__init__(self, self.robots_txt, "text/plain")
 
 
 class CGitScriptResource(twcgi.CGIScript):
@@ -440,41 +439,57 @@ class CGitScriptResource(twcgi.CGIScript):
     def runProcess(self, env, request, *args, **kwargs):
         request.notifyFinish().addBoth(self._finished)
         self.cgit_config = tempfile.NamedTemporaryFile(
-            mode='w+', prefix='turnip-cgit-')
+            mode="w+", prefix="turnip-cgit-"
+        )
         os.chmod(self.cgit_config.name, 0o644)
         fmt = {
-            'repo_url': six.ensure_text(self.repo_url),
-            'repo_path': six.ensure_text(self.repo_path)}
+            "repo_url": six.ensure_text(self.repo_url),
+            "repo_path": six.ensure_text(self.repo_path),
+        }
         if self.root.site_name is not None:
             prefixes = " ".join(
                 "{}://{}".format(scheme, self.root.site_name)
-                for scheme in ("git", "git+ssh", "https"))
+                for scheme in ("git", "git+ssh", "https")
+            )
             print("clone-prefix={}".format(prefixes), file=self.cgit_config)
         if self.private:
-            fmt['css'] = '/static/cgit-private.css'
+            fmt["css"] = "/static/cgit-private.css"
         else:
-            fmt['css'] = '/static/cgit-public.css'
-        print(textwrap.dedent("""\
+            fmt["css"] = "/static/cgit-public.css"
+        print(
+            textwrap.dedent(
+                """\
             css={css}
             enable-http-clone=0
             enable-index-owner=0
             logo=/static/launchpad-logo.png
-            """).format(**fmt), end='', file=self.cgit_config)
+            """
+            ).format(**fmt),
+            end="",
+            file=self.cgit_config,
+        )
         if self.private:
             top = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             print(
-                'header={top}/static/private-banner.html'.format(top=top),
-                file=self.cgit_config)
+                "header={top}/static/private-banner.html".format(top=top),
+                file=self.cgit_config,
+            )
         print(file=self.cgit_config)
-        print(textwrap.dedent("""\
+        print(
+            textwrap.dedent(
+                """\
             repo.url={repo_url}
             repo.path={repo_path}
-            """).format(**fmt), end='', file=self.cgit_config)
+            """
+            ).format(**fmt),
+            end="",
+            file=self.cgit_config,
+        )
         self.cgit_config.flush()
         env["CGIT_CONFIG"] = self.cgit_config.name
         env["PATH_INFO"] = "/%s%s" % (self.repo_url, self.trailing)
         env["SCRIPT_NAME"] = "/"
-        env['QUERY_STRING'] = six.ensure_text(env['QUERY_STRING'])
+        env["QUERY_STRING"] = six.ensure_text(env["QUERY_STRING"])
         twcgi.CGIScript.runProcess(self, env, request, *args, **kwargs)
 
 
@@ -494,7 +509,8 @@ class TurnipAuthCookieSigner(AuthCookieSigner):
         hmac = paste.auth.cookie.hmac
         make_time = paste.auth.cookie.make_time
         decode = base64.decodebytes(
-            cookie.replace(b"_", b"/").replace(b"~", b"="))
+            cookie.replace(b"_", b"/").replace(b"~", b"=")
+        )
         signature = decode[:_signature_size]
         expires = decode[_signature_size:_header_size]
         content = decode[_header_size:]
@@ -516,9 +532,9 @@ class TurnipAuthCookieSigner(AuthCookieSigner):
 class BaseHTTPAuthResource(resource.Resource):
     """Base HTTP resource for OpenID authentication handling."""
 
-    session_var = 'turnip.session'
-    cookie_name = b'TURNIP_COOKIE'
-    anonymous_id = '+launchpad-anonymous'
+    session_var = "turnip.session"
+    cookie_name = b"TURNIP_COOKIE"
+    anonymous_id = "+launchpad-anonymous"
 
     def __init__(self, root):
         resource.Resource.__init__(self)
@@ -540,12 +556,12 @@ class BaseHTTPAuthResource(resource.Resource):
     def _putSession(self, request, session):
         if self.signer is not None:
             content = self.signer.sign(encode_cookie(json.dumps(session)))
-            cookie = b'%s=%s; Path=/; secure;' % (self.cookie_name, content)
-            request.setHeader(b'Set-Cookie', cookie)
+            cookie = b"%s=%s; Path=/; secure;" % (self.cookie_name, content)
+            request.setHeader(b"Set-Cookie", cookie)
 
     def _setErrorCode(self, request, code=http.INTERNAL_SERVER_ERROR):
         request.setResponseCode(code)
-        request.setHeader(b'Content-Type', b'text/plain')
+        request.setHeader(b"Content-Type", b"text/plain")
 
     def _makeConsumer(self, session):
         """Build an OpenID `Consumer` object with standard arguments."""
@@ -571,38 +587,42 @@ class HTTPAuthLoginResource(BaseHTTPAuthResource):
         wrong.
         """
         session = self._getSession(request)
-        query = {six.ensure_text(k): six.ensure_text(v[-1])
-                 for k, v in request.args.items()}
+        query = {
+            six.ensure_text(k): six.ensure_text(v[-1])
+            for k, v in request.args.items()
+        }
         response = self._makeConsumer(session).complete(
-            query, query['openid.return_to'])
+            query, query["openid.return_to"]
+        )
         if response.status == consumer.SUCCESS:
-            log.msg('OpenID response: SUCCESS')
+            log.msg("OpenID response: SUCCESS")
             sreg_info = SRegResponse.fromSuccessResponse(response)
             if not sreg_info:
-                log.msg('sreg_info is None')
+                log.msg("sreg_info is None")
                 self._setErrorCode(request, http.UNAUTHORIZED)
                 return (
                     b"You don't have a Launchpad account.  Check that you're "
                     b"logged in as the right user, or log into Launchpad and "
-                    b"try again.")
+                    b"try again."
+                )
             else:
-                session['identity_url'] = response.identity_url
-                session['user'] = sreg_info['nickname']
+                session["identity_url"] = response.identity_url
+                session["user"] = sreg_info["nickname"]
                 self._putSession(request, session)
-                request.redirect(six.ensure_binary(query['back_to']))
-                return b''
+                request.redirect(six.ensure_binary(query["back_to"]))
+                return b""
         elif response.status == consumer.FAILURE:
-            log.msg('OpenID response: FAILURE: %s' % response.message)
+            log.msg("OpenID response: FAILURE: %s" % response.message)
             self._setErrorCode(request, http.UNAUTHORIZED)
-            return response.message.encode('UTF-8')
+            return response.message.encode("UTF-8")
         elif response.status == consumer.CANCEL:
-            log.msg('OpenID response: CANCEL')
+            log.msg("OpenID response: CANCEL")
             self._setErrorCode(request, http.UNAUTHORIZED)
-            return b'Authentication cancelled.'
+            return b"Authentication cancelled."
         else:
-            log.msg('OpenID response: UNKNOWN')
+            log.msg("OpenID response: UNKNOWN")
             self._setErrorCode(request, http.UNAUTHORIZED)
-            return b'Unknown OpenID response.'
+            return b"Unknown OpenID response."
 
 
 class HTTPAuthLogoutResource(BaseHTTPAuthResource):
@@ -616,12 +636,12 @@ class HTTPAuthLogoutResource(BaseHTTPAuthResource):
         Clear the cookie and redirect to `next_to`.
         """
         self._putSession(request, {})
-        if 'next_to' in request.args:
-            next_url = request.args['next_to'][-1]
+        if "next_to" in request.args:
+            next_url = request.args["next_to"][-1]
         else:
             next_url = self.root.main_site_root
         request.redirect(next_url)
-        return b''
+        return b""
 
 
 class HTTPAuthRootResource(BaseHTTPAuthResource):
@@ -642,48 +662,55 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
         that we can then redirect them again to the page they were looking
         at, with a cookie that gives us the identity URL and username.
         """
-        base_url = 'https://%s' % compat.nativeString(
-            request.getRequestHostname())
+        base_url = "https://%s" % compat.nativeString(
+            request.getRequestHostname()
+        )
         back_to = six.ensure_binary(base_url) + request.uri
-        realm = base_url + '/'
-        return_to = base_url + '/+login/?' + urlencode({'back_to': back_to})
+        realm = base_url + "/"
+        return_to = base_url + "/+login/?" + urlencode({"back_to": back_to})
 
         openid_request = self._makeConsumer(session).begin(
-            self.root.openid_provider_root)
-        openid_request.addExtension(SRegRequest(required=['nickname']))
+            self.root.openid_provider_root
+        )
+        openid_request.addExtension(SRegRequest(required=["nickname"]))
         target = openid_request.redirectURL(realm, return_to)
-        request.redirect(target.encode('UTF-8'))
+        request.redirect(target.encode("UTF-8"))
         request.finish()
 
     def _translatePathCallback(self, translated, request):
-        if 'path' not in translated:
+        if "path" not in translated:
             return fail_request(
-                request, 'translatePath response did not include path')
-        repo_url = six.ensure_text(request.path.rstrip(b'/'))
+                request, "translatePath response did not include path"
+            )
+        repo_url = six.ensure_text(request.path.rstrip(b"/"))
         # cgit simply parses configuration values up to the end of a line
         # following the first '=', so almost anything is safe, but
         # double-check that there are no newlines to confuse things.
-        if '\n' in repo_url:
+        if "\n" in repo_url:
             return fail_request(
-                request, 'repository URL may not contain newlines')
+                request, "repository URL may not contain newlines"
+            )
         try:
             repo_path = compose_path(
-                self.root.repo_store, six.ensure_binary(translated['path']))
+                self.root.repo_store, six.ensure_binary(translated["path"])
+            )
         except ValueError as e:
             return fail_request(request, str(e))
-        trailing = translated.get('trailing')
+        trailing = translated.get("trailing")
         if trailing:
-            if not trailing.startswith('/'):
-                trailing = '/' + trailing
+            if not trailing.startswith("/"):
+                trailing = "/" + trailing
             if not repo_url.endswith(trailing):
                 return fail_request(
                     request,
-                    'translatePath returned inconsistent response: '
-                    '"%s" does not end with "%s"' % (repo_url, trailing))
-            repo_url = repo_url[:-len(trailing)]
-        repo_url = six.ensure_text(repo_url.strip('/'))
+                    "translatePath returned inconsistent response: "
+                    '"%s" does not end with "%s"' % (repo_url, trailing),
+                )
+            repo_url = repo_url[: -len(trailing)]
+        repo_url = six.ensure_text(repo_url.strip("/"))
         cgit_resource = CGitScriptResource(
-            self.root, repo_url, repo_path, trailing, translated['private'])
+            self.root, repo_url, repo_path, trailing, translated["private"]
+        )
         # XXX pappacena 2020-12-15: CGIScript.render assumes postpath items
         # are str, and fail if any item is bytes.
         request.postpath = [six.ensure_text(i) for i in request.postpath]
@@ -692,25 +719,26 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
     def _translatePathErrback(self, failure, request, session):
         if failure.check(defer.TimeoutError) is not None:
             code = TurnipFaultCode.GATEWAY_TIMEOUT
-            message = 'Path translation timed out.'
+            message = "Path translation timed out."
         elif failure.check(xmlrpc.Fault) is not None:
             code = translate_xmlrpc_fault(failure.value.faultCode)
             message = failure.value.faultString
         else:
-            code, message = None, 'Unexpected error in translatePath.'
+            code, message = None, "Unexpected error in translatePath."
         if code == TurnipFaultCode.NOT_FOUND:
             error_code = http.NOT_FOUND
         elif code == TurnipFaultCode.FORBIDDEN:
             error_code = http.FORBIDDEN
         elif code == TurnipFaultCode.UNAUTHORIZED:
-            if 'user' in session:
+            if "user" in session:
                 error_code = http.FORBIDDEN
                 message = (
-                    'You are logged in as %s, but do not have access to this '
-                    'repository.' % session['user'])
+                    "You are logged in as %s, but do not have access to this "
+                    "repository." % session["user"]
+                )
             elif self.signer is None:
                 error_code = http.FORBIDDEN
-                message = 'Server does not support OpenID authentication.'
+                message = "Server does not support OpenID authentication."
             else:
                 self._beginLogin(request, session)
                 return
@@ -723,11 +751,14 @@ class HTTPAuthRootResource(BaseHTTPAuthResource):
 
     def render_GET(self, request):
         session = self._getSession(request)
-        identity_url = session.get('identity_url', self.anonymous_id)
+        identity_url = session.get("identity_url", self.anonymous_id)
         proxy = xmlrpc.Proxy(self.root.virtinfo_endpoint, allowNone=True)
         d = proxy.callRemote(
-            'translatePath', six.ensure_text(request.path), 'read',
-            {'uid': identity_url, 'can-authenticate': True})
+            "translatePath",
+            six.ensure_text(request.path),
+            "read",
+            {"uid": identity_url, "can-authenticate": True},
+        )
         d.addTimeout(self.root.virtinfo_timeout, self.root.reactor)
         d.addCallback(self._translatePathCallback, request)
         d.addErrback(self._translatePathErrback, request, session)
@@ -740,8 +771,8 @@ class HTTPAuthResource(resource.Resource):
     def __init__(self, root):
         resource.Resource.__init__(self)
         self.root = root
-        self.putChild(b'+login', HTTPAuthLoginResource(root))
-        self.putChild(b'+logout', HTTPAuthLogoutResource(root))
+        self.putChild(b"+login", HTTPAuthLoginResource(root))
+        self.putChild(b"+logout", HTTPAuthLogoutResource(root))
 
     def getChild(self, path, request):
         # Delegate to a child resource without consuming a path element.
@@ -753,15 +784,17 @@ class HTTPAuthResource(resource.Resource):
 class SmartHTTPFrontendResource(resource.Resource):
     """HTTP resource to translate Git smart HTTP requests to pack protocol."""
 
-    allowed_services = frozenset((
-        b'git-upload-pack', b'git-receive-pack', b'turnip-set-symbolic-ref'))
+    allowed_services = frozenset(
+        (b"git-upload-pack", b"git-receive-pack", b"turnip-set-symbolic-ref")
+    )
 
     def __init__(self, config, reactor=None):
         resource.Resource.__init__(self)
         self.backend_host = config.get("pack_virt_host")
         self.backend_port = int(config.get("pack_virt_port"))
         self.virtinfo_endpoint = six.ensure_binary(
-            config.get("virtinfo_endpoint"))
+            config.get("virtinfo_endpoint")
+        )
         self.virtinfo_timeout = int(config.get("virtinfo_timeout"))
         self.reactor = reactor or default_reactor
         # XXX cjwatson 2015-03-30: Knowing about the store path here
@@ -772,62 +805,67 @@ class SmartHTTPFrontendResource(resource.Resource):
         self.openid_provider_root = config.get("openid_provider_root")
         self.site_name = config.get("site_name")
         self.main_site_root = config.get("main_site_root")
-        self.putChild(b'', SmartHTTPRootResource(self))
+        self.putChild(b"", SmartHTTPRootResource(self))
         cgit_data_path = config.get("cgit_data_path")
         if cgit_data_path is not None:
             static_resource = DirectoryWithoutListings(
-                cgit_data_path, defaultType='text/plain')
+                cgit_data_path, defaultType="text/plain"
+            )
             top = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            stdir = os.path.join(top, 'static')
-            for name in ('launchpad-logo.png', 'notification-private.png'):
+            stdir = os.path.join(top, "static")
+            for name in ("launchpad-logo.png", "notification-private.png"):
                 path = os.path.join(stdir, name)
                 static_resource.putChild(
-                    name.encode('UTF-8'), static.File(path))
-            with open(os.path.join(cgit_data_path, 'cgit.css'), 'rb') as f:
+                    name.encode("UTF-8"), static.File(path)
+                )
+            with open(os.path.join(cgit_data_path, "cgit.css"), "rb") as f:
                 css = f.read()
-            with open(os.path.join(stdir, 'ubuntu-webfonts.css'), 'rb') as f:
-                css += b'\n' + f.read()
-            with open(os.path.join(stdir, 'global.css'), 'rb') as f:
-                css += b'\n' + f.read()
-            with open(os.path.join(stdir, 'private.css'), 'rb') as f:
-                private_css = css + b'\n' + f.read()
+            with open(os.path.join(stdir, "ubuntu-webfonts.css"), "rb") as f:
+                css += b"\n" + f.read()
+            with open(os.path.join(stdir, "global.css"), "rb") as f:
+                css += b"\n" + f.read()
+            with open(os.path.join(stdir, "private.css"), "rb") as f:
+                private_css = css + b"\n" + f.read()
             static_resource.putChild(
-                b'cgit-public.css', static.Data(css, 'text/css'))
+                b"cgit-public.css", static.Data(css, "text/css")
+            )
             static_resource.putChild(
-                b'cgit-private.css', static.Data(private_css, 'text/css'))
-            self.putChild(b'static', static_resource)
-            favicon = os.path.join(stdir, 'launchpad.png')
-            self.putChild(b'favicon.ico', static.File(favicon))
-            self.putChild(b'robots.txt', RobotsResource())
+                b"cgit-private.css", static.Data(private_css, "text/css")
+            )
+            self.putChild(b"static", static_resource)
+            favicon = os.path.join(stdir, "launchpad.png")
+            self.putChild(b"favicon.ico", static.File(favicon))
+            self.putChild(b"robots.txt", RobotsResource())
         cgit_secret_path = config.get("cgit_secret_path")
         if cgit_secret_path:
-            with open(cgit_secret_path, 'rb') as cgit_secret_file:
+            with open(cgit_secret_path, "rb") as cgit_secret_file:
                 self.cgit_secret = cgit_secret_file.read()
         else:
             self.cgit_secret = None
 
     @staticmethod
     def _isGitRequest(request):
-        if request.path.endswith(b'/info/refs'):
-            service = request.args.get(b'service', [])
-            if service and service[0].startswith(b'git-'):
+        if request.path.endswith(b"/info/refs"):
+            service = request.args.get(b"service", [])
+            if service and service[0].startswith(b"git-"):
                 return True
-        content_type = request.getHeader(b'Content-Type')
+        content_type = request.getHeader(b"Content-Type")
         if content_type is None:
             return False
-        return (
-            content_type.startswith(b'application/x-git-') or
-            content_type.startswith(b'application/x-turnip-'))
+        return content_type.startswith(
+            b"application/x-git-"
+        ) or content_type.startswith(b"application/x-turnip-")
 
     def getChild(self, path, request):
         if self._isGitRequest(request):
-            if request.path.endswith(b'/info/refs'):
+            if request.path.endswith(b"/info/refs"):
                 # /PATH/TO/REPO/info/refs
                 return SmartHTTPRefsResource(
-                    self, request.path[:-len(b'/info/refs')])
+                    self, request.path[: -len(b"/info/refs")]
+                )
             try:
                 # /PATH/TO/REPO/SERVICE
-                path, service = request.path.rsplit(b'/', 1)
+                path, service = request.path.rsplit(b"/", 1)
             except ValueError:
                 path = request.path
                 service = None
@@ -838,20 +876,22 @@ class SmartHTTPFrontendResource(resource.Resource):
             request.postpath.insert(0, path)
             request.prepath.pop()
             return HTTPAuthResource(self)
-        return resource.NoResource(b'No such resource')
+        return resource.NoResource(b"No such resource")
 
     def connectToBackend(self, client_factory):
         self.reactor.connectTCP(
-            self.backend_host, self.backend_port, client_factory)
+            self.backend_host, self.backend_port, client_factory
+        )
 
     @defer.inlineCallbacks
     def authenticateWithPassword(self, user, password):
         proxy = xmlrpc.Proxy(self.virtinfo_endpoint)
         try:
             translated = yield proxy.callRemote(
-                'authenticateWithPassword',
+                "authenticateWithPassword",
                 six.ensure_str(user),
-                six.ensure_str(password))
+                six.ensure_str(password),
+            )
         except xmlrpc.Fault as e:
             code = translate_xmlrpc_fault(e.faultCode)
             if code == TurnipFaultCode.UNAUTHORIZED:

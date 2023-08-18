@@ -4,17 +4,14 @@
 import os
 import re
 
+import pyramid.httpexceptions as exc
 from cornice.resource import resource
 from cornice.validators import extract_cstruct
 from pygit2 import GitError
-import pyramid.httpexceptions as exc
 from pyramid.response import Response
 
 from turnip.api import store
-from turnip.api.formatter import (
-    format_blob,
-    format_commit,
-    )
+from turnip.api.formatter import format_blob, format_commit
 from turnip.config import config
 
 
@@ -25,25 +22,27 @@ def is_valid_path(repo_store, repo_path):
 
 def validate_path(func):
     """Decorator validates repo path from request name and repo_store."""
+
     def validate_path_decorator(self):
-        name = self.request.matchdict['name']
+        name = self.request.matchdict["name"]
         if not name:
-            self.request.errors.add('body', 'name', 'repo name is missing')
+            self.request.errors.add("body", "name", "repo name is missing")
             return
         repo_path = os.path.join(self.repo_store, name)
         if not is_valid_path(self.repo_store, repo_path):
-            self.request.errors.add('body', 'name', 'invalid path.')
+            self.request.errors.add("body", "name", "invalid path.")
             raise exc.HTTPInternalServerError()
         return func(self, self.repo_store, name)
+
     return validate_path_decorator
 
 
 class BaseAPI(object):
     def __init__(self):
-        self.repo_store = config.get('repo_store')
+        self.repo_store = config.get("repo_store")
 
 
-@resource(collection_path='/repo', path='/repo/{name}')
+@resource(collection_path="/repo", path="/repo/{name}")
 class RepoAPI(BaseAPI):
     """Provides HTTP API for repository actions."""
 
@@ -57,19 +56,20 @@ class RepoAPI(BaseAPI):
 
     def collection_post(self):
         """Initialise a new git repository, or clone from an existing repo."""
-        json_data = extract_cstruct(self.request)['body']
-        repo_path = json_data.get('repo_path')
-        clone_path = json_data.get('clone_from')
-        clone_refs = json_data.get('clone_refs', False)
-        async_run = json_data.get('async', False)
+        json_data = extract_cstruct(self.request)["body"]
+        repo_path = json_data.get("repo_path")
+        clone_path = json_data.get("clone_from")
+        clone_refs = json_data.get("clone_refs", False)
+        async_run = json_data.get("async", False)
 
         if not repo_path:
-            self.request.errors.add('body', 'repo_path',
-                                    'repo_path is missing')
+            self.request.errors.add(
+                "body", "repo_path", "repo_path is missing"
+            )
             return
         repo = os.path.join(self.repo_store, repo_path)
         if not is_valid_path(self.repo_store, repo):
-            self.request.errors.add('body', 'name', 'invalid path.')
+            self.request.errors.add("body", "name", "invalid path.")
             raise exc.HTTPNotFound()
 
         if clone_path:
@@ -79,14 +79,15 @@ class RepoAPI(BaseAPI):
 
         try:
             kwargs = dict(
-                repo_path=repo, clone_from=repo_clone, clone_refs=clone_refs)
+                repo_path=repo, clone_from=repo_clone, clone_refs=clone_refs
+            )
             if async_run:
                 kwargs["untranslated_path"] = repo_path
                 store.init_and_confirm_repo.apply_async(kwargs=kwargs)
             else:
                 store.init_repo(**kwargs)
             repo_name = os.path.basename(os.path.normpath(repo))
-            return {'repo_url': '/'.join([self.request.url, repo_name])}
+            return {"repo_url": "/".join([self.request.url, repo_name])}
         except GitError:
             return exc.HTTPConflict()  # 409
 
@@ -96,12 +97,13 @@ class RepoAPI(BaseAPI):
         repo_path = os.path.join(repo_store, repo_name)
         if not os.path.exists(repo_path):
             self.request.errors.add(
-                'body', 'name', 'repository does not exist')
+                "body", "name", "repository does not exist"
+            )
             raise exc.HTTPNotFound()
         return {
-            'default_branch': store.get_default_branch(repo_path),
-            'is_available': store.is_repository_available(repo_path)
-            }
+            "default_branch": store.get_default_branch(repo_path),
+            "is_available": store.is_repository_available(repo_path),
+        }
 
     def _patch_default_branch(self, repo_path, value):
         try:
@@ -115,12 +117,13 @@ class RepoAPI(BaseAPI):
         repo_path = os.path.join(repo_store, repo_name)
         if not os.path.exists(repo_path):
             self.request.errors.add(
-                'body', 'name', 'repository does not exist')
+                "body", "name", "repository does not exist"
+            )
             raise exc.HTTPNotFound()
-        data = extract_cstruct(self.request)['body']
+        data = extract_cstruct(self.request)["body"]
         for key in data:
             if not hasattr(self, "_patch_%s" % key):
-                self.request.errors.add('body', key, 'unknown property')
+                self.request.errors.add("body", key, "unknown property")
                 raise exc.HTTPBadRequest()
         for key, value in data.items():
             getattr(self, "_patch_%s" % key)(repo_path, value)
@@ -136,7 +139,7 @@ class RepoAPI(BaseAPI):
             return exc.HTTPNotFound()  # 404
 
 
-@resource(path='/repo/{name}/repack')
+@resource(path="/repo/{name}/repack")
 class RepackAPI(BaseAPI):
     """Provides HTTP API for repository repacking."""
 
@@ -149,14 +152,15 @@ class RepackAPI(BaseAPI):
         repo_path = os.path.join(repo_store, repo_name)
         if not os.path.exists(repo_path):
             self.request.errors.add(
-                'body', 'name', 'repository does not exist')
+                "body", "name", "repository does not exist"
+            )
             raise exc.HTTPNotFound()
         kwargs = dict(repo_path=repo_path)
-        store.repack.apply_async(queue='repacks', kwargs=kwargs)
+        store.repack.apply_async(queue="repacks", kwargs=kwargs)
         return Response(status=200)
 
 
-@resource(path='/repo/{name}/gc')
+@resource(path="/repo/{name}/gc")
 class GarbageCollectAPI(BaseAPI):
     """Provides HTTP API for running gc for repository."""
 
@@ -169,14 +173,15 @@ class GarbageCollectAPI(BaseAPI):
         repo_path = os.path.join(repo_store, repo_name)
         if not os.path.exists(repo_path):
             self.request.errors.add(
-                'body', 'name', 'repository does not exist')
+                "body", "name", "repository does not exist"
+            )
             raise exc.HTTPNotFound()
         kwargs = dict(repo_path=repo_path)
         store.gc.apply_async(kwargs=kwargs)
         return Response(status=200)
 
 
-@resource(path='/repo/{name}/refs-copy')
+@resource(path="/repo/{name}/refs-copy")
 class RefCopyAPI(BaseAPI):
     """Provides HTTP API for git references copy operations."""
 
@@ -206,8 +211,10 @@ class RefCopyAPI(BaseAPI):
                 return
             except KeyError:
                 self.request.errors.add(
-                    'body', 'operations',
-                    'Ref %s does not exist.' % ref_or_commit)
+                    "body",
+                    "operations",
+                    "Ref %s does not exist." % ref_or_commit,
+                )
 
         if len(self.request.errors):
             self.request.errors.status = 404
@@ -216,27 +223,30 @@ class RefCopyAPI(BaseAPI):
     def post(self, repo_store, repo_name):
         orig_path = os.path.join(repo_store, repo_name)
         copy_refs_args = []
-        operations = self.request.json.get('operations', [])
+        operations = self.request.json.get("operations", [])
         self._validate_refs(
-            repo_store, repo_name, [i["from"] for i in operations])
+            repo_store, repo_name, [i["from"] for i in operations]
+        )
         if len(self.request.errors):
             return
 
         for operation in operations:
             source = operation["from"]
             dest = operation["to"]
-            dest_repo = dest.get('repo')
-            dest_ref_name = dest.get('ref')
+            dest_repo = dest.get("repo")
+            dest_ref_name = dest.get("ref")
             dest_path = os.path.join(repo_store, dest_repo)
             copy_refs_args.append(
-                (orig_path, source, dest_path, dest_ref_name))
+                (orig_path, source, dest_path, dest_ref_name)
+            )
 
-        store.fetch_refs.apply_async(args=(copy_refs_args, ))
+        store.fetch_refs.apply_async(args=(copy_refs_args,))
         return Response(status=202)
 
 
-@resource(collection_path='/repo/{name}/refs',
-          path='/repo/{name}/refs/{ref:.*}')
+@resource(
+    collection_path="/repo/{name}/refs", path="/repo/{name}/refs/{ref:.*}"
+)
 class RefAPI(BaseAPI):
     """Provides HTTP API for git references."""
 
@@ -246,16 +256,17 @@ class RefAPI(BaseAPI):
 
     @validate_path
     def collection_get(self, repo_store, repo_name):
-        exclude_prefixes = self.request.params.getall('exclude_prefix')
+        exclude_prefixes = self.request.params.getall("exclude_prefix")
         try:
             return store.get_refs(
-                repo_store, repo_name, exclude_prefixes=exclude_prefixes)
+                repo_store, repo_name, exclude_prefixes=exclude_prefixes
+            )
         except (KeyError, GitError):
             return exc.HTTPNotFound()  # 404
 
     @validate_path
     def get(self, repo_store, repo_name):
-        ref = 'refs/' + self.request.matchdict['ref']
+        ref = "refs/" + self.request.matchdict["ref"]
         try:
             return store.get_ref(repo_store, repo_name, ref)
         except (KeyError, GitError):
@@ -263,13 +274,14 @@ class RefAPI(BaseAPI):
 
     @validate_path
     def delete(self, repo_store, repo_name):
-        ref = 'refs/' + self.request.matchdict['ref']
+        ref = "refs/" + self.request.matchdict["ref"]
         # Make sure the ref actually exists. Otherwise, raise a 404.
         try:
             store.get_ref(repo_store, repo_name, ref)
         except (KeyError, GitError):
             self.request.errors.add(
-                'body', 'operations', 'Ref %s does not exist.' % ref)
+                "body", "operations", "Ref %s does not exist." % ref
+            )
             self.request.errors.status = 404
             return
         repo_path = os.path.join(repo_store, repo_name)
@@ -277,7 +289,7 @@ class RefAPI(BaseAPI):
         return Response(status=200)
 
 
-@resource(path='/repo/{name}/compare/{commits}')
+@resource(path="/repo/{name}/compare/{commits}")
 class DiffAPI(BaseAPI):
     """Provides HTTP API for rev-rev 'double' and 'triple dot' diff.
 
@@ -287,6 +299,7 @@ class DiffAPI(BaseAPI):
     to `git diff $(git-merge-base A B) B`.
     {name} can be two : separated repositories, for a cross repository diff.
     """
+
     def __init__(self, request, context=None):
         super().__init__()
         self.request = request
@@ -294,17 +307,22 @@ class DiffAPI(BaseAPI):
     @validate_path
     def get(self, repo_store, repo_name):
         """Returns diff of two commits."""
-        commits = re.split(r'(\.{2,3})', self.request.matchdict['commits'])
-        context_lines = int(self.request.params.get('context_lines', 3))
+        commits = re.split(r"(\.{2,3})", self.request.matchdict["commits"])
+        context_lines = int(self.request.params.get("context_lines", 3))
         if not len(commits) == 3:
             return exc.HTTPBadRequest()
         try:
             diff_type = commits[1]
-            args = (repo_store, repo_name, commits[0],
-                    commits[2], context_lines)
-            if diff_type == '..':
+            args = (
+                repo_store,
+                repo_name,
+                commits[0],
+                commits[2],
+                context_lines,
+            )
+            if diff_type == "..":
                 patch = store.get_diff(*args)
-            elif diff_type == '...':
+            elif diff_type == "...":
                 patch = store.get_common_ancestor_diff(*args)
         except (ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
@@ -312,13 +330,14 @@ class DiffAPI(BaseAPI):
         return patch
 
 
-@resource(path='/repo/{name}/compare-merge/{base}:{head}')
+@resource(path="/repo/{name}/compare-merge/{base}:{head}")
 class DiffMergeAPI(BaseAPI):
     """Provides an HTTP API for merge previews.
 
     {head} will be merged into {base} and the diff from {base} returned.
     {name} can be two : separated repositories, for a cross repository diff.
     """
+
     def __init__(self, request, context=None):
         super().__init__()
         self.request = request
@@ -326,21 +345,26 @@ class DiffMergeAPI(BaseAPI):
     @validate_path
     def get(self, repo_store, repo_name):
         """Returns diff of two commits."""
-        context_lines = int(self.request.params.get('context_lines', 3))
-        sha1_prerequisite = self.request.params.get('sha1_prerequisite')
+        context_lines = int(self.request.params.get("context_lines", 3))
+        sha1_prerequisite = self.request.params.get("sha1_prerequisite")
         try:
             patch = store.get_merge_diff(
-                repo_store, repo_name, self.request.matchdict['base'],
-                self.request.matchdict['head'], context_lines=context_lines,
-                sha1_prerequisite=sha1_prerequisite)
+                repo_store,
+                repo_name,
+                self.request.matchdict["base"],
+                self.request.matchdict["head"],
+                context_lines=context_lines,
+                sha1_prerequisite=sha1_prerequisite,
+            )
         except (KeyError, ValueError, GitError):
             # invalid pygit2 sha1's return ValueError: 1: Ambiguous lookup
             return exc.HTTPNotFound()
         return patch
 
 
-@resource(collection_path='/repo/{name}/commits',
-          path='/repo/{name}/commits/{sha1}')
+@resource(
+    collection_path="/repo/{name}/commits", path="/repo/{name}/commits/{sha1}"
+)
 class CommitAPI(BaseAPI):
     """Provides HTTP API for git commits."""
 
@@ -350,7 +374,7 @@ class CommitAPI(BaseAPI):
 
     @validate_path
     def get(self, repo_store, repo_name):
-        commit_sha1 = self.request.matchdict['sha1']
+        commit_sha1 = self.request.matchdict["sha1"]
         try:
             commit = store.get_commit(repo_store, repo_name, commit_sha1)
         except GitError:
@@ -384,7 +408,7 @@ class CommitAPI(BaseAPI):
         return rv
 
 
-@resource(path='/repo/{name}/log/{sha1}')
+@resource(path="/repo/{name}/log/{sha1}")
 class LogAPI(BaseAPI):
     """Provides HTTP API for git logs."""
 
@@ -395,9 +419,9 @@ class LogAPI(BaseAPI):
     @validate_path
     def get(self, repo_store, repo_name):
         """Get log by sha1, filtered by limit and stop."""
-        sha1 = self.request.matchdict['sha1']
-        limit = int(self.request.params.get('limit', -1))
-        stop = self.request.params.get('stop')
+        sha1 = self.request.matchdict["sha1"]
+        limit = int(self.request.params.get("limit", -1))
+        stop = self.request.params.get("stop")
 
         try:
             log = store.get_log(repo_store, repo_name, sha1, limit, stop)
@@ -406,7 +430,7 @@ class LogAPI(BaseAPI):
         return log
 
 
-@resource(path='/repo/{name}/detect-merges/{target}')
+@resource(path="/repo/{name}/detect-merges/{target}")
 class DetectMergesAPI(BaseAPI):
     """Provides HTTP API for detecting merges."""
 
@@ -425,19 +449,20 @@ class DetectMergesAPI(BaseAPI):
         descendant of the corresponding source commit.  Unmerged commits are
         omitted from the response.
         """
-        target = self.request.matchdict['target']
-        payload = extract_cstruct(self.request)['body']
-        sources = payload.get('sources')
-        stops = payload.get('stop', [])
+        target = self.request.matchdict["target"]
+        payload = extract_cstruct(self.request)["body"]
+        sources = payload.get("sources")
+        stops = payload.get("stop", [])
         try:
             merges = store.detect_merges(
-                repo_store, repo_name, target, sources, stops)
+                repo_store, repo_name, target, sources, stops
+            )
         except GitError:
             return exc.HTTPNotFound()
         return merges
 
 
-@resource(path='/repo/{name}/blob/{filename:.*}')
+@resource(path="/repo/{name}/blob/{filename:.*}")
 class BlobAPI(BaseAPI):
     """Provides HTTP API for fetching blobs."""
 
@@ -453,8 +478,8 @@ class BlobAPI(BaseAPI):
         gitrevisions(7) syntax) where the blob should be looked up.  It
         defaults to 'HEAD'.
         """
-        filename = self.request.matchdict['filename']
-        rev = self.request.params.get('rev', 'HEAD')
+        filename = self.request.matchdict["filename"]
+        rev = self.request.params.get("rev", "HEAD")
         try:
             return store.get_blob(repo_store, repo_name, rev, filename)
         except (KeyError, GitError):

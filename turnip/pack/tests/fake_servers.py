@@ -1,25 +1,20 @@
 # Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import (
-    absolute_import,
-    print_function,
-    unicode_literals,
-    )
+from __future__ import absolute_import, print_function, unicode_literals
 
-from collections import defaultdict
 import hashlib
+from collections import defaultdict
 from xmlrpc.client import Binary
 
-from lazr.sshserver.auth import NoSuchPersonWithName
 import six
+from lazr.sshserver.auth import NoSuchPersonWithName
 from twisted.web import xmlrpc
-
 
 __all__ = [
     "FakeAuthServerService",
     "FakeVirtInfoService",
-    ]
+]
 
 
 class FakeAuthServerService(xmlrpc.XMLRPC):
@@ -45,10 +40,10 @@ class FakeAuthServerService(xmlrpc.XMLRPC):
         if username not in self.keys:
             raise NoSuchPersonWithName(username)
         return {
-            "id": hash(username) % (2 ** 31),
+            "id": hash(username) % (2**31),
             "name": username,
             "keys": self.keys[username],
-            }
+        }
 
 
 class FakeVirtInfoService(xmlrpc.XMLRPC):
@@ -74,7 +69,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         self.translations = []
         self.authentications = []
         self.push_notifications = []
-        self.merge_proposal_url = 'http://bogus.test'
+        self.merge_proposal_url = "http://bogus.test"
         self.merge_proposal_url_fault = None
         self.ref_permissions_checks = []
         self.ref_permissions = {}
@@ -84,20 +79,20 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
 
     def getInternalPath(self, pathname):
         pathname = six.ensure_binary(pathname)
-        if pathname.startswith(b'/+rw'):
+        if pathname.startswith(b"/+rw"):
             pathname = pathname[4:]
         return hashlib.sha256(pathname).hexdigest()
 
     def xmlrpc_translatePath(self, pathname, permission, auth_params):
-        if self.require_auth and 'user' not in auth_params:
+        if self.require_auth and "user" not in auth_params:
             raise xmlrpc.Fault(3, "Unauthorized")
 
         self.translations.append((pathname, permission, auth_params))
-        writable = pathname.startswith('/+rw')
+        writable = pathname.startswith("/+rw")
 
-        if permission != 'read' and not writable:
+        if permission != "read" and not writable:
             raise xmlrpc.Fault(2, "Repository is read-only")
-        retval = {'path': self.getInternalPath(pathname)}
+        retval = {"path": self.getInternalPath(pathname)}
 
         if "-new" in pathname:
             if "/clone-from:" in pathname:
@@ -106,18 +101,17 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             else:
                 clone_from = None
             retval["creation_params"] = {"clone_from": clone_from}
-        retval['private'] = False
-        retval['trailing'] = ''
+        retval["private"] = False
+        retval["trailing"] = ""
         retval["writable"] = writable
         return retval
 
     def xmlrpc_authenticateWithPassword(self, username, password):
         self.authentications.append((username, password))
-        return {'user': username}
+        return {"user": username}
 
     def xmlrpc_notify(self, path, statistics, auth_params):
-        self.push_notifications.append((path, statistics,
-                                        auth_params))
+        self.push_notifications.append((path, statistics, auth_params))
 
     def xmlrpc_checkRefPermissions(self, path, ref_paths, auth_params):
         self.ref_permissions_checks.append((path, ref_paths, auth_params))
@@ -125,7 +119,8 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             raise self.ref_permissions_fault
         return [
             (Binary(ref), permissions)
-            for ref, permissions in self.ref_permissions.items()]
+            for ref, permissions in self.ref_permissions.items()
+        ]
 
     def xmlrpc_getMergeProposalURL(self, path, branch, auth_params):
         if self.merge_proposal_url_fault is not None:
@@ -138,7 +133,7 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
             return self.merge_proposal_url
 
     def xmlrpc_confirmRepoCreation(self, pathname, auth_params):
-        self.confirm_repo_creation_call_args.append((pathname, ))
+        self.confirm_repo_creation_call_args.append((pathname,))
 
     def xmlrpc_abortRepoCreation(self, pathname, auth_params):
-        self.abort_repo_creation_call_args.append((pathname, ))
+        self.abort_repo_creation_call_args.append((pathname,))

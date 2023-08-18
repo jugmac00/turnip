@@ -5,10 +5,7 @@
 #    twistd -ny httpserver.tac
 from __future__ import unicode_literals
 
-from twisted.application import (
-    internet,
-    service,
-    )
+from twisted.application import internet, service
 from twisted.scripts.twistd import ServerOptions
 from twisted.web import server
 
@@ -22,7 +19,8 @@ def getSmartHTTPService():
 
     smarthttp_site = server.Site(SmartHTTPFrontendResource(config))
     return internet.TCPServer(
-        int(config.get('smart_http_port')), smarthttp_site)
+        int(config.get("smart_http_port")), smarthttp_site
+    )
 
 
 options = ServerOptions()
@@ -30,5 +28,6 @@ options.parseOptions()
 
 application = service.Application("Turnip SmartHTTP Service")
 application.addComponent(
-    RotatableFileLogObserver(options.get('logfile')), ignoreClass=1)
+    RotatableFileLogObserver(options.get("logfile")), ignoreClass=1
+)
 getSmartHTTPService().setServiceParent(application)

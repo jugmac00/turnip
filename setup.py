@@ -5,73 +5,70 @@
 
 import os
 
-from setuptools import (
-    find_packages,
-    setup,
-    )
-
+from setuptools import find_packages, setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-with open(os.path.join(here, 'README.rst')) as f:
+with open(os.path.join(here, "README.rst")) as f:
     README = f.read()
-with open(os.path.join(here, 'NEWS')) as f:
+with open(os.path.join(here, "NEWS")) as f:
     README += "\n\n" + f.read()
 
 requires = [
-    'celery',
-    'contextlib2',
-    'cornice',
-    'gevent[monitor]',
-    'lazr.sshserver>=0.1.7',
-    'Paste',
-    'pygit2>=0.28.1,<1.1.0',
-    'python-openid2',
-    'PyYAML',
-    'statsd',
-    'Twisted[conch_nacl]',
-    'waitress',
-    'zope.interface',
-    ]
+    "celery",
+    "contextlib2",
+    "cornice",
+    "gevent[monitor]",
+    "lazr.sshserver>=0.1.7",
+    "Paste",
+    "pygit2>=0.28.1,<1.1.0",
+    "python-openid2",
+    "PyYAML",
+    "statsd",
+    "Twisted[conch_nacl]",
+    "waitress",
+    "zope.interface",
+]
 test_requires = [
-    'docutils',
-    'fixtures',
-    'flake8',
-    'testscenarios',
-    'testtools',
-    'webtest',
-    ]
+    "docutils",
+    "fixtures",
+    "flake8",
+    "testscenarios",
+    "testtools",
+    "webtest",
+]
 deploy_requires = [
-    'envdir',
-    'gunicorn',
-    ]
+    "envdir",
+    "gunicorn",
+]
 docs_requires = {
-    'sphinx',
+    "sphinx",
 }
 
 setup(
-    name='turnip',
-    version='0.1.1',
+    name="turnip",
+    version="0.1.1",
     packages=[
-        'turnip.%s' % package for package in
-        find_packages('turnip', exclude=['*.tests', 'tests'])],
+        "turnip.%s" % package
+        for package in find_packages("turnip", exclude=["*.tests", "tests"])
+    ],
     include_package_data=True,
     zip_safe=False,
-    maintainer='LAZR Developers',
-    maintainer_email='lazr-developers@lists.launchpad.net',
-    description='turnip',
+    maintainer="LAZR Developers",
+    maintainer_email="lazr-developers@lists.launchpad.net",
+    description="turnip",
     long_description=README,
-    long_description_content_type='text/x-rst',
-    license='AGPL v3',
-    url='https://launchpad.net/turnip',
-    download_url='https://launchpad.net/turnip/+download',
+    long_description_content_type="text/x-rst",
+    license="AGPL v3",
+    url="https://launchpad.net/turnip",
+    download_url="https://launchpad.net/turnip/+download",
     classifiers=[
-        'Development Status :: 4 - Beta',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: GNU Affero General Public License v3',
-        'Operating System :: OS Independent',
-        'Programming Language :: Python',
-        ],
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: GNU Affero General Public License v3",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python",
+    ],
     install_requires=requires,
     tests_require=test_requires,
     extras_require=dict(
@@ -79,10 +76,10 @@ setup(
         deploy=deploy_requires,
         docs=docs_requires,
     ),
-    test_suite='turnip',
+    test_suite="turnip",
     entry_points="""\
     [paste.app_factory]
     main = turnip.api:main
     """,
-    paster_plugins=['pyramid'],
-    )
+    paster_plugins=["pyramid"],
+)
