@@ -1,2 +1,4 @@
 # apply black
 caf722e96012df3f6bdbba37482685390a1d19c3
+# apply pyupgrade
+ca80e018b683bd0da2c8692727b3b9f38dddf49e
