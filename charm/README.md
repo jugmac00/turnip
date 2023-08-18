@@ -8,27 +8,16 @@ Pyramid.
 
 The simplest way to deploy the full charmed stack is by using the [Mojo
 spec](https://git.launchpad.net/launchpad-mojo-specs/tree/lp-git/README.md).
-If you can't do that for some reason, then read on.
 
-    $ juju add-model turnip
-    $ make deploy
+If you need to rebuild individual charms locally, you can run `charmcraft
+pack` in the `turnip-*` subdirectories here.
 
-This will deploy Turnip itself, but it must be linked to a separate service
-that defines things like how to translate repository paths, how to
-authenticate users, and so on.  This may be Launchpad or the stub
-"turnipcake" implementation.  To deploy the latter:
-
-    $ git clone https://git.launchpad.net/~canonical-launchpad-branches/turnip/+git/turnipcake
-    $ cd turnipcake/charm
-    $ make deploy
-    $ juju add-relation turnip-api turnipcake
-    $ juju add-relation haproxy turnipcake:turnipcake
-    $ HAPROXY_ADDRESS="$(juju status --format=json haproxy | jq -r '.applications.haproxy.units[]."public-address"')"
-    $ VIRT_ENDPOINT="http://$HAPROXY_ADDRESS:6543/githosting"
-    $ juju config turnip-pack-backend virtinfo_endpoint="$VIRT_ENDPOINT"
-    $ juju config turnip-pack-virt virtinfo_endpoint="$VIRT_ENDPOINT"
-    $ juju config turnip-pack-frontend-http virtinfo_endpoint="$VIRT_ENDPOINT"
-    $ juju config turnip-celery virtinfo_endpoint="$VIRT_ENDPOINT"
+Turnip must be linked to a separate service that defines things like how to
+translate repository paths, how to authenticate users, and so on.  This may
+be Launchpad or the stub "turnipcake" implementation.  The Mojo spec is set
+up by default to use a local Launchpad deployment, though you will need to
+ensure that `xmlrpc-private.launchpad.test` is set up to point to an
+appropriate local IP address in `/etc/hosts`.
 
 # Contact Information
 
