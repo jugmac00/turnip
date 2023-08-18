@@ -4,8 +4,6 @@
 # You can run this .tac file directly with:
 #    twistd -ny packfrontendserver.tac
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 from twisted.application import internet, service
 from twisted.scripts.twistd import ServerOptions
 

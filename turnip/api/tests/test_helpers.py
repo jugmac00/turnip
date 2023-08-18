@@ -45,7 +45,7 @@ def chdir(dirname=None):
         os.chdir(curdir)
 
 
-class RepoFactory(object):
+class RepoFactory:
     """Builds a git repository in a user defined state."""
 
     def __init__(
@@ -110,24 +110,24 @@ class RepoFactory(object):
 
     def add_branch(self, name, oid):
         commit = self.repo.get(oid)
-        branch = self.repo.create_branch("branch-{}".format(name), commit)
+        branch = self.repo.create_branch(f"branch-{name}", commit)
         self.branches.append(branch)
         return branch
 
     def _get_cmd_line_auth_params(self):
         return [
             "-c",
-            "user.name={}".format(self.author.name),
+            f"user.name={self.author.name}",
             "-c",
-            "user.email={}".format(self.author.email),
+            f"user.email={self.author.email}",
             "-c",
-            "author.name={}".format(self.author.name),
+            f"author.name={self.author.name}",
             "-c",
-            "author.email={}".format(self.author.email),
+            f"author.email={self.author.email}",
             "-c",
-            "committer.name={}".format(self.committer.name),
+            f"committer.name={self.committer.name}",
             "-c",
-            "committer.email={}".format(self.committer.email),
+            f"committer.email={self.committer.email}",
         ]
 
     def add_tag(self, tag_name, tag_message, oid):
@@ -188,7 +188,7 @@ class RepoFactory(object):
         repo = self.repo
         oid = repo.head.peel().oid
         for i in range(num_tags):
-            self.add_tag("tag{}".format(i), "tag message {}".format(i), oid)
+            self.add_tag(f"tag{i}", f"tag message {i}", oid)
 
     def generate_branches(self, num_branches, num_commits):
         """Generate n number of branches with n commits."""
@@ -197,7 +197,7 @@ class RepoFactory(object):
         for i in range(num_branches):
             self.generate_commits(num_commits, parents)
             oid = repo.revparse_single("HEAD")
-            branch = repo.create_branch("branch-{}".format(i), oid)
+            branch = repo.create_branch(f"branch-{i}", oid)
             self.branches.append(branch)
             parents.append(self.commits[0])
 

@@ -1,8 +1,6 @@
 # Copyright 2015-2022 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import os.path
 import re
 import shutil
@@ -487,12 +485,7 @@ class TestGetRepackData(TestCase):
         os.chdir(self.repo_dir)
         self.addCleanup(os.chdir, curdir)
         # create a test file
-        blob_content = (
-            b"commit "
-            + "file content".encode("ascii")
-            + b" - "
-            + uuid.uuid1().hex.encode("ascii")
-        )
+        blob_content = b"commit file content - " + uuid.uuid1().hex.encode()
         test_file = "test.txt"
         # stage the changes
         self.repo.index.add(
@@ -509,9 +502,7 @@ class TestGetRepackData(TestCase):
         ) as spy:
             objects, packs = get_repack_data()
             spy.mock.assert_called_once_with(
-                ["git", "count-objects", "-v"],
-                cwd=None,
-                universal_newlines=True,
+                ["git", "count-objects", "-v"], cwd=None, text=True
             )
 
         self.assertIsNotNone(objects)
@@ -519,12 +510,7 @@ class TestGetRepackData(TestCase):
 
     def test_get_repack_data_with_path(self):
         # create a test file
-        blob_content = (
-            b"commit "
-            + "file content".encode("ascii")
-            + b" - "
-            + uuid.uuid1().hex.encode("ascii")
-        )
+        blob_content = b"commit file content - " + uuid.uuid1().hex.encode()
         test_file = "test.txt"
         # stage the changes
         self.repo.index.add(
@@ -541,9 +527,7 @@ class TestGetRepackData(TestCase):
         ) as spy:
             objects, packs = get_repack_data(self.repo_dir)
             spy.mock.assert_called_once_with(
-                ["git", "count-objects", "-v"],
-                cwd=self.repo_dir,
-                universal_newlines=True,
+                ["git", "count-objects", "-v"], cwd=self.repo_dir, text=True
             )
 
         self.assertIsNotNone(objects)

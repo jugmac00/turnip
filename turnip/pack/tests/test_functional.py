@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015-2020 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import base64
 import hashlib
@@ -483,7 +480,7 @@ class FunctionalTestMixin(WithScenarios):
         # Pushing non-ASCII refs works.
         self.virtinfo.ref_permissions = {
             b"refs/heads/\x80": ["create", "push"],
-            "refs/heads/\N{SNOWMAN}".encode("UTF-8"): ["create", "push"],
+            "refs/heads/\N{SNOWMAN}".encode(): ["create", "push"],
         }
         test_root = self.useFixture(TempDir()).path
         clone1 = os.path.join(test_root, "clone1")
@@ -506,7 +503,7 @@ class FunctionalTestMixin(WithScenarios):
                 b"push",
                 b"origin",
                 b"master:\x80",
-                "master:\N{SNOWMAN}".encode("UTF-8"),
+                "master:\N{SNOWMAN}".encode(),
             ),
             path=clone1,
         )
@@ -525,7 +522,7 @@ class FunctionalTestMixin(WithScenarios):
             sorted(
                 [
                     b"refs/remotes/origin/\x80",
-                    "refs/remotes/origin/\N{SNOWMAN}".encode("UTF-8"),
+                    "refs/remotes/origin/\N{SNOWMAN}".encode(),
                 ]
             ),
             sorted(out.splitlines()),
@@ -871,7 +868,7 @@ class FrontendFunctionalTestMixin(FunctionalTestMixin):
         self.assertIn(
             b"Cloning into 'fail'...\n"
             + self.early_error
-            + "홍길동 is not a member of Project Team.".encode("UTF-8"),
+            + "홍길동 is not a member of Project Team.".encode(),
             output,
         )
 

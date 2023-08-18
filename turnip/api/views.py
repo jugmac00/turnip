@@ -37,7 +37,7 @@ def validate_path(func):
     return validate_path_decorator
 
 
-class BaseAPI(object):
+class BaseAPI:
     def __init__(self):
         self.repo_store = config.get("repo_store")
 
@@ -135,7 +135,7 @@ class RepoAPI(BaseAPI):
         try:
             repo_path = os.path.join(repo_store, repo_name)
             store.delete_repo(repo_path)
-        except (IOError, OSError):
+        except OSError:
             return exc.HTTPNotFound()  # 404
 
 

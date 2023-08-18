@@ -9,7 +9,6 @@ import time
 from datetime import datetime, timedelta
 
 import fixtures
-import six
 
 from turnip.config import config
 from turnip.tasks import app
@@ -77,10 +76,10 @@ class CeleryWorkerFixture(fixtures.Fixture):
         proc_env = {}
         for k in config.defaults:
             value = config.get(k)
-            if isinstance(value, six.binary_type):
+            if isinstance(value, bytes):
                 value = value.decode("utf-8")
             else:
-                value = six.text_type(value)
+                value = str(value)
             proc_env[k.upper()] = value
         proc_env.update(self.env or {})
 

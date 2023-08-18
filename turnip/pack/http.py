@@ -1,8 +1,6 @@
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import base64
 import io
 import json
@@ -288,7 +286,7 @@ class BaseSmartHTTPResource(resource.Resource):
         authenticated_params = yield self.authenticateUser(request)
         for key, value in authenticated_params.items():
             encoded_key = "turnip-authenticated-" + six.ensure_str(key)
-            params[encoded_key] = six.text_type(value)
+            params[encoded_key] = str(value)
         params.update(self.extra_params)
         d = defer.Deferred()
         client_factory = factory(service, path, params, content, request, d)
@@ -448,10 +446,10 @@ class CGitScriptResource(twcgi.CGIScript):
         }
         if self.root.site_name is not None:
             prefixes = " ".join(
-                "{}://{}".format(scheme, self.root.site_name)
+                f"{scheme}://{self.root.site_name}"
                 for scheme in ("git", "git+ssh", "https")
             )
-            print("clone-prefix={}".format(prefixes), file=self.cgit_config)
+            print(f"clone-prefix={prefixes}", file=self.cgit_config)
         if self.private:
             fmt["css"] = "/static/cgit-private.css"
         else:
@@ -471,7 +469,7 @@ class CGitScriptResource(twcgi.CGIScript):
         if self.private:
             top = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             print(
-                "header={top}/static/private-banner.html".format(top=top),
+                f"header={top}/static/private-banner.html",
                 file=self.cgit_config,
             )
         print(file=self.cgit_config)
@@ -487,7 +485,7 @@ class CGitScriptResource(twcgi.CGIScript):
         )
         self.cgit_config.flush()
         env["CGIT_CONFIG"] = self.cgit_config.name
-        env["PATH_INFO"] = "/%s%s" % (self.repo_url, self.trailing)
+        env["PATH_INFO"] = f"/{self.repo_url}{self.trailing}"
         env["SCRIPT_NAME"] = "/"
         env["QUERY_STRING"] = six.ensure_text(env["QUERY_STRING"])
         twcgi.CGIScript.runProcess(self, env, request, *args, **kwargs)

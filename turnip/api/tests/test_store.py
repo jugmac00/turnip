@@ -1,8 +1,6 @@
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import os.path
 import re
 import subprocess
@@ -88,7 +86,7 @@ class InitTestCase(TestCase):
                     re.sub("/objects\n$", "", line) for line in altf
                 ]
         self.assertEqual(
-            set([path.rstrip("/") for path in expected_paths]),
+            {path.rstrip("/") for path in expected_paths},
             set(actual_paths),
         )
 
@@ -502,9 +500,7 @@ class InitTestCase(TestCase):
     def hasZeroLooseObjects(self, path):
         curdir = os.getcwd()
         os.chdir(path)
-        objects = subprocess.check_output(
-            ["git", "count-objects"], universal_newlines=True
-        )
+        objects = subprocess.check_output(["git", "count-objects"], text=True)
         if int(objects[0 : (objects.find(" objects"))]) == 0:
             os.chdir(curdir)
             return True

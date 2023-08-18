@@ -57,7 +57,7 @@ def write_alternates(repo_path, alternate_repo_paths):
                 objects_path = os.path.join(path, "objects")
             else:
                 objects_path = os.path.join(path, ".git", "objects")
-            f.write("{}\n".format(objects_path))
+            f.write(f"{objects_path}\n")
 
 
 object_dir_re = re.compile(r"\A[0-9a-f][0-9a-f]\Z")
@@ -101,7 +101,7 @@ def fetch_refs(operations):
             errors.append((cmd, stderr))
 
     if errors:
-        details = "\n ".join("%s = %s" % (cmd, err) for cmd, err in errors)
+        details = "\n ".join(f"{cmd} = {err}" for cmd, err in errors)
         raise GitError("Error copying refs: %s" % details)
 
 
@@ -256,7 +256,7 @@ def init_repo(
         raise AlreadyExistsError(repo_path)
     # If no logger is provided, use module-level logger.
     log = log if log else logger
-    log.info("Running init_repository(%s, %s)" % (repo_path, is_bare))
+    log.info(f"Running init_repository({repo_path}, {is_bare})")
     init_repository(repo_path, is_bare)
 
     log.info("Running set_repository_creating(%s, True)" % repo_path)
@@ -284,9 +284,7 @@ def init_repo(
             import_into_subordinate(sub_path, clone_from, log=log)
         )
 
-        log.info(
-            "Running write_packed_refs(%s, %s)" % (sub_path, packable_refs)
-        )
+        log.info(f"Running write_packed_refs({sub_path}, {packable_refs})")
         write_packed_refs(sub_path, packable_refs)
 
     new_alternates = []
@@ -295,7 +293,7 @@ def init_repo(
     if clone_from:
         new_alternates.append("../turnip-subordinate")
 
-    log.info("Running write_alternates(%s, %s)" % (repo_path, new_alternates))
+    log.info(f"Running write_alternates({repo_path}, {new_alternates})")
     write_alternates(repo_path, new_alternates)
 
     if clone_from and clone_refs:
@@ -304,12 +302,10 @@ def init_repo(
         # pygit2.clone_repository, this won't set up a remote.
         # TODO: Filter out internal (eg. MP) refs.
 
-        log.info("Running copy_refs(%s, %s)" % (clone_from, repo_path))
+        log.info(f"Running copy_refs({clone_from}, {repo_path})")
         packable_refs = copy_refs(clone_from, repo_path)
 
-        log.info(
-            "Running write_packed_refs(%s, %s)" % (repo_path, packable_refs)
-        )
+        log.info(f"Running write_packed_refs({repo_path}, {packable_refs})")
         write_packed_refs(repo_path, packable_refs)
 
     log.info("Running ensure_config(%s)" % repo_path)
@@ -358,7 +354,7 @@ def init_and_confirm_repo(
         logger.error("Error creating repository at %s: %s", repo_path, e)
         try:
             delete_repo(repo_path)
-        except IOError as e:
+        except OSError as e:
             logger.error("Error deleting repository at %s: %s", repo_path, e)
         logger.debug(
             "Aborting repository creation: %s; %s",

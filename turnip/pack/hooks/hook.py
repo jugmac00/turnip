@@ -3,8 +3,6 @@
 # Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import base64
 import json
 import os
@@ -239,10 +237,7 @@ if __name__ == "__main__":
             send_mp_url(lines[0])
         sys.exit(0)
     elif hook == "update":
-        if six.PY3:
-            argvb = [os.fsencode(i) for i in sys.argv]
-        else:
-            argvb = sys.argv
+        argvb = [os.fsencode(i) for i in sys.argv]
         ref = argvb[1]
         rule_lines = check_ref_permissions(sock, rpc_key, [ref])
         errors = match_update_rules(rule_lines, argvb[1:4])
