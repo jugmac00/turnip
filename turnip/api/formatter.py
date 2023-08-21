@@ -1,7 +1,6 @@
 # Copyright 2022 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-
 import base64
 
 from pygit2 import (
@@ -23,9 +22,7 @@ REF_TYPE_NAME = {
 def format_blob(blob):
     """Return a formatted blob dict."""
     if blob.type != GIT_OBJ_BLOB:
-        raise GitError(
-            "Invalid type: object {} is not a blob.".format(blob.oid.hex)
-        )
+        raise GitError(f"Invalid type: object {blob.oid.hex} is not a blob.")
     return {
         "size": blob.size,
         "data": base64.b64encode(blob.data),

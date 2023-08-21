@@ -4,8 +4,6 @@
 # You can run this .tac file directly with:
 #    twistd -ny sshserver.tac
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import os
 
 from twisted.application import service

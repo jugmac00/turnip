@@ -1,11 +1,6 @@
 # Copyright 2015-2020 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import absolute_import, print_function, unicode_literals
-
-__metaclass__ = type
-
-
 import json
 import os
 import re
@@ -66,7 +61,7 @@ class RequestIDLogger(Logger):
     def emit(self, level, format=None, **kwargs):
         request_id = getattr(self.source, "request_id")
         if format is not None and request_id is not None:
-            format = "[request-id=%s] [%s] %s" % (
+            format = "[request-id={}] [{}] {}".format(
                 request_id,
                 self.source.__class__.__name__,
                 format,
@@ -74,7 +69,7 @@ class RequestIDLogger(Logger):
         super().emit(level, format=format, **kwargs)
 
 
-class UnstoppableProducerWrapper(object):
+class UnstoppableProducerWrapper:
     """An `IPushProducer` that won't be stopped.
 
     Used to avoid closing TCP connections just because one direction has
@@ -94,7 +89,7 @@ class UnstoppableProducerWrapper(object):
         pass
 
 
-class PackProtocol(protocol.Protocol, object):
+class PackProtocol(protocol.Protocol):
     paused = False
     raw = False
 
@@ -258,7 +253,7 @@ class PackServerProtocol(PackProxyProtocol):
         return auth_params
 
 
-class GitProcessProtocol(protocol.ProcessProtocol, object):
+class GitProcessProtocol(protocol.ProcessProtocol):
     _err_buffer = b""
     _resource_usage_buffer = b""
 
@@ -582,7 +577,7 @@ class PackBackendProtocol(PackServerProtocol):
         args.extend(extra_args)
 
         env = {}
-        env.update((cmd_env or {}))
+        env.update(cmd_env or {})
         if write_operation and self.factory.hookrpc_handler:
             # This is a write operation, so prepare config, hooks, the hook
             # RPC server, and the environment variables that link them up.
@@ -634,7 +629,7 @@ class PackBackendProtocol(PackServerProtocol):
             clone_path = None
         try:
             self.log.info(
-                "Creating repository %s, clone of %s" % (repo_path, clone_path)
+                f"Creating repository {repo_path}, clone of {clone_path}"
             )
             store.init_repo(repo_path, clone_path, log=self.log)
             self.log.info(
@@ -669,7 +664,7 @@ class PackBackendProtocol(PackServerProtocol):
             # could clean up the current exception. That's why we store
             # current exception at the beginning of the `except` block and
             # reraise it here.
-            six.reraise(t, v, tb)
+            raise v.with_traceback(tb)
 
     def packetReceived(self, data):
         if self.expect_set_symbolic_ref:

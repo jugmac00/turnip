@@ -3,7 +3,6 @@
 
 # You can run this .tac file directly with:
 #    twistd -ny httpserver.tac
-from __future__ import unicode_literals
 
 from twisted.application import internet, service
 from twisted.scripts.twistd import ServerOptions

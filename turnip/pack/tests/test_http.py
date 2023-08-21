@@ -1,8 +1,6 @@
 # Copyright 2015-2022 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import json
 import os
 from io import BytesIO
@@ -88,10 +86,10 @@ def render_resource(resource, request):
         request.finish()
         return defer.succeed(None)
     else:
-        raise AssertionError("Invalid return value: %r" % (result,))
+        raise AssertionError(f"Invalid return value: {result!r}")
 
 
-class FakeRoot(object):
+class FakeRoot:
     allowed_services = frozenset(
         (b"git-upload-pack", b"git-receive-pack", b"turnip-set-symbolic-ref")
     )
@@ -128,7 +126,7 @@ class FakeRoot(object):
         self.backend_connected.callback(None)
 
 
-class ErrorTestMixin(object):
+class ErrorTestMixin:
     @defer.inlineCallbacks
     def performRequest(
         self, backend_response=None, service=b"git-upload-pack"

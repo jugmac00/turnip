@@ -1,8 +1,6 @@
 # Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import hashlib
 from collections import defaultdict
 from xmlrpc.client import Binary
@@ -25,7 +23,7 @@ class FakeAuthServerService(xmlrpc.XMLRPC):
         self.keys = defaultdict(list)
 
     def addSSHKey(self, username, public_key_path):
-        with open(public_key_path, "r") as f:
+        with open(public_key_path) as f:
             public_key = f.read()
         kind, keytext, _ = public_key.split(" ", 2)
         if kind == "ssh-rsa":
@@ -128,8 +126,8 @@ class FakeVirtInfoService(xmlrpc.XMLRPC):
         else:
             # Launchpad fails if these parameters are binary. So, replicate
             # this behavior with a couple of asserts.
-            assert isinstance(path, six.string_types)
-            assert isinstance(branch, six.string_types)
+            assert isinstance(path, str)
+            assert isinstance(branch, str)
             return self.merge_proposal_url
 
     def xmlrpc_confirmRepoCreation(self, pathname, auth_params):

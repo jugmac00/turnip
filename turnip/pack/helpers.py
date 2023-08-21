@@ -1,8 +1,6 @@
 # Copyright 2015-2022 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import enum
 import hashlib
 import os.path
@@ -209,7 +207,7 @@ def ensure_hooks(repo_root):
 
 def get_repack_data(path=None):
     output = subprocess.check_output(
-        ["git", "count-objects", "-v"], cwd=path, universal_newlines=True
+        ["git", "count-objects", "-v"], cwd=path, text=True
     )
     if not output:
         return None, None

@@ -1,9 +1,5 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
-
-from __future__ import print_function, unicode_literals
 
 import base64
 import os
@@ -58,7 +54,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
     def get_ref(self, ref):
         repo_path = six.ensure_text(self.repo_path)
         ref = six.ensure_text(ref)
-        url = "/repo/{}/{}".format(repo_path, ref)
+        url = f"/repo/{repo_path}/{ref}"
         resp = self.app.get(quote(url))
         return resp.json
 
@@ -110,7 +106,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         factory.build()
         factory.repo.set_head("refs/heads/branch-0")
 
-        resp = self.app.get("/repo/{}".format(self.repo_path))
+        resp = self.app.get(f"/repo/{self.repo_path}")
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {"default_branch": "refs/heads/branch-0", "is_available": True},
@@ -124,7 +120,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         factory.repo.set_head("refs/heads/branch-0")
         factory.repo.references.delete("refs/heads/branch-0")
 
-        resp = self.app.get("/repo/{}".format(self.repo_path))
+        resp = self.app.get(f"/repo/{self.repo_path}")
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             {"default_branch": "refs/heads/branch-0", "is_available": True},
@@ -139,7 +135,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         self.assertReferencesEqual(factory.repo, "refs/heads/branch-0", "HEAD")
 
         resp = self.app.patch_json(
-            "/repo/{}".format(self.repo_path),
+            f"/repo/{self.repo_path}",
             {"default_branch": "refs/heads/branch-1"},
         )
         self.assertEqual(204, resp.status_code)
@@ -210,7 +206,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
 
     def test_repo_delete(self):
         self.app.post_json("/repo", {"repo_path": self.repo_path})
-        resp = self.app.delete("/repo/{}".format(self.repo_path))
+        resp = self.app.delete(f"/repo/{self.repo_path}")
         self.assertEqual(200, resp.status_code)
         self.assertFalse(os.path.exists(self.repo_store))
 
@@ -222,7 +218,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         subprocess.check_call(
             ["git", "-C", self.repo_store, "branch", b"\x80"]
         )
-        resp = self.app.delete("/repo/{}".format(self.repo_path))
+        resp = self.app.delete(f"/repo/{self.repo_path}")
         self.assertEqual(200, resp.status_code)
         self.assertFalse(os.path.exists(self.repo_store))
 
@@ -230,7 +226,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         """Ensure expected ref objects are returned and shas match."""
         ref = self.commit.get("ref")
         repo = RepoFactory(self.repo_store, num_commits=1, num_tags=1).build()
-        resp = self.app.get("/repo/{}/refs".format(self.repo_path))
+        resp = self.app.get(f"/repo/{self.repo_path}/refs")
         body = resp.json
 
         self.assertTrue(ref in body)
@@ -253,7 +249,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         tag_message = "tag message"
         factory.add_tag(tag, tag_message, commit_oid)
 
-        resp = self.app.get("/repo/{}/refs".format(self.repo_path))
+        resp = self.app.get(f"/repo/{self.repo_path}/refs")
         refs = resp.json
         self.assertEqual(1, len(refs.keys()))
 
@@ -261,11 +257,11 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         """Ensure unicode refs are included in ref collection."""
         factory = RepoFactory(self.repo_store)
         commit_oid = factory.add_commit("foo", "foobar.txt")
-        tag = "おいしいイカ".encode("utf-8")
-        tag_message = "かわいい タコ".encode("utf-8")
+        tag = "おいしいイカ".encode()
+        tag_message = "かわいい タコ".encode()
         factory.add_tag(tag, tag_message, commit_oid)
 
-        resp = self.app.get("/repo/{}/refs".format(self.repo_path))
+        resp = self.app.get(f"/repo/{self.repo_path}/refs")
         refs = resp.json
         self.assertEqual(2, len(refs.keys()))
 
@@ -308,12 +304,10 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
     def test_repo_get_ref_nonexistent_ref(self):
         """get_ref on a non-existent ref in a repository returns HTTP 404."""
         RepoFactory(self.repo_store, num_commits=1).build()
-        resp = self.app.get(
-            "/repo/{}/refs/heads/master".format(self.repo_path)
-        )
+        resp = self.app.get(f"/repo/{self.repo_path}/refs/heads/master")
         self.assertEqual(200, resp.status_code)
         resp = self.app.get(
-            "/repo/{}/refs/heads/nonexistent".format(self.repo_path),
+            f"/repo/{self.repo_path}/refs/heads/nonexistent",
             expect_errors=True,
         )
         self.assertEqual(404, resp.status_code)
@@ -329,7 +323,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
             commit_oid,
         )
 
-        tag = "refs/tags/{}".format(tag_name)
+        tag = f"refs/tags/{tag_name}"
         resp = self.get_ref(tag)
         self.assertIn(tag, resp)
 
@@ -349,7 +343,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         self.assertEqual(7, len(repo.references.objects))
 
         ref = "refs/heads/branch-0"
-        url = "/repo/{}/{}".format(self.repo_path, ref)
+        url = f"/repo/{self.repo_path}/{ref}"
         resp = self.app.delete(quote(url))
 
         self.assertEqual(6, len(repo.references.objects))
@@ -366,7 +360,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         self.assertEqual(7, len(repo.references.objects))
 
         ref = "refs/heads/fake-branch"
-        url = "/repo/{}/{}".format(self.repo_path, ref)
+        url = f"/repo/{self.repo_path}/{ref}"
         resp = self.app.delete(quote(url), expect_errors=True)
         self.assertEqual(404, resp.status_code)
         self.assertEqual(
@@ -490,7 +484,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         c1_oid = repo.add_commit("foo", "foobar.txt")
         c2_oid = repo.add_commit("bar", "foobar.txt", parents=[c1_oid])
 
-        path = "/repo/{}/compare/{}..{}".format(self.repo_path, c1_oid, c2_oid)
+        path = f"/repo/{self.repo_path}/compare/{c1_oid}..{c2_oid}"
         resp = self.app.get(path)
         self.assertIn(b"-foo", resp.body)
         self.assertIn(b"+bar", resp.body)
@@ -501,7 +495,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         c1_oid = repo.add_commit("foo", "foobar.txt")
         c2_oid = repo.add_commit("bar", "foobar.txt", parents=[c1_oid])
 
-        path = "/repo/{}/compare/{}..{}".format(self.repo_path, c1_oid, c2_oid)
+        path = f"/repo/{self.repo_path}/compare/{c1_oid}..{c2_oid}"
         resp = self.app.get(path)
         self.assertIn(c1_oid.hex, resp.json["commits"][0]["sha1"])
         self.assertIn(c2_oid.hex, resp.json["commits"][1]["sha1"])
@@ -509,14 +503,12 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
     def test_repo_diff_unicode_commits(self):
         """Ensure expected utf-8 commits objects are returned in diff."""
         factory = RepoFactory(self.repo_store)
-        message = "屋漏偏逢连夜雨".encode("utf-8")
-        message2 = "说曹操，曹操到".encode("utf-8")
+        message = "屋漏偏逢连夜雨".encode()
+        message2 = "说曹操，曹操到".encode()
         oid = factory.add_commit(message, "foo.py")
         oid2 = factory.add_commit(message2, "bar.py", [oid])
 
-        resp = self.app.get(
-            "/repo/{}/compare/{}..{}".format(self.repo_path, oid, oid2)
-        )
+        resp = self.app.get(f"/repo/{self.repo_path}/compare/{oid}..{oid2}")
         self.assertEqual(
             resp.json["commits"][0]["message"], message.decode("utf-8")
         )
@@ -531,9 +523,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         oid = factory.add_commit(message, "foo.py")
         oid2 = factory.add_commit("a sensible commit message", "foo.py", [oid])
 
-        resp = self.app.get(
-            "/repo/{}/compare/{}..{}".format(self.repo_path, oid, oid2)
-        )
+        resp = self.app.get(f"/repo/{self.repo_path}/compare/{oid}..{oid2}")
         self.assertEqual(
             resp.json["commits"][0]["message"],
             message.decode("utf-8", "replace"),
@@ -543,7 +533,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         """get_diff on a non-existent sha1 returns HTTP 404."""
         RepoFactory(self.repo_store).build()
         resp = self.app.get(
-            "/repo/{}/compare/1..2".format(self.repo_path), expect_errors=True
+            f"/repo/{self.repo_path}/compare/1..2", expect_errors=True
         )
         self.assertEqual(404, resp.status_code)
 
@@ -551,7 +541,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         """get_diff with an invalid separator (not ../...) returns HTTP 404."""
         RepoFactory(self.repo_store).build()
         resp = self.app.get(
-            "/repo/{}/compare/1++2".format(self.repo_path), expect_errors=True
+            f"/repo/{self.repo_path}/compare/1++2", expect_errors=True
         )
         self.assertEqual(400, resp.status_code)
 
@@ -579,9 +569,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         repo = RepoFactory(self.repo_store)
         c1 = repo.add_commit("foo\n", "blah.txt")
 
-        resp = self.app.get(
-            "/repo/{}/compare/{}..{}".format(self.repo_path, c1, c1)
-        )
+        resp = self.app.get(f"/repo/{self.repo_path}/compare/{c1}..{c1}")
         self.assertEqual("", resp.json_body["patch"])
 
     def test_repo_get_diff_extended_revision(self):
@@ -591,7 +579,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         c2 = repo.add_commit("bar\n", "foobar.txt", parents=[c1])
 
         path = "/repo/{}/compare/{}..{}".format(
-            self.repo_path, quote("{}^".format(c2)), c2
+            self.repo_path, quote(f"{c2}^"), c2
         )
         resp = self.app.get(path)
         self.assertIn(b"-foo", resp.body)
@@ -605,7 +593,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         c2 = repo.add_commit("foo\n", "bar.txt", parents=[c1])
 
         path = "/repo/{}/compare/{}..{}".format(
-            self.repo_path, quote("{}^".format(c2)), c2
+            self.repo_path, quote(f"{c2}^"), c2
         )
         resp = self.app.get(path)
         self.assertIn(
@@ -688,10 +676,10 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         repo = RepoFactory(self.repo_store)
         c1 = repo.add_commit("foo\n", "blah.txt")
         c2_left = repo.add_commit(
-            "foo\nbar\u2603\n".encode("utf-8"), "blah.txt", parents=[c1]
+            "foo\nbar\u2603\n".encode(), "blah.txt", parents=[c1]
         )
         c2_right = repo.add_commit(
-            "foo\nbaz\u263c\n".encode("utf-8"), "blah.txt", parents=[c1]
+            "foo\nbaz\u263c\n".encode(), "blah.txt", parents=[c1]
         )
 
         resp = self.app.get(
@@ -805,9 +793,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         repo = RepoFactory(self.repo_store)
         c1 = repo.add_commit("foo\n", "blah.txt")
 
-        resp = self.app.get(
-            "/repo/{}/compare-merge/{}:{}".format(self.repo_path, c1, c1)
-        )
+        resp = self.app.get(f"/repo/{self.repo_path}/compare-merge/{c1}:{c1}")
         self.assertEqual("", resp.json_body["patch"])
 
     def test_repo_diff_merge_nonexistent(self):
@@ -830,9 +816,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         repo.repo.index.remove("foo.txt")
         c2 = repo.add_commit("foo\n", "bar.txt", parents=[c1])
 
-        resp = self.app.get(
-            "/repo/{}/compare-merge/{}:{}".format(self.repo_path, c1, c2)
-        )
+        resp = self.app.get(f"/repo/{self.repo_path}/compare-merge/{c1}:{c2}")
         self.assertIn(
             "diff --git a/foo.txt b/bar.txt\n", resp.json_body["patch"]
         )
@@ -842,9 +826,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         message = "Computers make me angry."
         commit_oid = factory.add_commit(message, "foobar.txt")
 
-        resp = self.app.get(
-            "/repo/{}/commits/{}".format(self.repo_path, commit_oid.hex)
-        )
+        resp = self.app.get(f"/repo/{self.repo_path}/commits/{commit_oid.hex}")
         commit_resp = resp.json
         self.assertEqual(commit_oid.hex, commit_resp["sha1"])
         self.assertEqual(message, commit_resp["message"])
@@ -866,7 +848,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         factory.build()
         tree_oid = factory.repo[factory.commits[0]].tree.hex
         resp = self.app.get(
-            "/repo/{}/commits/{}".format(self.repo_path, tree_oid),
+            f"/repo/{self.repo_path}/commits/{tree_oid}",
             expect_errors=True,
         )
         self.assertEqual(404, resp.status_code)
@@ -878,7 +860,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         bulk_commits = {"commits": [c.hex for c in factory.commits[0::2]]}
 
         resp = self.app.post_json(
-            "/repo/{}/commits".format(self.repo_path), bulk_commits
+            f"/repo/{self.repo_path}/commits", bulk_commits
         )
         self.assertEqual(5, len(resp.json))
         self.assertEqual(bulk_commits["commits"][0], resp.json[0]["sha1"])
@@ -896,7 +878,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         }
 
         resp = self.app.post_json(
-            "/repo/{}/commits".format(self.repo_path), bulk_commits
+            f"/repo/{self.repo_path}/commits", bulk_commits
         )
         self.assertEqual(1, len(resp.json))
         self.assertEqual(bulk_commits["commits"][0], resp.json[0]["sha1"])
@@ -915,9 +897,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
             "commits": [c1.hex, c2.hex],
         }
 
-        resp = self.app.post_json(
-            "/repo/{}/commits".format(self.repo_path), payload
-        )
+        resp = self.app.post_json(f"/repo/{self.repo_path}/commits", payload)
 
         self.assertEqual(1, len(resp.json))
         self.assertIn("blobs", resp.json[0])
@@ -942,9 +922,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
             "commits": [c1.hex, c2.hex],
         }
 
-        resp = self.app.post_json(
-            "/repo/{}/commits".format(self.repo_path), payload
-        )
+        resp = self.app.post_json(f"/repo/{self.repo_path}/commits", payload)
 
         self.assertEqual(1, len(resp.json))
         self.assertIn("blobs", resp.json[0])
@@ -957,13 +935,13 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         """Ensure signatures are correct."""
         factory = RepoFactory(self.repo_store)
         committer = factory.makeSignature(
-            "村上 春樹".encode("utf-8"),
-            "tsukuru@猫の町.co.jp".encode("utf-8"),
+            "村上 春樹".encode(),
+            "tsukuru@猫の町.co.jp".encode(),
             encoding="utf-8",
         )
         author = factory.makeSignature(
-            "Владимир Владимирович Набоков".encode("utf-8"),
-            "Набоко@zembla.ru".encode("utf-8"),
+            "Владимир Владимирович Набоков".encode(),
+            "Набоко@zembla.ru".encode(),
             encoding="utf-8",
         )
         oid = factory.add_commit(
@@ -972,26 +950,24 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
             author=author,
             committer=committer,
         )
-        resp = self.app.get("/repo/{}/log/{}".format(self.repo_path, oid))
+        resp = self.app.get(f"/repo/{self.repo_path}/log/{oid}")
         self.assertEqual(author.name, resp.json[0]["author"]["name"])
 
     def test_repo_get_log(self):
         factory = RepoFactory(self.repo_store, num_commits=4)
         factory.build()
         commits_from = factory.commits[2].hex
-        resp = self.app.get(
-            "/repo/{}/log/{}".format(self.repo_path, commits_from)
-        )
+        resp = self.app.get(f"/repo/{self.repo_path}/log/{commits_from}")
         self.assertEqual(3, len(resp.json))
 
     def test_repo_get_unicode_log(self):
         factory = RepoFactory(self.repo_store)
-        message = "나는 김치 사랑".encode("utf-8")
-        message2 = "(╯°□°)╯︵ ┻━┻".encode("utf-8")
+        message = "나는 김치 사랑".encode()
+        message2 = "(╯°□°)╯︵ ┻━┻".encode()
         oid = factory.add_commit(message, "자장면/짜장면.py")
         oid2 = factory.add_commit(message2, "엄마야!.js", [oid])
 
-        resp = self.app.get("/repo/{}/log/{}".format(self.repo_path, oid2))
+        resp = self.app.get(f"/repo/{self.repo_path}/log/{oid2}")
         self.assertEqual(
             message2.decode("utf-8", "replace"), resp.json[0]["message"]
         )
@@ -1004,7 +980,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         factory = RepoFactory(self.repo_store)
         message = b"\xe9\xe9\xe9"  # latin-1
         oid = factory.add_commit(message, "foo.py")
-        resp = self.app.get("/repo/{}/log/{}".format(self.repo_path, oid))
+        resp = self.app.get(f"/repo/{self.repo_path}/log/{oid}")
         self.assertEqual(
             message.decode("utf-8", "replace"), resp.json[0]["message"]
         )
@@ -1014,9 +990,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         factory = RepoFactory(self.repo_store, num_commits=10)
         repo = factory.build()
         head = repo.head.target
-        resp = self.app.get(
-            "/repo/{}/log/{}?limit=5".format(self.repo_path, head)
-        )
+        resp = self.app.get(f"/repo/{self.repo_path}/log/{head}?limit=5")
         self.assertEqual(5, len(resp.json))
 
     def test_repo_get_log_with_stop(self):
@@ -1027,7 +1001,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         excluded_commit = factory.commits[5]
         head = repo.head.target
         resp = self.app.get(
-            "/repo/{}/log/{}?stop={}".format(self.repo_path, head, stop_commit)
+            f"/repo/{self.repo_path}/log/{head}?stop={stop_commit}"
         )
         self.assertEqual(5, len(resp.json))
         self.assertNotIn(excluded_commit, resp.json)
@@ -1036,7 +1010,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         """Ensure commit exists in pack."""
         factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
         factory.build()
-        resp = self.app.post_json("/repo/{}/repack".format(self.repo_path))
+        resp = self.app.post_json(f"/repo/{self.repo_path}/repack")
         self.assertEqual(200, resp.status_code)
         # test for nonexistent repositories
         resp = self.app.post_json(
@@ -1047,7 +1021,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
     def test_repo_gc(self):
         factory = RepoFactory(self.repo_store, num_branches=2, num_commits=1)
         factory.build()
-        resp = self.app.post_json("/repo/{}/gc".format(self.repo_path))
+        resp = self.app.post_json(f"/repo/{self.repo_path}/gc")
         self.assertEqual(200, resp.status_code)
         # test for nonexistent repositories
         resp = self.app.post_json("/repo/nonexistent/gc", expect_errors=True)
@@ -1072,7 +1046,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         a = factory.add_commit("a\n", "file")
         b = factory.add_commit("b\n", "file", parents=[a])
         resp = self.app.post_json(
-            "/repo/{}/detect-merges/{}".format(self.repo_path, b),
+            f"/repo/{self.repo_path}/detect-merges/{b}",
             {"sources": [factory.nonexistent_oid()]},
         )
         self.assertEqual(200, resp.status_code)
@@ -1088,7 +1062,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         b = factory.add_commit("b\n", "file", parents=[a])
         c = factory.add_commit("c\n", "file", parents=[a])
         resp = self.app.post_json(
-            "/repo/{}/detect-merges/{}".format(self.repo_path, b),
+            f"/repo/{self.repo_path}/detect-merges/{b}",
             {"sources": [c.hex]},
         )
         self.assertEqual(200, resp.status_code)
@@ -1105,7 +1079,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         # The start commit would never be the source of a merge proposal,
         # but include it anyway to test boundary conditions.
         resp = self.app.post_json(
-            "/repo/{}/detect-merges/{}".format(self.repo_path, c),
+            f"/repo/{self.repo_path}/detect-merges/{c}",
             {"sources": [a.hex, b.hex, c.hex]},
         )
         self.assertEqual(200, resp.status_code)
@@ -1127,7 +1101,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         h = factory.add_commit("h\n", "file", parents=[g])
         i = factory.add_commit("i\n", "file", parents=[f])
         resp = self.app.post_json(
-            "/repo/{}/detect-merges/{}".format(self.repo_path, h),
+            f"/repo/{self.repo_path}/detect-merges/{h}",
             {"sources": [b.hex, e.hex, i.hex]},
         )
         self.assertEqual(200, resp.status_code)
@@ -1153,13 +1127,13 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         h = factory.add_commit("h\n", "file", parents=[g])
         i = factory.add_commit("i\n", "file", parents=[f])
         resp = self.app.post_json(
-            "/repo/{}/detect-merges/{}".format(self.repo_path, h),
+            f"/repo/{self.repo_path}/detect-merges/{h}",
             {"sources": [b.hex, e.hex, i.hex], "stop": [c.hex]},
         )
         self.assertEqual(200, resp.status_code)
         self.assertEqual({e.hex: g.hex}, resp.json)
         resp = self.app.post_json(
-            "/repo/{}/detect-merges/{}".format(self.repo_path, h),
+            f"/repo/{self.repo_path}/detect-merges/{h}",
             {"sources": [b.hex, e.hex, i.hex], "stop": [c.hex, g.hex]},
         )
         self.assertEqual(200, resp.status_code)
@@ -1170,16 +1144,14 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         factory = RepoFactory(self.repo_store)
         c1 = factory.add_commit("a\n", "dir/file")
         factory.add_commit("b\n", "dir/file", parents=[c1])
-        resp = self.app.get("/repo/{}/blob/dir/file".format(self.repo_path))
+        resp = self.app.get(f"/repo/{self.repo_path}/blob/dir/file")
+        self.assertEqual(2, resp.json["size"])
+        self.assertEqual(b"b\n", base64.b64decode(resp.json["data"]))
+        resp = self.app.get(f"/repo/{self.repo_path}/blob/dir/file?rev=master")
         self.assertEqual(2, resp.json["size"])
         self.assertEqual(b"b\n", base64.b64decode(resp.json["data"]))
         resp = self.app.get(
-            "/repo/{}/blob/dir/file?rev=master".format(self.repo_path)
-        )
-        self.assertEqual(2, resp.json["size"])
-        self.assertEqual(b"b\n", base64.b64decode(resp.json["data"]))
-        resp = self.app.get(
-            "/repo/{}/blob/dir/file?rev={}".format(self.repo_path, c1.hex)
+            f"/repo/{self.repo_path}/blob/dir/file?rev={c1.hex}"
         )
         self.assertEqual(2, resp.json["size"])
         self.assertEqual(b"a\n", base64.b64decode(resp.json["data"]))
@@ -1201,7 +1173,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         factory = RepoFactory(self.repo_store)
         factory.add_commit("a\n", "dir/file")
         resp = self.app.get(
-            "/repo/{}/blob/nonexistent".format(self.repo_path),
+            f"/repo/{self.repo_path}/blob/nonexistent",
             expect_errors=True,
         )
         self.assertEqual(404, resp.status_code)
@@ -1211,7 +1183,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         factory = RepoFactory(self.repo_store)
         factory.add_commit("a\n", "dir/file")
         resp = self.app.get(
-            "/repo/{}/blob/dir".format(self.repo_path), expect_errors=True
+            f"/repo/{self.repo_path}/blob/dir", expect_errors=True
         )
         self.assertEqual(404, resp.status_code)
 
@@ -1219,7 +1191,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         """Blobs may contain non-ASCII (and indeed non-UTF-8) data."""
         factory = RepoFactory(self.repo_store)
         factory.add_commit(b"\x80\x81\x82\x83", "dir/file")
-        resp = self.app.get("/repo/{}/blob/dir/file".format(self.repo_path))
+        resp = self.app.get(f"/repo/{self.repo_path}/blob/dir/file")
         self.assertEqual(4, resp.json["size"])
         self.assertEqual(
             b"\x80\x81\x82\x83", base64.b64decode(resp.json["data"])
@@ -1232,7 +1204,7 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         factory.add_commit("b\n", "dir/file", parents=[c1])
         factory.add_tag("tag-name", "tag message", c1)
         resp = self.app.get(
-            "/repo/{}/blob/dir/file?rev=tag-name".format(self.repo_path)
+            f"/repo/{self.repo_path}/blob/dir/file?rev=tag-name"
         )
         self.assertEqual(2, resp.json["size"])
         self.assertEqual(b"a\n", base64.b64decode(resp.json["data"]))
@@ -1288,9 +1260,7 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
         while datetime.now() <= (start + timeout):
             self._doReactorIteration()
             try:
-                resp = self.app.get(
-                    "/repo/{}".format(repo_path), expect_errors=True
-                )
+                resp = self.app.get(f"/repo/{repo_path}", expect_errors=True)
                 if resp.status_code == 200 and resp.json["is_available"]:
                     return
             except Exception:
@@ -1482,7 +1452,7 @@ class AsyncRepoCreationAPI(TestCase, ApiRepoStoreMixin):
 
         self.assertRepositoryCreatedAsynchronously(new_repo_path)
 
-        with open(logfile, "r") as fd:
+        with open(logfile) as fd:
             log_lines = fd.read().split("\n")
         self.assertContainsLog(
             ".*INFO.*Received task: turnip.api.store.init_and_confirm_repo.*",

@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015-2018 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import base64
 import os.path
@@ -62,12 +59,12 @@ class MockHookRPCHandler(hookrpc.HookRPCHandler):
         return "http://mp-url.test"
 
 
-class MockRef(object):
+class MockRef:
     def __init__(self, hex):
         self.hex = hex
 
 
-class MockRepo(object):
+class MockRepo:
     def __init__(self, ancestor):
         self.ancestor = ancestor
 
@@ -75,7 +72,7 @@ class MockRepo(object):
         return MockRef(self.ancestor)
 
 
-class MockSocket(object):
+class MockSocket:
     # "sends" up to this amount of bytes on "send()"
     MAX_SEND_DATA = 5
 
@@ -160,7 +157,7 @@ class TestNetstringRecv(TestCase):
         self.assertEqual(b"14:some-fake-data,", sock._sent_data)
 
 
-class HookTestMixin(object):
+class HookTestMixin:
     run_tests_with = AsynchronousDeferredRunTest.make_factory(timeout=10)
 
     old_sha1 = b"a" * 40
@@ -256,7 +253,7 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
     @defer.inlineCallbacks
     def test_accepted_non_ascii(self):
         # Valid non-ASCII refs are accepted.
-        paths = [b"refs/heads/\x80", "refs/heads/géag".encode("UTF-8")]
+        paths = [b"refs/heads/\x80", "refs/heads/géag".encode()]
         yield self.assertAccepted(
             [(path, self.old_sha1, self.new_sha1) for path in paths],
             {path: ["push"] for path in paths},
@@ -302,7 +299,7 @@ class TestPreReceiveHook(HookTestMixin, TestCase):
     @defer.inlineCallbacks
     def test_rejected_non_ascii(self):
         # Invalid non-ASCII refs are rejected.
-        paths = [b"refs/heads/\x80", "refs/heads/géag".encode("UTF-8")]
+        paths = [b"refs/heads/\x80", "refs/heads/géag".encode()]
         yield self.assertRejected(
             [(path, self.old_sha1, self.new_sha1) for path in paths],
             {path: [] for path in paths},
@@ -446,7 +443,7 @@ class TestUpdateHook(TestCase):
     def test_no_matching_utf8_ref(self):
         # An unmatched UTF-8 ref is denied.
         output = hook.match_update_rules(
-            {}, ["refs/heads/géag".encode("UTF-8"), b"old", b"new"]
+            {}, ["refs/heads/géag".encode(), b"old", b"new"]
         )
         self.assertEqual(
             [
@@ -474,8 +471,8 @@ class TestUpdateHook(TestCase):
     def test_matching_utf8_ref(self):
         # A UTF-8 ref with force-push permission is accepted.
         output = hook.match_update_rules(
-            {"refs/heads/géag".encode("UTF-8"): ["force_push"]},
-            ["refs/heads/géag".encode("UTF-8"), "old", "new"],
+            {"refs/heads/géag".encode(): ["force_push"]},
+            ["refs/heads/géag".encode(), "old", "new"],
         )
         self.assertEqual([], output)
 

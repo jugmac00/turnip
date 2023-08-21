@@ -14,8 +14,6 @@ netstrings. Hooks authenticate using a secret key from their
 environment.
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import base64
 import json
 from xmlrpc.client import Binary
@@ -81,7 +79,7 @@ class RPCServerProtocol(JSONNetstringProtocol):
             res = yield self.methods[op](self, val)
         except xmlrpc.Fault as e:
             code = translate_xmlrpc_fault(e.faultCode)
-            self.sendValue({"error": "%s: %s" % (code.name, e.faultString)})
+            self.sendValue({"error": f"{code.name}: {e.faultString}"})
         except defer.TimeoutError:
             self.sendValue({"error": "%s timed out" % op})
         else:
@@ -101,7 +99,7 @@ class RPCServerFactory(protocol.ServerFactory):
         return self.protocol(self.methods)
 
 
-class HookRPCLogContext(object):
+class HookRPCLogContext:
     """A context for logging hook RPC operations."""
 
     log = RequestIDLogger()
@@ -110,7 +108,7 @@ class HookRPCLogContext(object):
         self.request_id = auth_params.get("request-id")
 
 
-class HookRPCHandler(object):
+class HookRPCHandler:
     """A collection of methods for use by git hooks.
 
     Operations that might execute git hooks generate and register a key
