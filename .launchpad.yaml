@@ -1,0 +1,21 @@
+pipeline:
+  - docs
+  - lint
+
+jobs:
+  docs:
+    architectures: amd64
+    packages:
+      - tox
+    run: tox -e docs
+    series: focal
+  lint:
+    architectures: amd64
+    packages:
+      - tox
+      - git
+    snaps:
+      - name: go
+        classic: true
+    run: tox -e lint
+    series: focal

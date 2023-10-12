@@ -6,7 +6,6 @@ PIP_CACHE = $(CURDIR)/pip-cache
 
 PYTHON := $(ENV)/bin/python
 PSERVE := $(ENV)/bin/pserve
-FLAKE8 := $(ENV)/bin/flake8
 CELERY := $(ENV)/bin/celery
 PIP := $(ENV)/bin/pip
 VIRTUALENV := /usr/bin/virtualenv
@@ -103,14 +102,10 @@ TAGS:
 tags:
 	ctags -R turnip
 
-lint: $(ENV)
-	@$(FLAKE8) --exclude=__pycache__,version_info.py *.tac turnip
-	$(PYTHON) setup.py check --restructuredtext --strict
-
 pip-check: $(ENV)
 	$(PIP) check
 
-check: pip-check test lint
+check: pip-check test
 
 run-api: $(ENV)
 	$(PSERVE) api.ini --reload
@@ -175,5 +170,5 @@ publish-tarball: build-tarball
 		$(SWIFT_CONTAINER_NAME) $(SWIFT_OBJECT_PATH) \
 		$(TARBALL_BUILD_PATH) turnip=$(TARBALL_BUILD_LABEL)
 
-.PHONY: build check clean dist lint run-api run-pack test
+.PHONY: build check clean dist run-api run-pack test
 .PHONY: build-tarball publish-tarball
