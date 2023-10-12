@@ -32,7 +32,6 @@ requires = [
 test_requires = [
     "docutils",
     "fixtures",
-    "flake8",
     "testscenarios",
     "testtools",
     "webtest",
