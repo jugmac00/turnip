@@ -187,6 +187,15 @@ def ensure_hooks(repo_root):
         os.rename(this.name, hook_path(target_name))
 
     for hook in wanted_hooks:
+        # Skip already symlinked hooks. This is required because over NFS,
+        # the rename below can briefly unlink the hook from the perspective of
+        # another machine, meaning that git subprocesses won't run the python
+        # hook
+        try:
+            if os.readlink(hook_path(hook)) == target_name:
+                continue
+        except Exception:
+            pass
         # Not actually insecure, since os.symlink fails if the file exists.
         path = mktemp(dir=hook_path("."))
         os.symlink(target_name, path)
