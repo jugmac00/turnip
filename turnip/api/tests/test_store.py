@@ -391,6 +391,131 @@ class InitTestCase(TestCase):
             packed_refs, os.path.join(too_path, "turnip-subordinate")
         )
 
+    def test_create_single_ref(self):
+        repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
+        factory = RepoFactory(repo_path)
+        commit_sha1 = factory.add_commit("foo", "foobar.txt").hex
+        tag_name = "refs/tags/1701"
+        branch_name = "refs/heads/new-feature"
+
+        for ref in [tag_name, branch_name]:
+            refs_to_create = [{"ref": ref, "commit_sha1": commit_sha1}]
+            created, _ = store.create_references(
+                self.repo_store, repo_path, refs_to_create
+            )
+            assert created[ref] == commit_sha1
+            self.assertAdvertisedRefs([(ref, commit_sha1)], [], repo_path)
+
+    def test_create_multiple_mixed_success_and_errors(self):
+        repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
+        factory = RepoFactory(repo_path)
+
+        expected_created = []
+        refs_to_create = []
+        # Expected successful cases: 5 commits with a tag and a branch ref
+        # created against each commit.
+        for i in range(5):
+            commit = factory.add_commit(f"foo-{i}", f"foobar-{i}.txt").hex
+
+            tag = f"refs/tags/{i}"
+            refs_to_create.append({"ref": tag, "commit_sha1": commit})
+            expected_created.append((tag, commit))
+
+            branch = f"refs/heads/new-feature-{i}"
+            refs_to_create.append({"ref": branch, "commit_sha1": commit})
+            expected_created.append((branch, commit))
+
+        expected_errors = []
+        # Invalid ref name
+        invalid_name = "refs/tags/?*"
+        refs_to_create.append(
+            {
+                "ref": invalid_name,
+                "commit_sha1": refs_to_create[0]["commit_sha1"],
+            }
+        )
+        expected_errors.append(
+            (invalid_name, refs_to_create[0]["commit_sha1"])
+        )
+
+        # Commit does not exist
+        nonexistent_commit = factory.nonexistent_oid()
+        nonexistent_commit_ref = "refs/tags/nonexistent-commit"
+        refs_to_create.append(
+            {
+                "ref": nonexistent_commit_ref,
+                "commit_sha1": nonexistent_commit,
+            }
+        )
+        expected_errors.append((nonexistent_commit_ref, nonexistent_commit))
+
+        # Ref already exists and force is not passed
+        existing_ref = refs_to_create[0]["ref"]
+        refs_to_create.append(
+            {
+                "ref": existing_ref,
+                "commit_sha1": refs_to_create[0]["commit_sha1"],
+            }
+        )
+        expected_errors.append(
+            (existing_ref, refs_to_create[0]["commit_sha1"])
+        )
+
+        created, errors = store.create_references(
+            self.repo_store, repo_path, refs_to_create
+        )
+
+        for entry in expected_created:
+            # Assert {ref:commit} key value pair for successful cases
+            self.assertEqual(entry[1], created[entry[0]])
+
+        self.assertEqual(
+            f"Invalid ref name '{invalid_name}'", errors[invalid_name]
+        )
+        self.assertEqual(
+            f"Commit '{nonexistent_commit}' not found",
+            errors[nonexistent_commit_ref],
+        )
+        self.assertEqual(
+            (
+                f"Ref '{existing_ref}' already exists; "
+                "retry with force to overwrite"
+            ),
+            errors[existing_ref],
+        )
+
+        # Verify successful cases are created and errorneous ones are not
+        # on the git level
+        self.assertAdvertisedRefs(expected_created, expected_errors, repo_path)
+
+    def test_force_overwrite_ref(self):
+        repo_path = os.path.join(self.repo_store, uuid.uuid1().hex)
+        factory = RepoFactory(repo_path)
+        first_commit_sha1 = factory.add_commit("foo", "foobar.txt").hex
+        tag_name = "refs/tags/1701"
+        branch_name = "refs/heads/new-feature"
+
+        for ref in [tag_name, branch_name]:
+            refs_to_create = [
+                {"ref": ref, "commit_sha1": first_commit_sha1, "force": False}
+            ]
+            store.create_references(self.repo_store, repo_path, refs_to_create)
+            second_commit_oid = factory.add_commit("bar", "barbaz.txt")
+            second_commit_sha1 = second_commit_oid.hex
+            refs_to_create = [
+                {"ref": ref, "commit_sha1": second_commit_sha1, "force": True}
+            ]
+            created, _ = store.create_references(
+                self.repo_store, repo_path, refs_to_create
+            )
+
+            assert created[ref] == second_commit_sha1
+            self.assertAdvertisedRefs(
+                [(ref, second_commit_sha1)],  # in refs
+                [(ref, first_commit_sha1)],  # not in refs
+                repo_path,
+            )
+
     def test_fetch_refs(self):
         celery_fixture = CeleryWorkerFixture()
         self.useFixture(celery_fixture)
