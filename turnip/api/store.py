@@ -17,8 +17,10 @@ from pygit2 import (
     GIT_OBJ_TAG,
     GIT_REF_OID,
     GIT_SORT_TOPOLOGICAL,
+    AlreadyExistsError,
     GitError,
     IndexEntry,
+    InvalidSpecError,
     Oid,
     Repository,
     init_repository,
@@ -235,7 +237,7 @@ def import_into_subordinate(sub_root, from_root, log=None):
     return copy_refs(from_root, sub_root)
 
 
-class AlreadyExistsError(GitError):
+class RepositoryAlreadyExistsError(GitError):
     """We tried to initialise a repository that already exists."""
 
     def __init__(self, path):
@@ -253,7 +255,7 @@ def init_repo(
 ):
     """Initialise a new git repository or clone from existing."""
     if os.path.exists(repo_path):
-        raise AlreadyExistsError(repo_path)
+        raise RepositoryAlreadyExistsError(repo_path)
     # If no logger is provided, use module-level logger.
     log = log if log else logger
     log.info(f"Running init_repository({repo_path}, {is_bare})")
@@ -398,7 +400,7 @@ def open_repo(repo_store, repo_name, force_ephemeral=False):
             init_repo(ephemeral_repo_path, alternate_repo_paths=repos)
             repo = Repository(ephemeral_repo_path)
             yield repo
-        except AlreadyExistsError:
+        except RepositoryAlreadyExistsError:
             # Don't clean up the repository in this case, since it already
             # existed so we didn't create it.
             raise
@@ -553,6 +555,45 @@ def get_ref(repo_store, repo_name, ref):
         git_object = repo.references[ref.encode("utf-8")].peel()
         ref_obj = format_ref(ref, git_object)
         return ref_obj
+
+
+def create_references(repo_store, repo_name, refs_to_create):
+    """Create a git reference against a given commit sha1.
+
+    :param refs_to_create: List of ref creation requests. Each request is a
+        dict containing the ref name "ref" and the "commit_sha1" against
+        which to create the ref. An optional "force" key is accepted;
+        if passed, an existing ref will be overwritten on conflict.
+    :return: 2 dicts: created and errors. Created takes the form
+        {ref:commit_sha1} and errors take the form {ref:err_msg}.
+    """
+    created = {}
+    errors = {}
+    with open_repo(repo_store, repo_name) as repo:
+        for ref_to_create in refs_to_create:
+            # Validated in the API layer
+            # Ref names are validated to be unique so we can use them as keys
+            ref = ref_to_create["ref"]
+            commit_sha1 = ref_to_create["commit_sha1"]
+            force = ref_to_create.get("force", False)
+
+            try:
+                repo.create_reference(ref, commit_sha1, force)
+            # The payload might contain multiple errors but pygit2 will only
+            # raise the last one. For such edge cases the client may need to
+            # retry more than once.
+            except InvalidSpecError:
+                errors[ref] = f"Invalid ref name '{ref}'"
+            except GitError:
+                errors[ref] = f"Commit '{commit_sha1}' not found"
+            except AlreadyExistsError:
+                errors[ref] = (
+                    f"Ref '{ref}' already exists; "
+                    "retry with force to overwrite"
+                )
+            else:
+                created[ref] = commit_sha1
+        return created, errors
 
 
 def get_common_ancestor_diff(

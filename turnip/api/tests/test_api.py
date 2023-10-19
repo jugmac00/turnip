@@ -241,6 +241,240 @@ class ApiTestCase(TestCase, ApiRepoStoreMixin):
         resp = self.app.get("/repo/1/refs", expect_errors=True)
         self.assertEqual(404, resp.status_code)
 
+    def test_repo_create_ref_request_body_validation(self):
+        factory = RepoFactory(self.repo_store)
+        commit_oid = factory.add_commit("foo", "foobar.txt")
+
+        resp = self.app.post_json(
+            f"/repo/{self.repo_path}/refs", [], expect_errors=True
+        )
+        self.assertEqual(400, resp.status_code)
+        self.assertIn(
+            "Empty request",
+            resp.text,
+        )
+
+        missing_sha_1 = [{"ref": "1701"}]
+        resp = self.app.post_json(
+            f"/repo/{self.repo_path}/refs", missing_sha_1, expect_errors=True
+        )
+        self.assertEqual(400, resp.status_code)
+        self.assertIn(
+            "Missing commit_sha1 for ref target",
+            resp.text,
+        )
+
+        missing_ref_name = [
+            {
+                "commit_sha1": commit_oid.hex,
+            }
+        ]
+        resp = self.app.post_json(
+            f"/repo/{self.repo_path}/refs",
+            missing_ref_name,
+            expect_errors=True,
+        )
+        self.assertEqual(400, resp.status_code)
+        self.assertIn(
+            "Missing ref name",
+            resp.text,
+        )
+
+        duplicate_ref_name = [
+            {
+                "commit_sha1": commit_oid.hex,
+                "ref": "refs/tags/1701",
+            },
+            {
+                "commit_sha1": commit_oid.hex,
+                "ref": "refs/tags/1701",
+            },
+        ]
+        resp = self.app.post_json(
+            f"/repo/{self.repo_path}/refs",
+            duplicate_ref_name,
+            expect_errors=True,
+        )
+        self.assertEqual(400, resp.status_code)
+        self.assertIn(
+            "Duplicate ref 'refs/tags/1701' in request",
+            resp.text,
+        )
+
+        wrong_ref_name_format = [
+            {
+                "commit_sha1": commit_oid.hex,
+                "ref": "tags/1701",
+            }
+        ]
+        resp = self.app.post_json(
+            f"/repo/{self.repo_path}/refs",
+            wrong_ref_name_format,
+            expect_errors=True,
+        )
+        self.assertEqual(400, resp.status_code)
+        self.assertIn(
+            "Invalid ref format. Ref must start with 'refs/'",
+            resp.text,
+        )
+
+        bad_force_option = [
+            {
+                "commit_sha1": commit_oid.hex,
+                "ref": "refs/tags/1701",
+                "force": "y",
+            }
+        ]
+        resp = self.app.post_json(
+            f"/repo/{self.repo_path}/refs",
+            bad_force_option,
+            expect_errors=True,
+        )
+        self.assertEqual(400, resp.status_code)
+        self.assertIn(
+            "'force' must be a json boolean",
+            resp.text,
+        )
+
+    def test_repo_create_single_ref(self):
+        factory = RepoFactory(self.repo_store)
+        commit_sha1 = factory.add_commit("foo", "foobar.txt").hex
+        tag_name = "refs/tags/1701"
+        branch_name = "refs/heads/new-feature"
+
+        for ref in [tag_name, branch_name]:
+            body = [
+                {
+                    "ref": ref,
+                    "commit_sha1": commit_sha1,
+                }
+            ]
+            resp = self.app.post_json(f"/repo/{self.repo_path}/refs", body)
+            self.assertEqual(201, resp.status_code)
+            self.assertEqual({ref: commit_sha1}, resp.json["created"])
+            self.assertEqual({}, resp.json["errors"])
+
+    def test_repo_force_overwrite_ref(self):
+        factory = RepoFactory(self.repo_store)
+        commit_oid = factory.add_commit("foo", "foobar.txt")
+        factory.add_tag("1701", "", commit_oid)
+        factory.add_branch("new-feature", commit_oid)
+        tag_name = "refs/tags/1701"
+        branch_name = "refs/heads/branch-new-feature"
+
+        for ref in [tag_name, branch_name]:
+            body = [
+                {
+                    "commit_sha1": commit_oid.hex,
+                    "ref": ref,
+                    "force": True,
+                }
+            ]
+            resp = self.app.post_json(f"/repo/{self.repo_path}/refs", body)
+            self.assertEqual(201, resp.status_code)
+            self.assertEqual({ref: commit_oid.hex}, resp.json["created"])
+            self.assertEqual({}, resp.json["errors"])
+
+    def test_repo_create_multiple_mixed_success_and_errors(self):
+        factory = RepoFactory(self.repo_store)
+
+        expected_created = []
+        refs_to_create = []
+        commits = []
+        # Expected successful cases: 5 commits with a tag and a branch ref
+        # created against each commit.
+        for i in range(5):
+            commit = factory.add_commit(f"foo-{i}", f"foobar-{i}.txt")
+            commits.append(commit)
+            commit = commit.hex
+
+            tag = f"refs/tags/{i}"
+            refs_to_create.append({"ref": tag, "commit_sha1": commit})
+            expected_created.append((tag, commit))
+
+            branch = f"refs/heads/new-feature-{i}"
+            refs_to_create.append({"ref": branch, "commit_sha1": commit})
+            expected_created.append((branch, commit))
+
+        expected_errors = []
+        # Invalid ref name
+        invalid_name = "refs/tags/?*"
+        refs_to_create.append(
+            {
+                "ref": invalid_name,
+                "commit_sha1": commits[0].hex,
+            }
+        )
+        expected_errors.append((invalid_name, commits[0].hex))
+
+        # Commit does not exist
+        nonexistent_commit = factory.nonexistent_oid()
+        nonexistent_commit_ref = "refs/tags/nonexistent-commit"
+        refs_to_create.append(
+            {
+                "ref": nonexistent_commit_ref,
+                "commit_sha1": nonexistent_commit,
+            }
+        )
+        expected_errors.append((nonexistent_commit_ref, nonexistent_commit))
+
+        # Ref already exists and force is not passed
+        factory.add_branch("existing", commits[0])
+        existing_ref = "refs/heads/branch-existing"
+        refs_to_create.append(
+            {
+                "ref": existing_ref,
+                "commit_sha1": commits[0].hex,
+            }
+        )
+        expected_errors.append((existing_ref, commits[0].hex))
+
+        resp = self.app.post_json(
+            f"/repo/{self.repo_path}/refs", refs_to_create
+        )
+        created = resp.json["created"]
+        errors = resp.json["errors"]
+
+        for entry in expected_created:
+            # Assert {ref:commit} key value pair for successful cases
+            self.assertEqual(entry[1], created[entry[0]])
+
+        self.assertEqual(
+            f"Invalid ref name '{invalid_name}'", errors[invalid_name]
+        )
+        self.assertEqual(
+            f"Commit '{nonexistent_commit}' not found",
+            errors[nonexistent_commit_ref],
+        )
+        self.assertEqual(
+            (
+                f"Ref '{existing_ref}' already exists; "
+                "retry with force to overwrite"
+            ),
+            errors[existing_ref],
+        )
+
+    def test_repo_create_refs_only_errors(self):
+        factory = RepoFactory(self.repo_store)
+        tag_name = "refs/tags/1701"
+        nonexistent_commit = factory.nonexistent_oid()
+        body = [
+            {
+                "ref": tag_name,
+                "commit_sha1": factory.nonexistent_oid(),
+            }
+        ]
+        resp = self.app.post_json(
+            f"/repo/{self.repo_path}/refs", body, expect_errors=True
+        )
+        # 400 response code if nothing is created and we have only errors
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {tag_name: f"Commit '{nonexistent_commit}' not found"},
+            resp.json["errors"],
+        )
+        self.assertEqual({}, resp.json["created"])
+
     def test_ignore_non_unicode_refs(self):
         """Ensure non-unicode refs are dropped from ref collection."""
         factory = RepoFactory(self.repo_store)

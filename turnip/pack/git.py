@@ -17,7 +17,7 @@ from twisted.web import xmlrpc
 from zope.interface import implementer
 
 from turnip.api import store
-from turnip.api.store import AlreadyExistsError
+from turnip.api.store import RepositoryAlreadyExistsError
 from turnip.config import config
 from turnip.helpers import compose_path
 from turnip.pack.helpers import (
@@ -638,7 +638,7 @@ class PackBackendProtocol(PackServerProtocol):
             yield proxy.callRemote(
                 "confirmRepoCreation", six.ensure_text(pathname), auth_params
             ).addTimeout(xmlrpc_timeout, default_reactor)
-        except AlreadyExistsError:
+        except RepositoryAlreadyExistsError:
             # Do not abort nor try to delete existing repositories.
             self.log.info("Repository %s already exists." % repo_path)
             raise

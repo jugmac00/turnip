@@ -1,6 +1,7 @@
 # Copyright 2015 Canonical Ltd.  This software is licensed under the
 # GNU Affero General Public License version 3 (see the file LICENSE).
 
+import json
 import os
 import re
 
@@ -263,6 +264,89 @@ class RefAPI(BaseAPI):
             )
         except (KeyError, GitError):
             return exc.HTTPNotFound()  # 404
+
+    def _validate_refs_api_payload(self, refs_to_create):
+        ref_set = set()
+        if not refs_to_create:
+            self.request.errors.add(
+                "body",
+                description="Empty request",
+            )
+            return
+
+        for ref_to_create in refs_to_create:
+            ref = ref_to_create.get("ref")
+            if not ref:
+                self.request.errors.add(
+                    "body",
+                    "ref",
+                    "Missing ref name",
+                )
+                return False
+            if ref in ref_set:
+                self.request.errors.add(
+                    "body",
+                    f"{ref}.ref",
+                    f"Duplicate ref '{ref}' in request",
+                )
+                return False
+            ref_set.add(ref)
+            commit_sha1 = ref_to_create.get("commit_sha1")
+            if not commit_sha1:
+                self.request.errors.add(
+                    "body",
+                    f"{ref}.commit_sha1",
+                    "Missing commit_sha1 for ref target",
+                )
+                return False
+            if not (isinstance(ref, str) and ref.startswith("refs/")):
+                self.request.errors.add(
+                    "body",
+                    f"{ref}.ref",
+                    "Invalid ref format. Ref must start with 'refs/'",
+                )
+                return False
+            force = ref_to_create.get("force", False)
+            if force and not isinstance(force, bool):
+                self.request.errors.add(
+                    "body", f"{ref}.force", "'force' must be a json boolean"
+                )
+                return False
+        return True
+
+    @validate_path
+    def collection_post(self, repo_store, repo_name):
+        """Bulk create git refs against corresponding commits.
+
+        The JSON request body should be a list of creation request dicts.
+        Each dict should contain the ref name "ref" and the "commit_sha1"
+        against which to create the ref. An optional "force" key is
+        accepted; if passed, an existing ref will be overwritten on conflict.
+
+        The JSON response body contains 2 dicts: resp.json["created"] is a dict
+        of successful requests in the form {ref:commit_sha1} and
+        resp.json["errors"] is a dict of error messages in the form
+        {ref:err_msg}.
+
+        Clients should check the response body for errors when making a bulk
+        request, because partial success will also return a 201 response.
+        """
+        refs_to_create = extract_cstruct(self.request)["body"]
+
+        if not self._validate_refs_api_payload(refs_to_create):
+            return
+
+        created, errors = store.create_references(
+            repo_store, repo_name, refs_to_create
+        )
+        resp = {"created": created, "errors": errors}
+        resp = json.dumps(resp).encode()
+
+        return (
+            Response(resp, status=201, content_type="application/json")
+            if created
+            else Response(resp, status=400, content_type="application/json")
+        )
 
     @validate_path
     def get(self, repo_store, repo_name):
